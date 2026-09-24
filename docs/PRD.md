@@ -5,7 +5,7 @@
 | 文档版本 | v1.0（MVP 范围已确认冻结） |
 | 日期 | 2026-09-24 |
 | 代码仓库 | https://github.com/dpoy-zht/cash-diary |
-| 相关文档 | `PLAN.md`（技术方案与路线图）、`demo/index.html`（可交互原型） |
+| 相关文档 | `docs/技术方案.md`（技术设计）、`PLAN.md`（路线图）、`demo/index.html`（可交互原型） |
 
 ---
 
