@@ -1,0 +1,29 @@
+{
+  "name": "现金日记",
+  "appid": "__UNI__CASHD1",
+  "description": "3秒记一笔的个人记账App（MVP：快速记账/明细/编辑删除/本地持久化）",
+  "versionName": "0.1.0",
+  "versionCode": 100,
+  "transformPx": false,
+  "app-plus": {
+    "usingComponents": true,
+    "nvueStyleCompiler": "uni-app",
+    "compilerVersion": 3,
+    "splashscreen": {
+      "alwaysShowBeforeRender": true,
+      "waiting": true,
+      "autoclose": true,
+      "delay": 0
+    },
+    "modules": {},
+    "distribute": {
+      "android": { "permissions": [] },
+      "ios": {},
+      "sdkConfigs": {}
+    }
+  },
+  "h5": {
+    "title": "现金日记"
+  },
+  "vueVersion": "3"
+}

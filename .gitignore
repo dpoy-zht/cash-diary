@@ -88,6 +88,7 @@ yarn-error.log*
 pnpm-debug.log*
 tmp/
 temp/
+.tmp/
 *.tmp
 
 # ===== 本地工具（如需团队共享 .workbuddy/skills，可删除下面两行）=====

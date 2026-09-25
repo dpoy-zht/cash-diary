@@ -1,0 +1,33 @@
+{
+  "pages": [
+    {
+      "path": "pages/quick-add/quick-add",
+      "style": { "navigationBarTitleText": "记一笔" }
+    },
+    {
+      "path": "pages/transactions/transactions",
+      "style": { "navigationBarTitleText": "明细" }
+    },
+    {
+      "path": "pages/me/me",
+      "style": { "navigationBarTitleText": "我的" }
+    }
+  ],
+  "tabBar": {
+    "color": "#8a8f99",
+    "selectedColor": "#0f6e56",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/quick-add/quick-add", "text": "记一笔" },
+      { "pagePath": "pages/transactions/transactions", "text": "明细" },
+      { "pagePath": "pages/me/me", "text": "我的" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "现金日记",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f6f7f9"
+  }
+}
