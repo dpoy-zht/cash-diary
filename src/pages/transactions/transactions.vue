@@ -1,19 +1,29 @@
 <template>
   <view class="page">
     <view class="month-bar">
-      <view class="mb-btn" @click="metaStore.shift(-1)">‹</view>
+      <view class="mb-btn" hover-class="mb-hover" @click="metaStore.shift(-1)">‹</view>
       <text class="mb-label">{{ monthLabel }}</text>
-      <view class="mb-btn" @click="metaStore.shift(1)">›</view>
+      <view class="mb-btn" hover-class="mb-hover" @click="metaStore.shift(1)">›</view>
     </view>
 
     <view class="month-summary">
-      <text class="ms-item">支出 <text class="sum expense">{{ formatCents(summary.expenseCents) }}</text></text>
-      <text class="ms-item">收入 <text class="sum income">{{ formatCents(summary.incomeCents) }}</text></text>
+      <view class="ms-item">
+        <text class="ms-label">支出</text>
+        <text class="ms-num expense">{{ formatCents(summary.expenseCents) }}</text>
+      </view>
+      <view class="ms-item">
+        <text class="ms-label">收入</text>
+        <text class="ms-num income">{{ formatCents(summary.incomeCents) }}</text>
+      </view>
     </view>
 
     <scroll-view scroll-y class="list-scroll">
-      <view v-if="!groups.length" class="empty">这个月还没有记录，去「记一笔」补上吧</view>
-      <block v-for="g in groups" :key="g.day">
+      <view v-if="!groups.length" class="empty">
+        <mascot :size="108" mood="sleep" float />
+        <text class="empty-text">这个月还没有记录，去「记一笔」补上吧</text>
+      </view>
+
+      <view v-for="g in groups" :key="g.day" class="day-card">
         <view class="day-head">{{ dayLabel(g.day) }}</view>
         <tx-item
           v-for="r in g.items"
@@ -22,7 +32,7 @@
           :category="catOf(r.category_id)"
           @click="openEdit(r)"
         />
-      </block>
+      </view>
     </scroll-view>
 
     <edit-sheet
@@ -113,55 +123,106 @@ onShow(function () {
   flex-direction: column;
   height: 100vh;
 }
+
+/* ---- 月份切换 ---- */
 .month-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px 4px;
+  padding: 12px 16px 8px;
   flex: none;
 }
+/* 34px 圆形按钮，触达面积靠 padding 补足到 44px */
 .mb-btn {
-  font-size: 22px;
-  color: #8a8f99;
-  padding: 4px 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cd-ink);
+  background: var(--cd-surface);
+  box-shadow: var(--cd-sh-1);
+}
+.mb-hover {
+  background: var(--cd-primary-lt);
 }
 .mb-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: #222426;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cd-ink);
 }
+
+/* ---- 月合计：两张并排小卡 ---- */
 .month-summary {
   display: flex;
-  gap: 16px;
-  padding: 2px 16px 10px;
-  font-size: 13px;
-  color: #8a8f99;
-  border-bottom: 1px solid #ebedf0;
-  background: #fff;
+  gap: 10px;
+  margin: 0 16px 10px;
   flex: none;
 }
-.sum {
-  font-weight: 600;
+.ms-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-md);
+  box-shadow: var(--cd-sh-1);
 }
-.sum.expense {
-  color: #e24b4a;
+.ms-label {
+  font-size: 12px;
+  color: var(--cd-ink-2);
 }
-.sum.income {
-  color: #12924f;
+/* 19px 粗体：语义色的"大字号"档，同时便于一眼比较两个合计 */
+.ms-num {
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.ms-num.expense {
+  color: var(--cd-expense);
+}
+.ms-num.income {
+  color: var(--cd-income);
+}
+
+/* ---- 流水列表：按天分组，每组一张圆角卡 ---- */
 .list-scroll {
   flex: 1;
 }
+.day-card {
+  margin: 0 16px 10px;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-md);
+  box-shadow: var(--cd-sh-1);
+  overflow: hidden;
+}
 .day-head {
   font-size: 12px;
-  color: #8a8f99;
-  padding: 14px 16px 6px;
+  font-weight: 600;
+  color: var(--cd-ink-2);
+  padding: 12px 16px 8px;
 }
+
+/* ---- 空状态：打盹的吉祥物 ---- */
 .empty {
-  text-align: center;
-  color: #8a8f99;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 56px 32px 60px;
+}
+.empty-text {
   font-size: 13px;
-  padding: 60px 32px;
-  line-height: 2;
+  line-height: 1.9;
+  text-align: center;
+  color: var(--cd-ink-2);
 }
 </style>

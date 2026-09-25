@@ -14,10 +14,10 @@
     }
   ],
   "tabBar": {
-    "color": "#8a8f99",
-    "selectedColor": "#0f6e56",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "black",
+    "color": "#7e6849",
+    "selectedColor": "#8a5a0f",
+    "backgroundColor": "#fffdf7",
+    "borderStyle": "white",
     "list": [
       { "pagePath": "pages/quick-add/quick-add", "text": "记一笔" },
       { "pagePath": "pages/transactions/transactions", "text": "明细" },
@@ -27,7 +27,9 @@
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "现金日记",
-    "navigationBarBackgroundColor": "#ffffff",
-    "backgroundColor": "#f6f7f9"
+    "navigationBarBackgroundColor": "#ffd34d",
+    "backgroundColor": "#fff8e7",
+    "backgroundColorTop": "#fff8e7",
+    "backgroundColorBottom": "#fff8e7"
   }
 }

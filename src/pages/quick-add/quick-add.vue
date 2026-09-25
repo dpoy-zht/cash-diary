@@ -1,13 +1,16 @@
 <template>
   <view class="page">
     <view class="type-switch">
-      <view class="ts-item" :class="{ on: type === 'expense', exp: type === 'expense' }" @click="setType('expense')">支出</view>
-      <view class="ts-item" :class="{ on: type === 'income', inc: type === 'income' }" @click="setType('income')">收入</view>
+      <view class="ts-item" :class="{ on: type === 'expense' }" @click="setType('expense')">支出</view>
+      <view class="ts-item" :class="{ on: type === 'income' }" @click="setType('income')">收入</view>
     </view>
 
-    <view class="amount-box">
-      <text class="cur">¥</text>
-      <text class="amount-text">{{ display }}</text>
+    <view class="amount-card">
+      <mascot :size="46" />
+      <view class="amount-box">
+        <text class="cur">¥</text>
+        <text class="amount-text" :class="type">{{ display }}</text>
+      </view>
     </view>
 
     <category-grid :categories="currentCats" v-model="catId" />
@@ -21,7 +24,7 @@
 
     <money-keyboard @press="onKey" />
 
-    <button class="btn-confirm" :disabled="!canConfirm" @click="onConfirm">完成</button>
+    <button class="btn-confirm" hover-class="btn-hover" :disabled="!canConfirm" @click="onConfirm">完成</button>
   </view>
 </template>
 
@@ -91,83 +94,124 @@ async function onConfirm() {
 .page {
   padding-bottom: 16px;
 }
+
+/* ---- 收支分段控件：外层浅奶黄胶囊，内层选中项用品牌黄实底 ---- */
 .type-switch {
   display: flex;
-  background: #eceef1;
-  border-radius: 10px;
+  background: var(--cd-cream);
+  border-radius: var(--cd-r-md);
   margin: 12px 16px;
-  padding: 3px;
+  padding: 4px;
 }
 .ts-item {
   flex: 1;
   text-align: center;
-  padding: 8px 0;
+  padding: 9px 0;
   font-size: 14px;
-  border-radius: 8px;
-  color: #8a8f99;
+  border-radius: var(--cd-r-sm);
+  color: var(--cd-ink-2);
+  transition: background-color var(--cd-dur) var(--cd-ease),
+    color var(--cd-dur) var(--cd-ease);
 }
 .ts-item.on {
-  background: #fff;
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: var(--cd-grad-brand);
+  color: var(--cd-ink);
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(240, 165, 0, 0.25);
 }
-.ts-item.on.exp {
-  color: #e24b4a;
-}
-.ts-item.on.inc {
-  color: #12924f;
+
+/* ---- 金额卡：左侧吉祥物 + 右侧大金额 ---- */
+.amount-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 16px 10px;
+  padding: 14px 16px;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-md);
+  box-shadow: var(--cd-sh-1);
 }
 .amount-box {
+  flex: 1;
+  min-width: 0; /* 允许收缩，极端长金额时裁切而不是撑破布局 */
+  overflow: hidden;
   display: flex;
   align-items: baseline;
   justify-content: flex-end;
-  padding: 6px 20px 10px;
   gap: 6px;
 }
 .cur {
   font-size: 18px;
-  color: #8a8f99;
-}
-.amount-text {
-  font-size: 40px;
+  color: var(--cd-ink-2);
   font-weight: 600;
 }
+/* 30px 粗体：既是大字号对比度达标档，也是本页的视觉焦点 */
+.amount-text {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--cd-ink);
+}
+.amount-text.expense {
+  color: var(--cd-expense);
+}
+.amount-text.income {
+  color: var(--cd-income);
+}
+
+/* ---- 备注 + 日期 ---- */
 .meta-row {
   display: flex;
   gap: 8px;
-  padding: 10px 16px;
+  margin: 0 16px 12px;
 }
 .note-input {
   flex: 1;
-  border: 1px solid #ebedf0;
-  border-radius: 10px;
-  padding: 10px 12px;
+  min-width: 0;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-md);
+  padding: 12px 14px;
+  font-family: var(--cd-font);
   font-size: 14px;
-  background: #fff;
+  color: var(--cd-ink);
+  box-shadow: var(--cd-sh-1);
 }
 .date-btn {
-  border: 1px solid #ebedf0;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  color: #222426;
-  background: #fff;
-}
-.btn-confirm {
-  margin: 10px 16px 0;
-  height: 48px;
-  line-height: 48px;
-  border-radius: 12px;
-  background: #0f6e56;
-  color: #fff;
-  font-size: 16px;
+  background: var(--cd-cream);
+  border-radius: var(--cd-r-md);
+  padding: 12px 14px;
+  font-size: 13px;
   font-weight: 600;
+  color: var(--cd-ink);
+  white-space: nowrap;
+}
+
+/* ---- 主按钮 ---- */
+.btn-confirm {
+  margin: 14px 16px 0;
+  height: 50px;
+  line-height: 50px;
+  border-radius: var(--cd-r-md);
+  background: var(--cd-grad-brand);
+  color: var(--cd-ink);
+  font-family: var(--cd-font);
+  font-size: 17px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(240, 165, 0, 0.3);
+  transition: transform var(--cd-dur) var(--cd-ease), opacity var(--cd-dur) var(--cd-ease);
 }
 .btn-confirm::after {
   border: none;
 }
 .btn-confirm[disabled] {
-  background: #c4e0d7;
-  color: #fff;
+  background: var(--cd-cream);
+  color: var(--cd-ink-3);
+  box-shadow: none;
+}
+.btn-hover {
+  opacity: 0.9;
+  transform: scale(0.985);
 }
 </style>

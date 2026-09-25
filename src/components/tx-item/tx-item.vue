@@ -1,6 +1,6 @@
 <template>
-  <view class="tx-item" @click="$emit('click')">
-    <view class="tx-icon">{{ category.icon }}</view>
+  <view class="tx-item" hover-class="tx-hover" @click="$emit('click')">
+    <view class="tx-icon" :style="{ backgroundColor: tintOf(category.id) }">{{ category.icon }}</view>
     <view class="tx-main">
       <text class="tx-name">{{ category.name }}</text>
       <text v-if="record.note" class="tx-note">{{ record.note }}</text>
@@ -12,6 +12,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatSigned } from '../../utils/money.js'
+import { tintOf } from '../../utils/palette.js'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -30,14 +31,19 @@ const formatted = computed(function () {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: #fff;
-  border-bottom: 1px solid #ebedf0;
+  border-bottom: 1px solid var(--cd-line);
+  transition: background-color var(--cd-dur) var(--cd-ease);
+}
+.tx-item:last-child {
+  border-bottom: 0;
+}
+.tx-hover {
+  background: var(--cd-cream-2);
 }
 .tx-icon {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  background: #f4f5f7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -52,24 +58,28 @@ const formatted = computed(function () {
 }
 .tx-name {
   font-size: 15px;
-  color: #222426;
+  color: var(--cd-ink);
 }
 .tx-note {
   font-size: 12px;
-  color: #8a8f99;
+  color: var(--cd-ink-2);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 金额 ≥19px 粗体：既是视觉焦点，也满足语义色作为"大字号"的对比度要求；
+   tabular-nums 让数字等宽，滚动与编辑时不跳动 */
 .tx-amount {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
 }
 .tx-amount.expense {
-  color: #e24b4a;
+  color: var(--cd-expense);
 }
 .tx-amount.income {
-  color: #12924f;
+  color: var(--cd-income);
 }
 </style>

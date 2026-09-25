@@ -1,5 +1,13 @@
 <template>
   <view class="page">
+    <view class="me-hero">
+      <mascot :size="64" />
+      <view class="hero-main">
+        <text class="hero-title">现金日记</text>
+        <text class="hero-sub">今天想记点什么呢</text>
+      </view>
+    </view>
+
     <view class="me-card">
       <view class="me-row">
         <text class="mr-label">存储模式</text>
@@ -63,47 +71,77 @@ const tip = computed(function () {
 .page {
   padding-bottom: 20px;
 }
+
+/* ---- 顶部：吉祥物打招呼 ---- */
+.me-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 12px 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--cd-cream) 0%, var(--cd-surface) 60%);
+  border-radius: var(--cd-r-lg);
+  box-shadow: var(--cd-sh-1);
+}
+.hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.hero-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--cd-ink);
+}
+.hero-sub {
+  font-size: 12px;
+  color: var(--cd-ink-2);
+}
+
 .me-card {
-  background: #fff;
-  border-radius: 14px;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-lg);
   overflow: hidden;
   margin: 12px 16px;
+  box-shadow: var(--cd-sh-1);
 }
 .me-row {
   display: flex;
   align-items: center;
   padding: 14px 16px;
-  border-bottom: 1px solid #ebedf0;
+  border-bottom: 1px solid var(--cd-line);
 }
 .me-row:last-child {
   border-bottom: 0;
 }
 .mr-label {
   font-size: 15px;
-  color: #222426;
+  color: var(--cd-ink);
 }
 .mr-value {
   margin-left: auto;
   font-size: 13px;
-  color: #8a8f99;
+  color: var(--cd-ink-2);
 }
+/* 未上线的功能用浅奶黄胶囊标注，视觉上"待办但不喧宾夺主" */
 .badge {
   margin-left: auto;
   font-size: 11px;
-  color: #8a8f99;
-  background: #f1f2f4;
-  padding: 2px 8px;
-  border-radius: 999px;
+  color: var(--cd-ink-2);
+  background: var(--cd-cream);
+  padding: 3px 10px;
+  border-radius: var(--cd-r-pill);
 }
 .me-tip {
   margin: 16px;
   font-size: 12px;
-  color: #8a8f99;
-  line-height: 1.7;
+  color: var(--cd-ink-2);
+  line-height: 1.8;
 }
 .me-version {
   text-align: center;
-  color: #c0c4cb;
+  color: var(--cd-ink-3);
   font-size: 12px;
   padding: 8px 0 20px;
 }

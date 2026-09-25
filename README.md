@@ -22,6 +22,7 @@
 | [`PLAN.md`](./PLAN.md) | 开发起步方案与 5 阶段路线图 |
 | [`docs/PRD.md`](./docs/PRD.md) | 产品设计文档（MVP 范围已冻结） |
 | [`docs/技术方案.md`](./docs/技术方案.md) | 技术方案（架构 / 数据层 / 测试 / 风险） |
+| [`docs/nailong-ui-spec.md`](./docs/nailong-ui-spec.md) | 视觉规范（奶龙风暖黄治愈系：令牌表 / 对比度 / 一致性规则） |
 | [`demo/index.html`](./demo/index.html) | HTML 可交互原型（界面与交互以此为准） |
 
 ## 快速开始
@@ -47,12 +48,12 @@ npm run dev:h5
 ```
 ├─ src/                uni-app 源码根（CLI 约定）
 │  ├─ pages/           页面：quick-add（记一笔）/ transactions（明细）/ me（我的）
-│  ├─ components/      公共组件：money-keyboard / category-grid / tx-item / edit-sheet
+│  ├─ components/      公共组件：money-keyboard / category-grid / tx-item / edit-sheet / mascot
 │  ├─ stores/          Pinia：category / tx / meta
 │  ├─ services/        业务层：记账校验与编排、分类种子
 │  ├─ db/              数据层：schema + sqlite/memory 双存储 + repository
-│  ├─ utils/           money（分↔元换算）/ date（时间戳与分组）
-│  ├─ App.vue          应用入口（启动初始化数据库与分类）
+│  ├─ utils/           money（分↔元换算）/ date（时间戳与分组）/ palette（分类底色，纯展示）
+│  ├─ App.vue          应用入口（启动初始化数据库与分类 + **全站设计令牌层**）
 │  └─ pages.json / manifest.json
 ├─ tests/              vitest 单元与集成测试
 ├─ demo/               HTML 交互原型（UX 基准）
