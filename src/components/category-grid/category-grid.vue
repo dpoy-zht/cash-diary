@@ -1,5 +1,5 @@
 <template>
-  <view class="cat-grid">
+  <view class="cat-grid cd-card">
     <view
       v-for="c in categories"
       :key="c.id"
@@ -35,14 +35,13 @@ function iconStyle(c) {
 </script>
 
 <style scoped>
+/* 容器只负责布局：玻璃材质走全局 .cd-card（模板里已挂类名），
+   避免在一处重复玻璃配方 —— 这是"组件样式一致"的做法 */
 .cat-grid {
   display: flex;
   flex-wrap: wrap;
-  margin: 4px 16px 10px;
-  padding: 10px 6px 4px;
-  background: var(--cd-surface);
-  border-radius: var(--cd-r-md);
-  box-shadow: var(--cd-sh-1);
+  margin: 4px 16px 12px;
+  padding: 12px 6px 6px;
 }
 .cat-item {
   width: 25%;
@@ -57,29 +56,34 @@ function iconStyle(c) {
   width: 46px;
   height: 46px;
   border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 22px;
   transition: transform var(--cd-dur) var(--cd-ease),
-    box-shadow var(--cd-dur) var(--cd-ease);
+    box-shadow var(--cd-dur) var(--cd-ease-smooth);
 }
 .cat-name {
   font-size: 12px;
+  font-weight: 600;
   color: var(--cd-ink-2);
-  transition: color var(--cd-dur) var(--cd-ease);
+  transition: color var(--cd-dur) var(--cd-ease-smooth);
 }
-/* 选中：主黄渐变 + 一圈金色描边环 + 轻微放大（用 shadow 画环，不改变盒子尺寸） */
+/* 选中 = 加深档品牌渐变 + 白色厚描边 + 弹性放大 + 暖色光晕。
+   用"尺寸 + 描边 + 填充对比 + 字重"多重线索区分，而不只靠色相 ——
+   马卡龙色板里有个分类的底色本身就是鹅黄，单靠色相会分不出选没选中 */
 .cat-item.active .cat-icon {
-  background: var(--cd-grad-brand);
-  box-shadow: 0 0 0 2px var(--cd-primary-dk), 0 3px 10px rgba(240, 165, 0, 0.3);
-  transform: scale(1.06);
+  background: var(--cd-grad-brand-deep);
+  border-color: var(--cd-white);
+  box-shadow: var(--cd-btn-shadow), 0 0 0 2px rgba(255, 255, 255, 0.95);
+  transform: scale(1.1);
 }
 .cat-item.active .cat-name {
   color: var(--cd-ink);
-  font-weight: 600;
+  font-weight: 800;
 }
 .cat-hover .cat-icon {
-  transform: scale(0.92);
+  transform: scale(0.9);
 }
 </style>

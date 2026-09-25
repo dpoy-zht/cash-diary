@@ -82,8 +82,11 @@ function onSave() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--cd-surface);
-  border-radius: var(--cd-r-lg) var(--cd-r-lg) 0 0;
+  /* 玻璃弹层：顶角用最大圆角（--cd-r-xl 40px），对齐参考项目的大圆角语言 */
+  background: var(--cd-card);
+  border-top: 1px solid var(--cd-card-line);
+  border-radius: var(--cd-r-xl) var(--cd-r-xl) 0 0;
+  box-shadow: 0 -8px 32px rgba(139, 119, 99, 0.18);
   padding: 8px 16px 24px;
   /* 留出全面屏底部安全区；不支持 env() 时上一行兜底 */
   padding-bottom: calc(24px + env(safe-area-inset-bottom));
@@ -93,7 +96,7 @@ function onSave() {
   width: 44px;
   height: 5px;
   border-radius: var(--cd-r-pill);
-  background: var(--cd-line);
+  background: rgba(255, 255, 255, 0.9);
   margin: 4px auto 14px;
 }
 .sheet-title {
@@ -104,25 +107,28 @@ function onSave() {
 }
 .sheet-title-text {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--cd-ink);
 }
 .stype {
   font-size: 12px;
+  font-weight: 700;
   color: var(--cd-ink-2);
-  background: var(--cd-cream);
+  background: rgba(255, 228, 160, 0.55);
   padding: 3px 10px;
   border-radius: var(--cd-r-pill);
 }
+/* 输入框用更不透明的玻璃：它是主要输入面，清晰度优先于通透感 */
 .sheet-input {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--cd-line);
+  border: 1px solid var(--cd-card-line);
   border-radius: var(--cd-r-md);
-  background: var(--cd-cream-2);
-  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 13px 14px;
   font-family: var(--cd-font);
   font-size: 16px;
+  font-weight: 700;
   color: var(--cd-ink);
   font-variant-numeric: tabular-nums;
   margin-bottom: 10px;
@@ -133,22 +139,24 @@ function onSave() {
 }
 .chip {
   display: inline-block;
-  border: 1px solid var(--cd-line);
+  border: 1px solid var(--cd-card-line);
   border-radius: var(--cd-r-pill);
-  background: var(--cd-surface);
-  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 9px 15px;
   font-size: 13px;
+  font-weight: 700;
   color: var(--cd-ink);
   margin-right: 8px;
-  transition: background-color var(--cd-dur) var(--cd-ease),
-    border-color var(--cd-dur) var(--cd-ease);
+  transition: background-color var(--cd-dur) var(--cd-ease-smooth),
+    transform var(--cd-dur) var(--cd-ease);
 }
-/* 选中的 chip 用品牌黄实底：与主按钮同一套"黄底深棕字"语言 */
+/* 选中的 chip 用品牌渐变实底：与主按钮同一套"鹅黄底深棕字"语言 */
 .chip.active {
-  border-color: var(--cd-primary-dk);
-  background: var(--cd-primary);
+  border-color: rgba(255, 255, 255, 0.95);
+  background: var(--cd-grad-brand);
   color: var(--cd-ink);
-  font-weight: 600;
+  font-weight: 800;
+  transform: scale(1.04);
 }
 .sheet-actions {
   display: flex;
@@ -157,28 +165,29 @@ function onSave() {
 }
 .sheet-actions button {
   flex: 1;
-  height: 46px;
-  line-height: 46px;
-  border-radius: var(--cd-r-md);
+  height: 52px;
+  line-height: 52px;
+  border-radius: var(--cd-r-sm);
   font-family: var(--cd-font);
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
 }
 .sheet-actions button::after {
   border: none;
 }
 .btn-del {
-  background: var(--cd-danger-lt);
+  background: rgba(255, 255, 255, 0.8);
   color: var(--cd-danger-ink);
+  border: 1px solid rgba(185, 59, 57, 0.22);
 }
 .btn-save {
   flex: 2;
   background: var(--cd-grad-brand);
   color: var(--cd-ink);
-  box-shadow: 0 3px 10px rgba(240, 165, 0, 0.28);
+  box-shadow: var(--cd-btn-shadow);
 }
 .btn-hover {
-  opacity: 0.88;
-  transform: scale(0.98);
+  opacity: 0.9;
+  transform: scale(0.97) translateY(1px);
 }
 </style>

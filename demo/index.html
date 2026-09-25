@@ -11,38 +11,116 @@
      规范说明见 docs/nailong-ui-spec.md
      ====================================================================== */
   :root {
-    /* 底色与容器 */
-    --cd-bg: #fff8e7;
-    --cd-surface: #ffffff;
-    --cd-cream: #fff3d6;
-    --cd-cream-2: #fffaee;
-    /* 品牌黄 */
-    --cd-primary: #ffd34d;
-    --cd-primary-lt: #fff0be;
-    --cd-primary-dk: #f0a500;
-    --cd-grad-brand: linear-gradient(180deg, #ffe98f 0%, #ffc93c 100%);
+    /* ============================================================
+       设计令牌：与 src/App.vue 逐条对齐（马卡龙奶油风）
+       改配色请两边同步 —— 本文件是记账 App 的 UX/视觉基准原型
+       ============================================================ */
+
+    /* 马卡龙色板（完整 7 色见 docs/nailong-ui-spec.md §12） */
+    --cd-cream-yellow: #ffe4a0;
+    --cd-peach: #ffd4b3;
+    --cd-cream-white: #fffdf7;
+    --cd-mint: #b8f0d8;
+    --cd-sakura: #ffd1dc;
+    --cd-sky: #b8e4f0;
+    --cd-lavender: #e8d5f2;
+    --cd-white: #ffffff;
+
+    /* 页面背景：三段多色渐变（= 参考项目 --bg-page） */
+    --cd-bg: linear-gradient(180deg, #fff9e8 0%, #fff0f5 40%, #e8f5f0 100%);
+    --cd-bg-end: #e8f5f0;
+
     /* 文字 */
-    --cd-ink: #4a3520;
-    --cd-ink-2: #7e6849;
-    --cd-ink-3: #b9a88f;
-    /* 分隔与点缀 */
-    --cd-line: #f2e6ce;
-    --cd-blush: #ff9cae;
-    --cd-face-ink: #3d2a17;
-    --cd-face-mouth: #c2504c;
+    --cd-ink: #5a4a3a;
+    --cd-ink-2: #6b5d4f;
+    --cd-ink-3: #a89a88;
+    --cd-accent-ink: #8a5a22;
+
+    /* 玻璃材质 */
+    --cd-card: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.7) 50%,
+      rgba(255, 253, 250, 0.74) 100%
+    );
+    --cd-glass: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.66) 0%,
+      rgba(255, 252, 245, 0.5) 100%
+    );
+    --cd-card-line: rgba(255, 255, 255, 0.6);
+
+    /* 多层阴影系统 */
+    --cd-sh-contact: 0 1px 2px rgba(139, 119, 99, 0.06);
+    --cd-sh-mid: 0 4px 12px rgba(139, 119, 99, 0.1);
+    --cd-sh-far: 0 12px 32px rgba(139, 119, 99, 0.14);
+    --cd-sh-inset: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 2px rgba(139, 119, 99, 0.04);
+    --cd-card-shadow: var(--cd-sh-contact), var(--cd-sh-mid), var(--cd-sh-far),
+      var(--cd-sh-inset);
+    --cd-btn-shadow: 0 3px 10px rgba(240, 184, 96, 0.3),
+      0 1px 4px rgba(240, 184, 96, 0.18);
+
+    /* 圆角 */
+    --cd-r-pill: 999px;
+    --cd-r-sm: 16px;
+    --cd-r-md: 24px;
+    --cd-r-lg: 32px;
+    --cd-r-xl: 40px;
+
+    /* 动效曲线 */
+    --cd-dur: 220ms;
+    --cd-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --cd-ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    --cd-ease-bounce: cubic-bezier(0.68, -0.55, 0.27, 1.55);
+
+    /* 品牌渐变 */
+    --cd-grad-brand: linear-gradient(135deg, #ffe4a0 0%, #ffd4b3 100%);
+
     /* 语义色（PRD §8 冻结） */
     --cd-expense: #e24b4a;
     --cd-income: #12924f;
-    --cd-danger-lt: #fdeceb;
     --cd-danger-ink: #b93b39;
-    /* 圆角 / 阴影 */
-    --cd-r-pill: 999px;
-    --cd-r-lg: 28px;
-    --cd-r-md: 20px;
-    --cd-r-sm: 16px;
-    --cd-sh-1: 0 2px 10px rgba(191, 149, 42, 0.12);
-    --cd-font: "MiSans", "HarmonyOS Sans SC", "PingFang SC", "Noto Sans SC",
-      system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    /* 分隔 */
+    --cd-line-ink: rgba(139, 119, 99, 0.14);
+
+    /* 吸顶导航 */
+    --cd-nav-h: 44px;
+    --cd-nav-solid: linear-gradient(135deg, #ffe4a0 0%, #ffd4b3 100%);
+    --cd-nav-bg: linear-gradient(
+      135deg,
+      rgba(255, 228, 160, 0.84) 0%,
+      rgba(255, 212, 179, 0.84) 100%
+    );
+    --cd-nav-ink: #5a4a3a;
+
+    /* 吉祥物 */
+    --cd-face-head: linear-gradient(180deg, #fff0c2 0%, #ffe4a0 55%, #ffd08a 100%);
+    --cd-face-tuft: #f0b860;
+    --cd-face-ink: #5a4a3a;
+    --cd-face-mouth: #c2504c;
+    --cd-face-glint: #fffdf7;
+    --cd-blush: #ffb0c0;
+
+    /* 字体 */
+    --cd-font: "Nunito", "Varela Round", "MiSans", "HarmonyOS Sans SC",
+      "PingFang SC", "Noto Sans SC", system-ui, -apple-system, "Segoe UI",
+      Roboto, sans-serif;
+
+    /* ---- 兼容映射：改造前的老令牌名 ----
+       原型里有 25 处旧引用，这里把它们指向新色板，避免逐条改；
+       新写样式请直接用上面的新令牌。 */
+    --cd-surface: rgba(255, 255, 255, 0.78);
+    --cd-cream: rgba(255, 228, 160, 0.5);
+    --cd-cream-2: rgba(255, 255, 255, 0.55);
+    --cd-primary: #ffe4a0;
+    --cd-primary-lt: rgba(255, 228, 160, 0.62);
+    --cd-primary-dk: #e8a94d;
+    --cd-sh-1: var(--cd-sh-contact), var(--cd-sh-mid);
+    --cd-sh-2: var(--cd-sh-contact), var(--cd-sh-mid), var(--cd-sh-far);
+    --cd-line: rgba(255, 255, 255, 0.75);
+    --cd-danger-lt: #fdeceb;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -68,7 +146,10 @@
   /* 顶栏：品牌黄，对应真机的 navigationBar */
   .app-header {
     height: 52px; flex: none; display: flex; align-items: center; justify-content: space-between;
-    padding: 0 16px; background: var(--cd-primary);
+    padding: 0 20px;
+    background: var(--cd-nav-solid);
+    border-radius: 0 0 var(--cd-r-lg) var(--cd-r-lg);
+    box-shadow: var(--cd-sh-contact), var(--cd-sh-mid);
   }
   .app-title { font-size: 17px; font-weight: 700; }
   .demo-tag {

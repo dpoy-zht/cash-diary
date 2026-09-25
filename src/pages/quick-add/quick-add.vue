@@ -7,7 +7,7 @@
       <view class="ts-item" :class="{ on: type === 'income' }" @click="setType('income')">收入</view>
     </view>
 
-    <view class="amount-card">
+    <view class="amount-card cd-card cd-glow cd-elevated">
       <mascot :size="46" />
       <view class="amount-box">
         <text class="cur">¥</text>
@@ -101,10 +101,11 @@ async function onConfirm() {
   padding-bottom: 16px;
 }
 
-/* ---- 收支分段控件：外层浅奶黄胶囊，内层选中项用品牌黄实底 ---- */
+/* ---- 收支分段控件：外层玻璃胶囊，内层选中项用品牌渐变实底 ---- */
 .type-switch {
   display: flex;
-  background: var(--cd-cream);
+  background: var(--cd-glass);
+  border: 1px solid var(--cd-card-line);
   border-radius: var(--cd-r-md);
   margin: 12px 16px;
   padding: 4px;
@@ -112,30 +113,30 @@ async function onConfirm() {
 .ts-item {
   flex: 1;
   text-align: center;
-  padding: 9px 0;
-  font-size: 14px;
+  padding: 10px 0;
+  font-size: 15px;
+  font-weight: 700;
   border-radius: var(--cd-r-sm);
   color: var(--cd-ink-2);
-  transition: background-color var(--cd-dur) var(--cd-ease),
-    color var(--cd-dur) var(--cd-ease);
+  transition: background-color var(--cd-dur) var(--cd-ease-smooth),
+    color var(--cd-dur) var(--cd-ease-smooth),
+    transform var(--cd-dur) var(--cd-ease-bounce);
 }
 .ts-item.on {
   background: var(--cd-grad-brand);
   color: var(--cd-ink);
-  font-weight: 700;
-  box-shadow: 0 2px 6px rgba(240, 165, 0, 0.25);
+  font-weight: 800;
+  box-shadow: var(--cd-btn-shadow);
+  transform: scale(1.02);
 }
 
-/* ---- 金额卡：左侧吉祥物 + 右侧大金额 ---- */
+/* ---- 金额卡：左侧吉祥物 + 右侧大金额（玻璃卡片，挂全局 .cd-card）---- */
 .amount-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 16px 10px;
-  padding: 14px 16px;
-  background: var(--cd-surface);
-  border-radius: var(--cd-r-md);
-  box-shadow: var(--cd-sh-1);
+  margin: 0 16px 12px;
+  padding: 16px;
 }
 .amount-box {
   flex: 1;
@@ -149,12 +150,12 @@ async function onConfirm() {
 .cur {
   font-size: 18px;
   color: var(--cd-ink-2);
-  font-weight: 600;
+  font-weight: 700;
 }
 /* 30px 粗体：既是大字号对比度达标档，也是本页的视觉焦点 */
 .amount-text {
   font-size: 30px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.5px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -171,53 +172,60 @@ async function onConfirm() {
 .meta-row {
   display: flex;
   gap: 8px;
-  margin: 0 16px 12px;
+  margin: 0 16px 14px;
 }
 .note-input {
   flex: 1;
   min-width: 0;
-  background: var(--cd-surface);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--cd-card-line);
   border-radius: var(--cd-r-md);
-  padding: 12px 14px;
+  padding: 13px 14px;
   font-family: var(--cd-font);
   font-size: 14px;
+  font-weight: 600;
   color: var(--cd-ink);
-  box-shadow: var(--cd-sh-1);
+  box-shadow: var(--cd-sh-contact), var(--cd-sh-mid);
 }
 .date-btn {
-  background: var(--cd-cream);
+  background: var(--cd-glass);
+  border: 1px solid var(--cd-card-line);
   border-radius: var(--cd-r-md);
-  padding: 12px 14px;
+  padding: 13px 14px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--cd-ink);
   white-space: nowrap;
 }
 
-/* ---- 主按钮 ---- */
+/* ---- 主按钮（= 参考项目 .btn-cream：渐变 + 暖色发光 + 弹性按压）---- */
 .btn-confirm {
-  margin: 14px 16px 0;
-  height: 50px;
-  line-height: 50px;
-  border-radius: var(--cd-r-md);
+  margin: 16px 16px 0;
+  height: 54px;
+  line-height: 54px;
+  border-radius: var(--cd-r-sm);
   background: var(--cd-grad-brand);
   color: var(--cd-ink);
   font-family: var(--cd-font);
-  font-size: 17px;
-  font-weight: 700;
-  box-shadow: 0 4px 14px rgba(240, 165, 0, 0.3);
-  transition: transform var(--cd-dur) var(--cd-ease), opacity var(--cd-dur) var(--cd-ease);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  box-shadow: var(--cd-btn-shadow);
+  transition: transform var(--cd-dur) var(--cd-ease),
+    box-shadow var(--cd-dur) var(--cd-ease-smooth), opacity var(--cd-dur);
 }
 .btn-confirm::after {
   border: none;
 }
+/* 禁用态：退回中性玻璃，去掉发光，视觉上"还没准备好" */
 .btn-confirm[disabled] {
-  background: var(--cd-cream);
+  background: var(--cd-glass);
   color: var(--cd-ink-3);
-  box-shadow: none;
+  box-shadow: var(--cd-sh-contact);
 }
 .btn-hover {
-  opacity: 0.9;
-  transform: scale(0.985);
+  opacity: 0.92;
+  transform: scale(0.97) translateY(1px);
+  box-shadow: var(--cd-btn-shadow-press);
 }
 </style>

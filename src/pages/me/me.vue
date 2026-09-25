@@ -2,7 +2,7 @@
   <view class="page">
     <nav-bar title="我的" />
 
-    <view class="me-hero">
+    <view class="me-hero cd-card cd-glow">
       <mascot :size="64" />
       <view class="hero-main">
         <text class="hero-title">现金日记</text>
@@ -10,7 +10,7 @@
       </view>
     </view>
 
-    <view class="me-card">
+    <view class="me-card cd-card">
       <view class="me-row">
         <text class="mr-label">存储模式</text>
         <text class="mr-value">{{ storageLabel }}</text>
@@ -21,7 +21,7 @@
       </view>
     </view>
 
-    <view class="me-card">
+    <view class="me-card cd-card">
       <view class="me-row">
         <text class="mr-label">分类管理</text>
         <text class="badge">P1 敬请期待</text>
@@ -78,16 +78,13 @@ const tip = computed(function () {
   padding-bottom: 20px;
 }
 
-/* ---- 顶部：吉祥物打招呼 ---- */
+/* ---- 顶部：吉祥物打招呼（= 参考项目 .menu-header 的渐变头图手法）---- */
 .me-hero {
   display: flex;
   align-items: center;
   gap: 14px;
   margin: 12px 16px;
-  padding: 16px;
-  background: linear-gradient(135deg, var(--cd-cream) 0%, var(--cd-surface) 60%);
-  border-radius: var(--cd-r-lg);
-  box-shadow: var(--cd-sh-1);
+  padding: 18px;
 }
 .hero-main {
   display: flex;
@@ -96,52 +93,56 @@ const tip = computed(function () {
   min-width: 0;
 }
 .hero-title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 800;
   color: var(--cd-ink);
+  letter-spacing: 0.3px;
 }
 .hero-sub {
   font-size: 12px;
+  font-weight: 600;
   color: var(--cd-ink-2);
 }
 
+/* 卡片材质走全局 .cd-card（模板里已挂类名） */
 .me-card {
-  background: var(--cd-surface);
-  border-radius: var(--cd-r-lg);
-  overflow: hidden;
   margin: 12px 16px;
-  box-shadow: var(--cd-sh-1);
+  padding: 4px 0;
 }
 .me-row {
   display: flex;
   align-items: center;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--cd-line);
+  border-bottom: 1px solid var(--cd-line-ink);
 }
 .me-row:last-child {
   border-bottom: 0;
 }
 .mr-label {
   font-size: 15px;
+  font-weight: 700;
   color: var(--cd-ink);
 }
 .mr-value {
   margin-left: auto;
   font-size: 13px;
+  font-weight: 600;
   color: var(--cd-ink-2);
 }
-/* 未上线的功能用浅奶黄胶囊标注，视觉上"待办但不喧宾夺主" */
+/* 未上线的功能用浅鹅黄胶囊标注，视觉上"待办但不喧宾夺主" */
 .badge {
   margin-left: auto;
   font-size: 11px;
-  color: var(--cd-ink-2);
-  background: var(--cd-cream);
-  padding: 3px 10px;
+  font-weight: 700;
+  color: var(--cd-accent-ink);
+  background: rgba(255, 228, 160, 0.75);
+  padding: 4px 10px;
   border-radius: var(--cd-r-pill);
 }
 .me-tip {
   margin: 16px;
   font-size: 12px;
+  font-weight: 600;
   color: var(--cd-ink-2);
   line-height: 1.8;
 }
@@ -149,6 +150,7 @@ const tip = computed(function () {
   text-align: center;
   color: var(--cd-ink-3);
   font-size: 12px;
+  font-weight: 600;
   padding: 8px 0 20px;
 }
 </style>

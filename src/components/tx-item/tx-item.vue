@@ -30,20 +30,23 @@ const formatted = computed(function () {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--cd-line);
-  transition: background-color var(--cd-dur) var(--cd-ease);
+  padding: 13px 16px;
+  /* 分隔线改用暖棕半透明细线：玻璃卡上的实色线会显脏 */
+  border-bottom: 1px solid var(--cd-line-ink);
+  transition: background-color var(--cd-dur) var(--cd-ease-smooth);
 }
 .tx-item:last-child {
   border-bottom: 0;
 }
+/* 按下时的整行反馈：比底色略深一档的暖白 */
 .tx-hover {
-  background: var(--cd-cream-2);
+  background: rgba(255, 228, 160, 0.28);
 }
 .tx-icon {
   width: 42px;
   height: 42px;
   border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,6 +61,7 @@ const formatted = computed(function () {
 }
 .tx-name {
   font-size: 15px;
+  font-weight: 700;
   color: var(--cd-ink);
 }
 .tx-note {
@@ -72,7 +76,7 @@ const formatted = computed(function () {
    tabular-nums 让数字等宽，滚动与编辑时不跳动 */
 .tx-amount {
   font-size: 19px;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.2px;
   font-variant-numeric: tabular-nums;
 }

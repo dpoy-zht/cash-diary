@@ -9,11 +9,11 @@
     </view>
 
     <view class="month-summary">
-      <view class="ms-item">
+      <view class="ms-item cd-card">
         <text class="ms-label">支出</text>
         <text class="ms-num expense">{{ formatCents(summary.expenseCents) }}</text>
       </view>
-      <view class="ms-item">
+      <view class="ms-item cd-card">
         <text class="ms-label">收入</text>
         <text class="ms-num income">{{ formatCents(summary.incomeCents) }}</text>
       </view>
@@ -25,7 +25,7 @@
         <text class="empty-text">这个月还没有记录，去「记一笔」补上吧</text>
       </view>
 
-      <view v-for="g in groups" :key="g.day" class="day-card">
+      <view v-for="g in groups" :key="g.day" class="day-card cd-card">
         <view class="day-head">{{ dayLabel(g.day) }}</view>
         <tx-item
           v-for="r in g.items"
@@ -137,34 +137,39 @@ onShow(function () {
   justify-content: space-between;
   padding: 12px 16px 8px;
 }
-/* 34px 圆形按钮，触达面积靠 padding 补足到 44px */
+/* 34px 圆形按钮，触达面积靠 padding 补足到 44px；玻璃圆钮（= 参考项目 .menu-btn） */
 .mb-btn {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--cd-ink);
-  background: var(--cd-surface);
-  box-shadow: var(--cd-sh-1);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--cd-card-line);
+  box-shadow: var(--cd-sh-contact), var(--cd-sh-mid);
+  transition: transform var(--cd-dur) var(--cd-ease),
+    background-color var(--cd-dur) var(--cd-ease-smooth);
 }
 .mb-hover {
-  background: var(--cd-primary-lt);
+  background: var(--cd-grad-brand);
+  transform: scale(0.92);
 }
 .mb-label {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
   color: var(--cd-ink);
+  letter-spacing: 0.3px;
 }
 
-/* ---- 月合计：两张并排小卡 ---- */
+/* ---- 月合计：两张并排玻璃小卡（容器挂全局 .cd-card）---- */
 .month-summary {
   display: flex;
   gap: 10px;
-  margin: 0 16px 10px;
+  margin: 0 16px 12px;
 }
 .ms-item {
   flex: 1;
@@ -172,19 +177,17 @@ onShow(function () {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 14px;
-  background: var(--cd-surface);
-  border-radius: var(--cd-r-md);
-  box-shadow: var(--cd-sh-1);
+  padding: 12px 14px;
 }
 .ms-label {
   font-size: 12px;
+  font-weight: 700;
   color: var(--cd-ink-2);
 }
 /* 19px 粗体：语义色的"大字号"档，同时便于一眼比较两个合计 */
 .ms-num {
   font-size: 19px;
-  font-weight: 700;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -197,21 +200,17 @@ onShow(function () {
   color: var(--cd-income);
 }
 
-/* ---- 流水列表：按天分组，每组一张圆角卡 ----
-   容器不再自己滚动（见 .page 说明），整页一起滚 */
+/* ---- 流水列表：按天分组，每组一张玻璃卡 ----
+   容器不再自己滚动（见 .page 说明），整页一起滚；卡片材质走全局 .cd-card */
 .list-scroll {
   padding-bottom: 4px;
 }
 .day-card {
-  margin: 0 16px 10px;
-  background: var(--cd-surface);
-  border-radius: var(--cd-r-md);
-  box-shadow: var(--cd-sh-1);
-  overflow: hidden;
+  margin: 0 16px 12px;
 }
 .day-head {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--cd-ink-2);
   padding: 12px 16px 8px;
 }
@@ -226,6 +225,7 @@ onShow(function () {
 }
 .empty-text {
   font-size: 13px;
+  font-weight: 600;
   line-height: 1.9;
   text-align: center;
   color: var(--cd-ink-2);

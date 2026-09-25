@@ -8,19 +8,21 @@
  * - 内置分类 id 为 1..12（8 支出 + 4 收入，见 services/category.js），
  *   因此底色表按 8 个一组循环——支出 8 项刚好各不相同。
  *
- * 设计约束见 docs/nailong-ui-spec.md §3.4。
+ * 色板对齐 sdufe-nailong-checkin 的"马卡龙奶油系"：
+ * 鹅黄 / 天蓝 / 樱花粉 / 薄荷 / 蜜桃 / 薰衣草，再加两支同族色补足 8 个，
+ * 保证 8 个支出分类两两不同色。设计约束见 docs/nailong-ui-spec.md §12。
  */
 
-/** 柔和底色表（8 色循环，均为浅色，保证 emoji 图标清晰可辨） */
+/** 柔和底色表（8 色循环，取自参考项目的马卡龙色板） */
 export const CATEGORY_TINTS = [
-  '#fff0be', // 奶黄
-  '#e6f6ff', // 天空蓝
-  '#ffedf0', // 腮红粉
-  '#e8f8f0', // 薄荷绿
-  '#fff1e3', // 奶油橙
-  '#ede9ff', // 淡紫
-  '#e4f5f7', // 淡青
-  '#fbeaf2' // 淡玫
+  '#ffe4a0', // 鹅黄（= 参考项目 --cream-yellow）
+  '#b8e4f0', // 天蓝（= --sky-blue）
+  '#ffd1dc', // 樱花粉（= --sakura-pink）
+  '#b8f0d8', // 薄荷（= --mint-green）
+  '#ffd4b3', // 蜜桃（= --peach）
+  '#e8d5f2', // 薰衣草（= --lavender）
+  '#e4f5d8', // 淡草绿（同族补充）
+  '#d9e8ff' // 淡蓝紫（同族补充）
 ]
 
 /**

@@ -53,7 +53,7 @@ const boxStyle = computed(function () {
   top: 0;
   width: 9%;
   height: 14%;
-  background: var(--cd-primary-dk);
+  background: var(--cd-face-tuft);
   border-radius: 999px 999px 0 0;
   transform: rotate(-18deg);
   transform-origin: bottom center;
@@ -66,11 +66,12 @@ const boxStyle = computed(function () {
   top: 7%;
   height: 93%;
   border-radius: 50% 50% 46% 46%;
-  /* 本组件是唯一允许内联色值的例外：头部渐变属于插画本身，不作为通用背景复用 */
-  background: linear-gradient(180deg, #ffe98f 0%, #ffd34d 55%, #f9c02f 100%);
-  /* 上缘柔光 + 下缘金黄内影 + 外部暖色投影，做出"软乎乎"的立体感 */
-  box-shadow: inset 0 0.05em 0.08em rgba(255, 255, 255, 0.55),
-    inset 0 -0.07em 0 rgba(240, 165, 0, 0.28), 0 0.05em 0.12em rgba(191, 149, 42, 0.25);
+  /* 头部渐变走令牌（--cd-face-head）：与全站马卡龙主色保持同一套 */
+  background: var(--cd-face-head);
+  /* 上缘柔光 + 下缘暖色内影 + 外部暖色投影，做出"软乎乎"的立体感 */
+  box-shadow: inset 0 0.05em 0.08em rgba(255, 255, 255, 0.6),
+    inset 0 -0.07em 0 rgba(240, 184, 96, 0.28),
+    0 0.05em 0.12em rgba(139, 119, 99, 0.22);
 }
 
 /* 眼睛：深棕圆点 + 白色高光，构成"童真的圆眼睛" */
@@ -95,7 +96,7 @@ const boxStyle = computed(function () {
   top: 14%;
   width: 32%;
   height: 30%;
-  background: var(--cd-surface);
+  background: var(--cd-face-glint);
   border-radius: 50%;
 }
 
