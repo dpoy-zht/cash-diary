@@ -2,9 +2,13 @@
 import { onLaunch } from '@dcloudio/uni-app'
 import { initDB } from './db/index.js'
 import { useCategoryStore } from './stores/category.js'
+import { useUiStore } from './stores/ui.js'
 
 onLaunch(() => {
   const categoryStore = useCategoryStore()
+  // 外观状态（导航档位偏好 / 能力探测 / 降级记忆）尽早初始化，
+  // 否则首帧会先按"毛玻璃"渲染再跳回纯色，闪一下。
+  useUiStore().init()
   initDB()
     .then(() => categoryStore.init())
     .catch((err) => console.error('[cash-diary] 初始化失败：', err))
@@ -68,6 +72,19 @@ uni-page-body {
 
   /* ---- 阴影：暖色调，替代中性灰阴影 ---- */
   --cd-sh-1: 0 2px 10px rgba(191, 149, 42, 0.12);
+
+  /* ---- 吸顶导航（自绘，规范见 docs/nailong-ui-spec.md §11） ----
+     App 端原生导航栏无法做半透明/模糊，只能 navigationStyle:custom 自绘。
+     不透明度下限的推导：品牌黄 #ffd34d 取 72% 时，即使正下方是纯黑，
+     深棕文字仍有 5.95:1（AA 正文门槛 4.5:1），故 72% 是该配色的安全下限。
+     默认渲染成不透明纯色，由 JS 判定通过后才加 .can-blur 升为毛玻璃。 */
+  --cd-nav-h: 44px;                                /* 导航条本体高度，不含状态栏 */
+  --cd-nav-total: calc(var(--status-bar-height, 0px) + var(--cd-nav-h));
+  --cd-nav-bg: rgba(255, 211, 77, 0.72);           /* 毛玻璃档 */
+  --cd-nav-solid: #ffd34d;                         /* 默认档 / 回退档 */
+  --cd-nav-ink: #4a3520;                           /* 对纯黄 8.1:1 */
+  --cd-nav-line: rgba(255, 255, 255, 0.42);
+  --cd-nav-filter: blur(12px) saturate(1.35);
 
   /* ---- 动效 ---- */
   --cd-dur: 180ms;

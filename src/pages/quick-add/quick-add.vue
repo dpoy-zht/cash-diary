@@ -1,5 +1,7 @@
 <template>
   <view class="page">
+    <nav-bar title="记一笔" />
+
     <view class="type-switch">
       <view class="ts-item" :class="{ on: type === 'expense' }" @click="setType('expense')">支出</view>
       <view class="ts-item" :class="{ on: type === 'income' }" @click="setType('income')">收入</view>
@@ -35,10 +37,14 @@ import { useTxStore } from '../../stores/tx.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { keypadInput, parseAmountToCents, displayAmount } from '../../utils/money.js'
 import { toDateStr, tsFromDateStr } from '../../utils/date.js'
+import { useNavScrollWatch } from '../../utils/nav-scroll.js'
 
 const categoryStore = useCategoryStore()
 const txStore = useTxStore()
 const metaStore = useMetaStore()
+
+// 滚动时采集帧率，供吸顶导航决定是否退回纯色档
+useNavScrollWatch()
 
 const type = ref('expense')
 const catId = ref(null)

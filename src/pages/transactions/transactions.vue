@@ -1,5 +1,7 @@
 <template>
   <view class="page">
+    <nav-bar title="明细" />
+
     <view class="month-bar">
       <view class="mb-btn" hover-class="mb-hover" @click="metaStore.shift(-1)">‹</view>
       <text class="mb-label">{{ monthLabel }}</text>
@@ -17,7 +19,7 @@
       </view>
     </view>
 
-    <scroll-view scroll-y class="list-scroll">
+    <view class="list-scroll">
       <view v-if="!groups.length" class="empty">
         <mascot :size="108" mood="sleep" float />
         <text class="empty-text">这个月还没有记录，去「记一笔」补上吧</text>
@@ -33,7 +35,7 @@
           @click="openEdit(r)"
         />
       </view>
-    </scroll-view>
+    </view>
 
     <edit-sheet
       :record="editing"
@@ -53,10 +55,14 @@ import { useMetaStore } from '../../stores/meta.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { groupByDay, dayLabel } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
+import { useNavScrollWatch } from '../../utils/nav-scroll.js'
 
 const txStore = useTxStore()
 const metaStore = useMetaStore()
 const categoryStore = useCategoryStore()
+
+// 滚动时采集帧率，供吸顶导航决定是否退回纯色档
+useNavScrollWatch()
 
 const editing = ref(null)
 
@@ -119,9 +125,9 @@ onShow(function () {
 
 <style scoped>
 .page {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
+  /* 整页滚动（不再自己撑 100vh + 内部滚动区）：
+     这样流水才能从吸顶导航下方穿过去，毛玻璃才有作用对象 */
+  padding-bottom: 16px;
 }
 
 /* ---- 月份切换 ---- */
@@ -130,7 +136,6 @@ onShow(function () {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px 8px;
-  flex: none;
 }
 /* 34px 圆形按钮，触达面积靠 padding 补足到 44px */
 .mb-btn {
@@ -160,7 +165,6 @@ onShow(function () {
   display: flex;
   gap: 10px;
   margin: 0 16px 10px;
-  flex: none;
 }
 .ms-item {
   flex: 1;
@@ -193,9 +197,10 @@ onShow(function () {
   color: var(--cd-income);
 }
 
-/* ---- 流水列表：按天分组，每组一张圆角卡 ---- */
+/* ---- 流水列表：按天分组，每组一张圆角卡 ----
+   容器不再自己滚动（见 .page 说明），整页一起滚 */
 .list-scroll {
-  flex: 1;
+  padding-bottom: 4px;
 }
 .day-card {
   margin: 0 16px 10px;

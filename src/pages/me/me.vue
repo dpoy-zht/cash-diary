@@ -1,5 +1,7 @@
 <template>
   <view class="page">
+    <nav-bar title="我的" />
+
     <view class="me-hero">
       <mascot :size="64" />
       <view class="hero-main">
@@ -47,9 +49,13 @@
 import { computed } from 'vue'
 import { useTxStore } from '../../stores/tx.js'
 import { useMetaStore } from '../../stores/meta.js'
+import { useNavScrollWatch } from '../../utils/nav-scroll.js'
 
 const txStore = useTxStore()
 const metaStore = useMetaStore()
+
+// 内容不足一屏时不会触发滚动，也就不会采样——没有滚动开销自然无需降级
+useNavScrollWatch()
 
 const isApp = computed(function () {
   return typeof plus !== 'undefined' && !!plus.sqlite

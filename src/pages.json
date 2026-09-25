@@ -25,6 +25,7 @@
     ]
   },
   "globalStyle": {
+    "navigationStyle": "custom",
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "现金日记",
     "navigationBarBackgroundColor": "#ffd34d",
