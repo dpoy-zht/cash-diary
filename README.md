@@ -24,6 +24,7 @@
 | [`docs/技术方案.md`](./docs/技术方案.md) | 技术方案（架构 / 数据层 / 测试 / 风险） |
 | [`docs/nailong-ui-spec.md`](./docs/nailong-ui-spec.md) | 视觉规范（奶龙风暖黄治愈系：令牌表 / 对比度 / 一致性规则） |
 | [`demo/index.html`](./demo/index.html) | HTML 可交互原型（界面与交互以此为准） |
+| [`demo/nailong-gallery.html`](./demo/nailong-gallery.html) | 「形象中心」设计稿（嵌入真实图片素材，含素材版权说明） |
 
 ## 快速开始
 
@@ -57,10 +58,25 @@ npm run dev:h5
 │  └─ pages.json / manifest.json
 ├─ tests/              vitest 单元与集成测试
 ├─ demo/               HTML 交互原型（UX 基准）
+│  ├─ index.html            记账全流程可交互原型
+│  ├─ nailong-gallery.html  形象中心（真实图片素材，见 §图片素材）
+│  └─ assets/nailong/       图片素材目录（含 fetch.py；图片本身不入库）
 └─ docs/               产品与技术文档
 ```
 
 > 采用 uni-app **CLI 工程结构**（源码在 `src/`）：`npm run dev:h5` / `npm run build:h5` / `npm run test` 是自动化验证通路；该结构同样可被 HBuilderX 打开并运行到手机。
+
+## 图片素材
+
+`demo/assets/nailong/` 的图片属于第三方版权素材（「奶龙」© 第七印象文化传媒（深圳）有限公司），
+**仅限本机原型验证与个人学习，不得商用或公开发布**，因此**不随仓库分发**。
+
+```bash
+pip install pillow
+python demo/assets/nailong/fetch.py   # 下载 + 抠白底 + 生成两档 WebP
+```
+
+细节与替换方案见 [`demo/assets/nailong/README.md`](./demo/assets/nailong/README.md)。
 
 ## 三条数据铁律
 
