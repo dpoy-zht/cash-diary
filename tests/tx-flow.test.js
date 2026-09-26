@@ -18,18 +18,18 @@ describe('记账闭环（内存存储）', () => {
     ym = ymOf(Date.now())
   })
 
-  it('内置分类初始化：8 支出 + 4 收入', async () => {
+  it('内置分类初始化：12 支出 + 8 收入（对齐 v2.0 参考包）', async () => {
     const cats = await listCats()
-    expect(cats.length).toBe(12)
-    expect(cats.filter(function (c) { return c.type === 'expense' }).length).toBe(8)
-    expect(cats.filter(function (c) { return c.type === 'income' }).length).toBe(4)
-    expect(DEFAULT_CATEGORIES.length).toBe(12)
+    expect(cats.length).toBe(20)
+    expect(cats.filter(function (c) { return c.type === 'expense' }).length).toBe(12)
+    expect(cats.filter(function (c) { return c.type === 'income' }).length).toBe(8)
+    expect(DEFAULT_CATEGORIES.length).toBe(20)
   })
 
   it('分类种子幂等：重复初始化不产生重复数据', async () => {
     await seedIfEmpty()
     await seedIfEmpty()
-    expect((await listCats()).length).toBe(12)
+    expect((await listCats()).length).toBe(20)
   })
 
   it('记账 → 列表 → 月合计 → 编辑 → 软删除 全链路', async () => {
