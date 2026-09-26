@@ -9,6 +9,7 @@ import { parseAmountToCents } from '../utils/money.js'
  * 构造一条待入库流水。校验失败抛错：
  * - 金额必须能解析为正整数分
  * - 分类必选
+ * @param {object} input 可带 accountId（不传则落默认账本）
  */
 export function buildTx(input) {
   const cents = parseAmountToCents(input.amountStr)
@@ -16,6 +17,7 @@ export function buildTx(input) {
   if (!input.categoryId) throw new Error('请选择分类')
   const now = Date.now()
   return {
+    account_id: input.accountId,
     category_id: input.categoryId,
     type: input.type,
     amount_cents: cents,
@@ -59,20 +61,20 @@ export async function removeTx(id) {
   await txRepo.softDelete(id)
 }
 
-export async function listByMonth(ym) {
-  return txRepo.listByMonth(ym)
+export async function listByMonth(ym, accountId) {
+  return txRepo.listByMonth(ym, accountId)
 }
 
-export async function monthSummary(ym) {
-  return txRepo.monthSummary(ym)
+export async function monthSummary(ym, accountId) {
+  return txRepo.monthSummary(ym, accountId)
 }
 
-/** 全量概览：累计笔数与收支、最早/最近一笔时间（账本页用） */
-export async function overview() {
-  return txRepo.overview()
+/** 全量概览：累计笔数与收支、最早/最近一笔时间（账本页 / 我的页用） */
+export async function overview(accountId) {
+  return txRepo.overview(accountId)
 }
 
 /** 某时间点之后的流水时间戳（我的页算连续记账天数用） */
-export async function recentTimestamps(sinceTs) {
-  return txRepo.recentTimestamps(sinceTs)
+export async function recentTimestamps(sinceTs, accountId) {
+  return txRepo.recentTimestamps(sinceTs, accountId)
 }

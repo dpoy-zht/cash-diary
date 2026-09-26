@@ -2,11 +2,14 @@
 import { onLaunch } from '@dcloudio/uni-app'
 import { initDB } from './db/index.js'
 import { useCategoryStore } from './stores/category.js'
+import { useAccountStore } from './stores/account.js'
 
 onLaunch(() => {
   const categoryStore = useCategoryStore()
+  const accountStore = useAccountStore()
+  // 账本要先就绪：流水查询都带"当前账本"过滤，账本没初始化好会查错账本
   initDB()
-    .then(() => categoryStore.init())
+    .then(() => Promise.all([categoryStore.init(), accountStore.init()]))
     .catch((err) => console.error('[cash-diary] 初始化失败：', err))
 })
 </script>

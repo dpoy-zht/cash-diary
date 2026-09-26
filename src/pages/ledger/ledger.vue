@@ -6,7 +6,7 @@
         <view class="ib" :style="iconMenu" />
       </view>
       <text class="nav-title">我的账本</text>
-      <view class="icon-btn" hover-class="ib-hover" @click="onCreateLedger">
+      <view class="icon-btn" hover-class="ib-hover" @click="onCreate">
         <view class="ib" :style="iconPlus" />
       </view>
     </view>
@@ -15,7 +15,7 @@
     <view class="ledger-card">
       <image class="caishen" src="/static/milo/milo-caishen.webp" mode="aspectFill" />
       <text class="lc-label">当前账本</text>
-      <text class="lc-name">{{ ledgerName }}</text>
+      <text class="lc-name">{{ currentName }}</text>
       <text class="lc-num">¥{{ balanceText }}</text>
       <view class="lc-row">
         <text class="inc">已存 ¥{{ incomeText }}</text>
@@ -23,7 +23,7 @@
       </view>
     </view>
 
-    <!-- 其他账本：当前数据层还没有多账本，这里给诚实的空态而不是编造数据 -->
+    <!-- 其他账本：真实数据；点一行切换，长按可改名/删除 -->
     <text class="section-label">其他账本（{{ others.length }}）</text>
     <view class="list-card">
       <view v-if="!others.length" class="empty-row">
@@ -36,20 +36,23 @@
         class="list-row"
         hover-class="row-hover"
         @click="switchTo(l)"
+        @longpress="onLongPress(l)"
       >
-        <view class="list-ic" :style="{ background: l.color }" />
+        <view class="list-ic" :style="{ background: colorOfIndex(l.id) }" />
         <view class="list-main">
           <text class="list-name">{{ l.name }}</text>
-          <text class="list-sub">{{ l.sub }}</text>
+          <text class="list-sub">{{ subOf(l) }}</text>
         </view>
-        <text class="list-amt">¥{{ l.amountText }}</text>
+        <text class="list-amt" :class="{ inc: l.balanceCents > 0 }">¥{{ formatCents(Math.abs(l.balanceCents)) }}</text>
       </view>
     </view>
+
+    <text v-if="others.length" class="hint">点一下切换账本，长按可改名或删除</text>
 
     <!-- 新建账本行：金条奶龙 + 黄色胶囊按钮 -->
     <view class="create-row">
       <image class="gold-img" src="/static/milo/milo-gold.webp" mode="aspectFit" />
-      <view class="create-btn" hover-class="create-hover" @click="onCreateLedger">
+      <view class="create-btn" hover-class="create-hover" @click="onCreate">
         <text class="create-t">+ 新建账本</text>
       </view>
     </view>
@@ -62,6 +65,7 @@
 import { computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
+import { useAccountStore } from '../../stores/account.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { formatCents } from '../../utils/money.js'
 import { balanceCents } from '../../utils/stats.js'
@@ -71,16 +75,20 @@ import { svgMaskStyle } from '../../utils/svg-icon.js'
  * 账本页（布局/组件/间距/配色逐项对齐 v2.0 参考包的 view-ledger）：
  * navbar（菜单/标题/新建）→ 当前账本卡（财神奶龙趴右上角）→ 其他账本（N）→ 新建账本行。
  *
- * ⚠️ 与参考包的差异：参考包里「其他账本（3）」是写死的假数据（旅行基金/减肥基金/红包零钱），
- * 本 App 的数据层**还没有多账本**（没有 account 表），所以这里是**诚实的空态**，
- * 不编造账本。等做多账本时，把 others 接上真实数据即可，版式不用动。
+ * 多账本已接真实数据：点行切换、长按改名/删除、底部按钮新建。
+ * 删除只允许删「没有记录的账本」，避免误删流水。
  */
 const txStore = useTxStore()
+const accountStore = useAccountStore()
 const metaStore = useMetaStore()
 
-const ledgerName = '日常账本'
-/** 多账本未实现，恒为空数组；版式与列表行渲染逻辑已就绪 */
-const others = []
+const others = computed(function () {
+  return accountStore.others
+})
+const currentName = computed(function () {
+  const c = accountStore.current
+  return c ? c.name : '日常账本'
+})
 
 const balanceText = computed(function () {
   return formatCents(balanceCents(txStore.overview))
@@ -92,18 +100,120 @@ const expenseText = computed(function () {
   return formatCents(txStore.overview.expenseCents)
 })
 
+/** 列表行图标底色：轮流用参考包里的几个色，保证同名账本也不会撞色 */
+const ROW_COLORS = ['#ff8a65', '#81c784', '#f48fb1', '#ffc93c', '#ba68c8', '#4dd0e1']
+function colorOfIndex(id) {
+  const n = Number(id) || 1
+  return ROW_COLORS[(n - 1) % ROW_COLORS.length]
+}
+
+function shortDate(ts) {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  return d.getMonth() + 1 + '月' + d.getDate() + '日'
+}
+function subOf(l) {
+  if (!l.count) return '还没有记录'
+  return l.count + ' 笔 · 最近 ' + shortDate(l.lastAt)
+}
+
 function toast(msg) {
   uni.showToast({ title: msg, icon: 'none' })
 }
-function switchTo(l) {
-  toast('切换到' + l.name)
+
+async function switchTo(l) {
+  if (l.id === accountStore.currentId) return
+  accountStore.setCurrent(l.id)
+  await txStore.refresh(metaStore.ym)
+  toast('已切换到「' + l.name + '」')
 }
-function onCreateLedger() {
+
+function onCreate() {
   uni.showModal({
     title: '新建账本',
-    content: '多账本（把「日常」「旅行基金」这类钱分开记）还在计划里，做好后就能在这里新建与切换。',
-    showCancel: false,
-    confirmText: '知道啦'
+    editable: true,
+    placeholderText: '给账本起个名字（最多 12 字）',
+    success: function (res) {
+      if (!res.confirm) return
+      const name = String(res.content || '').trim()
+      if (!name) {
+        toast('名字不能为空')
+        return
+      }
+      accountStore
+        .create(name)
+        .then(function () {
+          return txStore.refresh(metaStore.ym)
+        })
+        .then(function () {
+          toast('已新建「' + name + '」')
+        })
+        .catch(function (err) {
+          toast((err && err.message) || '新建失败')
+        })
+    }
+  })
+}
+
+function onLongPress(l) {
+  uni.showActionSheet({
+    itemList: ['改名', '删除'],
+    success: function (res) {
+      if (res.tapIndex === 0) renameLedger(l)
+      else if (res.tapIndex === 1) removeLedger(l)
+    }
+  })
+}
+
+function renameLedger(l) {
+  uni.showModal({
+    title: '账本改名',
+    editable: true,
+    content: l.name,
+    success: function (res) {
+      if (!res.confirm) return
+      const name = String(res.content || '').trim()
+      accountStore
+        .rename(l.id, name)
+        .then(function () {
+          toast('已改名')
+        })
+        .catch(function (err) {
+          toast((err && err.message) || '改名失败')
+        })
+    }
+  })
+}
+
+function removeLedger(l) {
+  if (l.count > 0) {
+    uni.showModal({
+      title: '不能删除',
+      content: '「' + l.name + '」里还有 ' + l.count + ' 笔记录。先把记录删掉或移到别的账本，再来删它。',
+      showCancel: false,
+      confirmText: '好'
+    })
+    return
+  }
+  uni.showModal({
+    title: '删除账本',
+    content: '确定删除「' + l.name + '」吗？',
+    confirmText: '删除',
+    confirmColor: '#b93b39',
+    success: function (res) {
+      if (!res.confirm) return
+      accountStore
+        .remove(l.id)
+        .then(function () {
+          return txStore.refresh(metaStore.ym)
+        })
+        .then(function () {
+          toast('已删除')
+        })
+        .catch(function (err) {
+          toast((err && err.message) || '删除失败')
+        })
+    }
   })
 }
 
@@ -163,7 +273,6 @@ onShow(function () {
   position: relative;
   overflow: visible;
 }
-/* 场景底图圆形裁切 + 白描边，露出卡片上沿（= 参考包写法） */
 .caishen {
   position: absolute;
   top: -24px;
@@ -275,6 +384,12 @@ onShow(function () {
   font-weight: 800;
   color: var(--cd-ink);
   font-variant-numeric: tabular-nums;
+}
+.hint {
+  display: block;
+  margin: 8px 20px 0;
+  font-size: 11px;
+  color: var(--cd-ink-2);
 }
 
 /* ---- 新建账本行 ---- */

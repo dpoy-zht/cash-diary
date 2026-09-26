@@ -6,9 +6,11 @@
  */
 import * as maintenanceRepo from '../db/repository/maintenance.js'
 import { seedIfEmpty } from './category.js'
+import { seedDefaultIfEmpty } from './account.js'
 
-/** 重置全部数据并恢复内置分类；调用方负责之后刷新 store */
+/** 重置全部数据并恢复内置分类与默认账本；调用方负责之后刷新 store */
 export async function resetAll() {
   await maintenanceRepo.clearAll()
   await seedIfEmpty()
+  await seedDefaultIfEmpty()
 }
