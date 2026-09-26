@@ -98,3 +98,5 @@ temp/
 # ===== 第三方版权素材（奶龙 IP，不入库；运行 demo/assets/nailong/fetch.py 重新获取）=====
 demo/assets/nailong/*.webp
 demo/assets/nailong/_raw/
+# 奶龙记账 v2.0 基准原型用的 milo 表情包（用户提供，仅个人自用，不随仓库分发）
+demo/assets/milo/*.png

@@ -24,6 +24,7 @@
 | [`docs/技术方案.md`](./docs/技术方案.md) | 技术方案（架构 / 数据层 / 测试 / 风险） |
 | [`docs/nailong-ui-spec.md`](./docs/nailong-ui-spec.md) | 视觉规范（奶龙风暖黄治愈系：令牌表 / 对比度 / 一致性规则） |
 | [`demo/index.html`](./demo/index.html) | HTML 可交互原型（界面与交互以此为准） |
+| [`demo/nailong-ledger.html`](./demo/nailong-ledger.html) | **「奶龙记账」设计基准原型 v2.0**（当前设计基准，复现自用户提供的参考包） |
 | [`demo/nailong-gallery.html`](./demo/nailong-gallery.html) | 「形象中心」设计稿（嵌入真实图片素材，含素材版权说明） |
 
 ## 快速开始
@@ -68,15 +69,13 @@ npm run dev:h5
 
 ## 图片素材
 
-`demo/assets/nailong/` 的图片属于第三方版权素材（「奶龙」© 第七印象文化传媒（深圳）有限公司），
+`demo/assets/nailong/` 与 `demo/assets/milo/` 的图片属于第三方版权素材（「奶龙」© 第七印象文化传媒（深圳）有限公司），
 **仅限本机原型验证与个人学习，不得商用或公开发布**，因此**不随仓库分发**。
 
-```bash
-pip install pillow
-python demo/assets/nailong/fetch.py   # 下载 + 抠白底 + 生成两档 WebP
-```
+- `nailong/`（形象中心用）：`pip install pillow && python demo/assets/nailong/fetch.py` 重新获取
+- `milo/`（奶龙记账 v2.0 基准原型用）：从参考包目录复制 5 张 PNG（见该目录 README）
 
-细节与替换方案见 [`demo/assets/nailong/README.md`](./demo/assets/nailong/README.md)。
+细节与替换方案见 [`demo/assets/nailong/README.md`](./demo/assets/nailong/README.md)、[`demo/assets/milo/README.md`](./demo/assets/milo/README.md)。
 
 ## 三条数据铁律
 
