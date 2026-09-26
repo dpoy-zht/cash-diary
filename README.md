@@ -49,13 +49,14 @@ npm run dev:h5
 
 ```
 ├─ src/                uni-app 源码根（CLI 约定）
-│  ├─ pages/           页面：quick-add（记一笔）/ transactions（明细）/ me（我的）
-│  ├─ components/      公共组件：money-keyboard / category-grid / tx-item / edit-sheet / mascot
+│  ├─ pages/           页面：home（首页）/ add（记一笔）/ stats（统计）/ me（我的）
+│  ├─ components/      公共组件：tab-bar（5 Tab 自定义导航）/ money-keyboard / category-grid / cat-icon / tx-item / edit-sheet / mascot
 │  ├─ stores/          Pinia：category / tx / meta
 │  ├─ services/        业务层：记账校验与编排、分类种子
 │  ├─ db/              数据层：schema + sqlite/memory 双存储 + repository
-│  ├─ utils/           money（分↔元换算）/ date（时间戳与分组）/ palette（分类底色，纯展示）
-│  ├─ App.vue          应用入口（启动初始化数据库与分类 + **全站设计令牌层**）
+│  ├─ utils/           money（分↔元换算）/ date（时间戳与分组）/ stats（聚合与环形图）/ palette（分类色与图标，纯展示）/ svg-icon
+│  ├─ static/milo/     milo 表情包（第三方 IP，仅个人自用；界面素材，见版权说明）
+│  ├─ App.vue          应用入口（启动初始化数据库与分类 + **全站设计令牌层 v2.0**）
 │  └─ pages.json / manifest.json
 ├─ tests/              vitest 单元与集成测试
 ├─ demo/               HTML 交互原型（UX 基准）

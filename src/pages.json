@@ -1,34 +1,15 @@
 {
   "pages": [
-    {
-      "path": "pages/quick-add/quick-add",
-      "style": { "navigationBarTitleText": "记一笔" }
-    },
-    {
-      "path": "pages/transactions/transactions",
-      "style": { "navigationBarTitleText": "明细" }
-    },
-    {
-      "path": "pages/me/me",
-      "style": { "navigationBarTitleText": "我的" }
-    }
+    { "path": "pages/home/home", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/add/add", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/stats/stats", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/me/me", "style": { "navigationStyle": "custom" } }
   ],
-  "tabBar": {
-    "color": "#7e6849",
-    "selectedColor": "#8a5a0f",
-    "backgroundColor": "#fffdf7",
-    "borderStyle": "white",
-    "list": [
-      { "pagePath": "pages/quick-add/quick-add", "text": "记一笔" },
-      { "pagePath": "pages/transactions/transactions", "text": "明细" },
-      { "pagePath": "pages/me/me", "text": "我的" }
-    ]
-  },
   "globalStyle": {
     "navigationStyle": "custom",
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "现金日记",
-    "navigationBarBackgroundColor": "#ffd34d",
+    "navigationBarTitleText": "奶龙记账",
+    "navigationBarBackgroundColor": "#ffd93d",
     "backgroundColor": "#fff8e7",
     "backgroundColorTop": "#fff8e7",
     "backgroundColorBottom": "#fff8e7"

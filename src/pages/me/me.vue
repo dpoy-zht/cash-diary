@@ -1,90 +1,102 @@
 <template>
   <view class="page">
-    <nav-bar title="我的" />
+    <view class="navbar"><text class="nav-title">我的</text></view>
 
-    <view class="me-hero cd-card cd-glow">
-      <mascot :size="64" />
+    <!-- 问候卡（原创吉祥物，非第三方 IP） -->
+    <view class="me-hero">
+      <mascot :size="62" />
       <view class="hero-main">
-        <text class="hero-title">现金日记</text>
-        <text class="hero-sub">今天想记点什么呢</text>
+        <text class="hero-title">你好呀，记账人</text>
+        <text class="hero-sub">{{ monthText }}已经记了 {{ countText }} 笔</text>
       </view>
     </view>
 
-    <view class="me-card cd-card">
+    <view class="me-card">
       <view class="me-row">
         <text class="mr-label">存储模式</text>
         <text class="mr-value">{{ storageLabel }}</text>
       </view>
       <view class="me-row">
-        <text class="mr-label">记录条数</text>
-        <text class="mr-value">{{ recordCount }}</text>
-      </view>
-    </view>
-
-    <view class="me-card cd-card">
-      <view class="me-row">
         <text class="mr-label">分类管理</text>
-        <text class="badge">P1 敬请期待</text>
-      </view>
-      <view class="me-row">
-        <text class="mr-label">预算提醒</text>
-        <text class="badge">P1 敬请期待</text>
-      </view>
-      <view class="me-row">
-        <text class="mr-label">数据备份</text>
-        <text class="badge">P2 敬请期待</text>
-      </view>
-      <view class="me-row">
-        <text class="mr-label">统计图表</text>
-        <text class="badge">P1 敬请期待</text>
+        <view class="badge">P1</view>
       </view>
     </view>
 
-    <view class="me-tip">{{ tip }}</view>
-    <view class="me-version">现金日记 v0.1.0 · MVP</view>
+    <view class="me-card">
+      <view class="me-row">
+        <text class="mr-label">数据备份导出</text>
+        <view class="badge">P1</view>
+      </view>
+      <view class="me-row">
+        <text class="mr-label">预算与超支提醒</text>
+        <view class="badge">P2</view>
+      </view>
+    </view>
+
+    <text class="me-tip">数据只保存在本机（App 端为 SQLite），卸载 App 前请先导出备份。</text>
+    <text class="me-version">奶龙记账 · v2.0.0</text>
+
+    <tab-bar current="me" />
   </view>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useMetaStore } from '../../stores/meta.js'
-import { useNavScrollWatch } from '../../utils/nav-scroll.js'
 
+/**
+ * 我的（v2.0 风格重刷）：问候卡 + 设置卡。
+ * 参考包没有这一页的设计，按同一套令牌（奶油底 / 白卡 / 蛋黄点缀）补齐。
+ */
 const txStore = useTxStore()
 const metaStore = useMetaStore()
 
-// 内容不足一屏时不会触发滚动，也就不会采样——没有滚动开销自然无需降级
-useNavScrollWatch()
-
-const isApp = computed(function () {
-  return typeof plus !== 'undefined' && !!plus.sqlite
+const monthText = computed(function () {
+  const parts = metaStore.ym.split('-')
+  return Number(parts[1]) + '月'
+})
+const countText = computed(function () {
+  return txStore.records.length
 })
 const storageLabel = computed(function () {
-  return isApp.value ? 'SQLite 本地数据库' : '浏览器演示存储'
+  // #ifdef APP-PLUS
+  return 'SQLite · 本机'
+  // #endif
+  // #ifndef APP-PLUS
+  return '内存 · 刷新即清空'
+  // #endif
 })
-const recordCount = computed(function () {
-  return txStore.records.length + ' 条（' + metaStore.ym + '）'
-})
-const tip = computed(function () {
-  return isApp.value
-    ? '离线优先：所有数据保存在本机 SQLite，无网络也可记账与查看。'
-    : '当前运行在浏览器演示存储（内存/localStorage），正式使用请在 HBuilderX 中运行到手机。'
+
+onShow(function () {
+  txStore.loadMonth(metaStore.ym)
 })
 </script>
 
 <style scoped>
 .page {
-  padding-bottom: 20px;
+  min-height: 100vh;
+  padding-bottom: 90px;
+}
+.navbar {
+  padding: 12px 20px 4px;
+}
+.nav-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--cd-ink);
 }
 
-/* ---- 顶部：吉祥物打招呼（= 参考项目 .menu-header 的渐变头图手法）---- */
 .me-hero {
   display: flex;
   align-items: center;
   gap: 14px;
   margin: 12px 16px;
   padding: 18px;
+  background: var(--cd-grad-brand);
+  border-radius: var(--cd-r-card);
+  box-shadow: 0 10px 24px rgba(255, 217, 61, 0.35);
 }
 .hero-main {
   display: flex;
@@ -96,27 +108,28 @@ const tip = computed(function () {
   font-size: 18px;
   font-weight: 800;
   color: var(--cd-ink);
-  letter-spacing: 0.3px;
 }
 .hero-sub {
   font-size: 12px;
   font-weight: 600;
-  color: var(--cd-ink-2);
+  color: rgba(93, 78, 55, 0.75);
 }
 
-/* 卡片材质走全局 .cd-card（模板里已挂类名） */
 .me-card {
   margin: 12px 16px;
-  padding: 4px 0;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-md);
+  padding: 4px 16px;
+  box-shadow: var(--cd-sh-card);
 }
 .me-row {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--cd-line-ink);
+  padding: 14px 0;
+  border-bottom: 1px solid var(--cd-line);
 }
 .me-row:last-child {
-  border-bottom: 0;
+  border-bottom: none;
 }
 .mr-label {
   font-size: 15px;
@@ -129,28 +142,27 @@ const tip = computed(function () {
   font-weight: 600;
   color: var(--cd-ink-2);
 }
-/* 未上线的功能用浅鹅黄胶囊标注，视觉上"待办但不喧宾夺主" */
 .badge {
   margin-left: auto;
   font-size: 11px;
-  font-weight: 700;
-  color: var(--cd-accent-ink);
-  background: rgba(255, 228, 160, 0.75);
+  font-weight: 800;
+  color: #8a7450;
+  background: var(--cd-primary-lt);
   padding: 4px 10px;
   border-radius: var(--cd-r-pill);
 }
 .me-tip {
+  display: block;
   margin: 16px;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--cd-ink-2);
   line-height: 1.8;
+  color: var(--cd-ink-2);
 }
 .me-version {
+  display: block;
   text-align: center;
-  color: var(--cd-ink-3);
+  color: var(--cd-ink-2);
   font-size: 12px;
-  font-weight: 600;
   padding: 8px 0 20px;
 }
 </style>

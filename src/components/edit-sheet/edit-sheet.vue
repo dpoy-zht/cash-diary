@@ -17,7 +17,10 @@
           class="chip"
           :class="{ active: c.id === catId }"
           @click="catId = c.id"
-        >{{ c.icon }} {{ c.name }}</view>
+        >
+          <view class="chip-dot" :style="{ background: colorOf(c) }" />
+          <text class="chip-name">{{ c.name }}</text>
+        </view>
       </scroll-view>
 
       <input v-model="note" class="sheet-input" type="text" placeholder="备注（可选）" maxlength="30" />
@@ -32,6 +35,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { colorOf } from '../../utils/palette.js'
 
 const props = defineProps({
   record: { type: Object, default: null },
@@ -74,7 +78,7 @@ function onSave() {
 .mask {
   position: absolute;
   inset: 0;
-  background: rgba(61, 42, 23, 0.42);
+  background: rgba(93, 78, 55, 0.45);
   animation: cd-fade-in 200ms ease both;
 }
 .sheet {
@@ -82,11 +86,8 @@ function onSave() {
   left: 0;
   right: 0;
   bottom: 0;
-  /* 玻璃弹层：顶角用最大圆角（--cd-r-xl 40px），对齐参考项目的大圆角语言 */
-  background: var(--cd-card);
-  border-top: 1px solid var(--cd-card-line);
-  border-radius: var(--cd-r-xl) var(--cd-r-xl) 0 0;
-  box-shadow: 0 -8px 32px rgba(139, 119, 99, 0.18);
+  background: var(--cd-surface);
+  border-radius: 28px 28px 0 0;
   padding: 8px 16px 24px;
   /* 留出全面屏底部安全区；不支持 env() 时上一行兜底 */
   padding-bottom: calc(24px + env(safe-area-inset-bottom));
@@ -96,7 +97,7 @@ function onSave() {
   width: 44px;
   height: 5px;
   border-radius: var(--cd-r-pill);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--cd-line);
   margin: 4px auto 14px;
 }
 .sheet-title {
@@ -113,19 +114,18 @@ function onSave() {
 .stype {
   font-size: 12px;
   font-weight: 700;
-  color: var(--cd-ink-2);
-  background: rgba(255, 228, 160, 0.55);
+  color: var(--cd-ink);
+  background: var(--cd-primary-lt);
   padding: 3px 10px;
   border-radius: var(--cd-r-pill);
 }
-/* 输入框用更不透明的玻璃：它是主要输入面，清晰度优先于通透感 */
 .sheet-input {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--cd-card-line);
-  border-radius: var(--cd-r-md);
-  background: rgba(255, 255, 255, 0.86);
-  padding: 13px 14px;
+  border: 1px solid var(--cd-line);
+  border-radius: var(--cd-r-sm);
+  background: var(--cd-bg);
+  padding: 12px 14px;
   font-family: var(--cd-font);
   font-size: 16px;
   font-weight: 700;
@@ -138,25 +138,31 @@ function onSave() {
   padding: 2px 0 10px;
 }
 .chip {
-  display: inline-block;
-  border: 1px solid var(--cd-card-line);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: var(--cd-r-pill);
-  background: rgba(255, 255, 255, 0.72);
-  padding: 9px 15px;
+  background: var(--cd-bg);
+  padding: 8px 14px;
+  margin-right: 8px;
+  transition: transform var(--cd-dur) var(--cd-ease);
+}
+.chip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.chip-name {
   font-size: 13px;
   font-weight: 700;
   color: var(--cd-ink);
-  margin-right: 8px;
-  transition: background-color var(--cd-dur) var(--cd-ease-smooth),
-    transform var(--cd-dur) var(--cd-ease);
 }
-/* 选中的 chip 用品牌渐变实底：与主按钮同一套"鹅黄底深棕字"语言 */
+/* 选中的 chip：蛋黄实底深棕字（= 参考包选中语言） */
 .chip.active {
-  border-color: rgba(255, 255, 255, 0.95);
-  background: var(--cd-grad-brand);
-  color: var(--cd-ink);
+  background: var(--cd-primary);
+}
+.chip.active .chip-name {
   font-weight: 800;
-  transform: scale(1.04);
 }
 .sheet-actions {
   display: flex;
@@ -165,26 +171,26 @@ function onSave() {
 }
 .sheet-actions button {
   flex: 1;
-  height: 52px;
-  line-height: 52px;
-  border-radius: var(--cd-r-sm);
+  height: 50px;
+  line-height: 50px;
+  border-radius: var(--cd-r-pill);
   font-family: var(--cd-font);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
 }
 .sheet-actions button::after {
   border: none;
 }
 .btn-del {
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--cd-surface);
   color: var(--cd-danger-ink);
-  border: 1px solid rgba(185, 59, 57, 0.22);
+  border: 1.5px solid var(--cd-primary);
 }
 .btn-save {
   flex: 2;
-  background: var(--cd-grad-brand);
-  color: var(--cd-ink);
-  box-shadow: var(--cd-btn-shadow);
+  background: var(--cd-primary);
+  color: var(--cd-btn-ink);
+  box-shadow: var(--cd-sh-btn);
 }
 .btn-hover {
   opacity: 0.9;
