@@ -48,10 +48,6 @@ function go(t) {
     uni.navigateTo({ url: '/pages/add/add' })
     return
   }
-  if (t.key === 'ledger') {
-    uni.showToast({ title: '账本功能规划中', icon: 'none' })
-    return
-  }
   if (t.key === props.current) return
   const url = t.key === 'home' ? '/pages/home/home' : '/pages/' + t.key + '/' + t.key
   uni.reLaunch({ url: url })

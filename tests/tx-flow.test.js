@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { getStorage, resetStorageForTest } from '../src/db/index.js'
 import { seedIfEmpty, listAll as listCats, DEFAULT_CATEGORIES } from '../src/services/category.js'
+import { resetAll } from '../src/services/maintenance.js'
 import * as txService from '../src/services/tx.js'
 import { ymOf, monthRange } from '../src/utils/date.js'
 
@@ -103,5 +104,98 @@ describe('记账闭环（内存存储）', () => {
     const lastList = await txService.listByMonth(lastYm)
     expect(lastList.length).toBe(1)
     expect(lastList[0].amount_cents).toBe(10000)
+  })
+})
+
+describe('全量概览（账本页数据）', () => {
+  let ym
+
+  beforeEach(async () => {
+    resetStorageForTest()
+    await getStorage().init()
+    await seedIfEmpty()
+    ym = ymOf(Date.now())
+  })
+
+  it('空库时笔数与金额为 0、时间为 null', async () => {
+    const o = await txService.overview()
+    expect(o.totalCount).toBe(0)
+    expect(o.incomeCents).toBe(0)
+    expect(o.expenseCents).toBe(0)
+    expect(o.firstAt).toBeNull()
+    expect(o.lastAt).toBeNull()
+  })
+
+  it('累计所有月份的收支，并给出最早/最近一笔的时间', async () => {
+    const cats = await listCats()
+    const exp = cats.find(function (c) { return c.type === 'expense' })
+    const inc = cats.find(function (c) { return c.type === 'income' })
+    const parts = ym.split('-').map(Number)
+    const lastMonthTs = monthRange(parts[0], parts[1] - 1)[0] + 86400000
+    const nowTs = Date.now()
+
+    await txService.addTx({ amountStr: '100', categoryId: exp.id, type: 'expense', ts: lastMonthTs })
+    await txService.addTx({ amountStr: '19.9', categoryId: exp.id, type: 'expense', ts: nowTs })
+    await txService.addTx({ amountStr: '8500', categoryId: inc.id, type: 'income', ts: nowTs })
+
+    const o = await txService.overview()
+    expect(o.totalCount).toBe(3) // 跨月份也算进累计
+    expect(o.expenseCents).toBe(10000 + 1990)
+    expect(o.incomeCents).toBe(850000)
+    expect(o.firstAt).toBe(lastMonthTs)
+    expect(o.lastAt).toBe(nowTs)
+  })
+
+  it('软删除的记录不计入概览', async () => {
+    const cat = (await listCats()).find(function (c) { return c.type === 'expense' })
+    await txService.addTx({ amountStr: '50', categoryId: cat.id, type: 'expense', ts: Date.now() })
+    const list = await txService.listByMonth(ym)
+    await txService.removeTx(list[0].id)
+
+    const o = await txService.overview()
+    expect(o.totalCount).toBe(0)
+    expect(o.expenseCents).toBe(0)
+  })
+})
+
+describe('重置数据（我的页入口）', () => {
+  let ym
+
+  beforeEach(async () => {
+    resetStorageForTest()
+    await getStorage().init()
+    await seedIfEmpty()
+    ym = ymOf(Date.now())
+  })
+
+  it('清空流水并恢复内置分类，重置后立刻可用', async () => {
+    const cat = (await listCats()).find(function (c) { return c.type === 'expense' })
+    await txService.addTx({ amountStr: '19.9', categoryId: cat.id, type: 'expense', ts: Date.now() })
+    expect((await txService.listByMonth(ym)).length).toBe(1)
+
+    await resetAll()
+
+    // 流水清空
+    expect((await txService.listByMonth(ym)).length).toBe(0)
+    expect((await txService.overview()).totalCount).toBe(0)
+    // 分类被重新种回来，数量与内容不变
+    const cats = await listCats()
+    expect(cats.length).toBe(20)
+    expect(cats.filter(function (c) { return c.type === 'expense' }).length).toBe(12)
+    expect(cats.filter(function (c) { return c.type === 'income' }).length).toBe(8)
+  })
+
+  it('重置后还能正常记账（分类 id 可用）', async () => {
+    await resetAll()
+    const cat = (await listCats())[0]
+    expect(cat.id).toBeTruthy()
+    await txService.addTx({ amountStr: '1', categoryId: cat.id, type: 'expense', ts: Date.now() })
+    expect((await txService.listByMonth(ym)).length).toBe(1)
+  })
+
+  it('重复重置不报错', async () => {
+    await resetAll()
+    await resetAll()
+    expect((await listCats()).length).toBe(20)
   })
 })

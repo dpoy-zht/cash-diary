@@ -48,7 +48,7 @@ npm run dev:h5
 
 ```
 ├─ src/                uni-app 源码根（CLI 约定）
-│  ├─ pages/           页面：home（首页）/ add（记一笔）/ stats（统计）/ me（我的）
+│  ├─ pages/           页面：home（首页）/ add（记一笔）/ stats（统计）/ ledger（账本）/ me（我的）
 │  ├─ components/      公共组件：tab-bar（5 Tab 自定义导航）/ money-keyboard / category-grid / cat-icon / tx-item / edit-sheet / mascot
 │  ├─ stores/          Pinia：category / tx / meta
 │  ├─ services/        业务层：记账校验与编排、分类种子

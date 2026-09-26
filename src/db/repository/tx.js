@@ -54,3 +54,21 @@ export async function update(id, patch) {
 export async function softDelete(id) {
   return getStorage().txSoftDelete(id)
 }
+
+/**
+ * 全量概览（未删除）：笔数 / 累计收支 / 最早与最近一笔的时间。
+ * 空库时笔数与金额为 0，时间为 null。
+ */
+export async function overview() {
+  const row = await getStorage().txOverview()
+  function num(v) {
+    return v == null ? 0 : Number(v)
+  }
+  return {
+    totalCount: num(row.c),
+    incomeCents: num(row.inc),
+    expenseCents: num(row.exp),
+    firstAt: row.firstAt == null ? null : Number(row.firstAt),
+    lastAt: row.lastAt == null ? null : Number(row.lastAt)
+  }
+}

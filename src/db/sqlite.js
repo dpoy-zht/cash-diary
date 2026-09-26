@@ -97,3 +97,28 @@ export async function categoryInsert(cat) {
   const vals = cols.map(function (c) { return sqlValue(cat[c]) }).join(', ')
   await executeBatch(['INSERT INTO category (' + cols.join(',') + ') VALUES (' + vals + ')'])
 }
+
+/* ---------- 全量概览与维护 ---------- */
+
+/** 全量（未删除）流水概览：笔数、累计收支、最早/最近时间；聚合交给 SQL，不在 JS 累加 */
+export async function txOverview() {
+  const rows = await select(
+    'SELECT COUNT(*) AS c, ' +
+    "SUM(CASE WHEN type = 'income'  THEN amount_cents ELSE 0 END) AS inc, " +
+    "SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END) AS exp, " +
+    'MIN(occurred_at) AS firstAt, MAX(occurred_at) AS lastAt ' +
+    'FROM transaction_record WHERE deleted_at IS NULL'
+  )
+  return rows[0] || {}
+}
+
+/** 清空全部业务数据（流水 + 分类），表结构不动 —— 供「重置数据」用
+    sqlite_sequence 也要清，否则自增 id 会接着往下涨 */
+export async function clearAll() {
+  await executeBatch([
+    'DELETE FROM transaction_record',
+    'DELETE FROM category',
+    "DELETE FROM sqlite_sequence WHERE name IN ('transaction_record','category')"
+  ])
+}
+

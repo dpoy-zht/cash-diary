@@ -66,3 +66,8 @@ export async function listByMonth(ym) {
 export async function monthSummary(ym) {
   return txRepo.monthSummary(ym)
 }
+
+/** 全量概览：累计笔数与收支、最早/最近一笔时间（账本页用） */
+export async function overview() {
+  return txRepo.overview()
+}

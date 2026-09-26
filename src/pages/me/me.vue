@@ -28,6 +28,15 @@
       <text class="me-soon">分类管理、数据备份导出、预算提醒还在计划里，做好后会出现在这里。</text>
     </view>
 
+    <!-- 重置数据：开发期工具，需两次确认 -->
+    <view class="me-card">
+      <view class="me-row" @click="confirmReset">
+        <text class="mr-label mr-danger">重置数据</text>
+        <text class="mr-value">清空全部流水并恢复内置分类</text>
+      </view>
+      <text class="me-soon">开发期工具：把本机数据恢复到「刚装好」的状态，正式版会移除。</text>
+    </view>
+
     <text class="me-tip">数据只保存在本机（App 端为 SQLite）。备份导出功能尚未完成，现阶段请勿卸载 App。</text>
     <text class="me-version">奶龙记账 · v2.0.0</text>
 
@@ -40,13 +49,16 @@ import { computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useMetaStore } from '../../stores/meta.js'
+import { useCategoryStore } from '../../stores/category.js'
+import { resetAll } from '../../services/maintenance.js'
 
 /**
- * 我的（v2.0 风格重刷）：问候卡 + 设置卡。
+ * 我的（v2.0 风格重刷）：问候卡 + 设置卡 + 重置数据入口。
  * 参考包没有这一页的设计，按同一套令牌（奶油底 / 白卡 / 蛋黄点缀）补齐。
  */
 const txStore = useTxStore()
 const metaStore = useMetaStore()
+const categoryStore = useCategoryStore()
 
 const monthText = computed(function () {
   const parts = metaStore.ym.split('-')
@@ -67,6 +79,49 @@ const storageLabel = computed(function () {
 onShow(function () {
   txStore.loadMonth(metaStore.ym)
 })
+
+/** 第一次确认：说清后果 */
+function confirmReset() {
+  uni.showModal({
+    title: '重置数据',
+    content: '会清空本机全部流水并恢复内置分类。备份导出功能尚未完成，重置后无法找回。',
+    confirmText: '继续',
+    cancelText: '取消',
+    success: function (r1) {
+      if (!r1.confirm) return
+      confirmResetTwice()
+    }
+  })
+}
+
+/** 第二次确认：不可撤销 */
+function confirmResetTwice() {
+  uni.showModal({
+    title: '再次确认',
+    content: '重置后无法撤销，确定要清空吗？',
+    confirmText: '确认重置',
+    confirmColor: '#b93b39',
+    cancelText: '我再想想',
+    success: function (r2) {
+      if (!r2.confirm) return
+      doReset()
+    }
+  })
+}
+
+async function doReset() {
+  uni.showLoading({ title: '重置中…', mask: true })
+  try {
+    await resetAll()
+    await categoryStore.init() // 重置时已回写种子，这里把分类读进 store
+    await txStore.refresh(metaStore.ym)
+    uni.hideLoading()
+    uni.showToast({ title: '已重置', icon: 'none' })
+  } catch (err) {
+    uni.hideLoading()
+    uni.showToast({ title: (err && err.message) || '重置失败', icon: 'none' })
+  }
+}
 </script>
 
 <style scoped>
@@ -138,6 +193,10 @@ onShow(function () {
   font-size: 13px;
   font-weight: 600;
   color: var(--cd-ink-2);
+}
+/* 危险操作：加深红字（对奶油底 ≥4.5:1） */
+.mr-danger {
+  color: var(--cd-danger-ink);
 }
 .me-soon {
   display: block;

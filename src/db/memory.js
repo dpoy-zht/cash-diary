@@ -111,3 +111,28 @@ export async function categoryInsert(cat) {
   persist()
   return id
 }
+
+/* ---------- 全量概览与维护 ---------- */
+
+/** 全量（未删除）流水概览：笔数、累计收支、最早/最近时间；空库时 c=0、时间为 null */
+export async function txOverview() {
+  const rows = data.transaction_record.filter(function (r) { return r.deleted_at == null })
+  let inc = 0
+  let exp = 0
+  let firstAt = null
+  let lastAt = null
+  rows.forEach(function (r) {
+    if (r.type === 'income') inc += r.amount_cents
+    else if (r.type === 'expense') exp += r.amount_cents
+    if (firstAt == null || r.occurred_at < firstAt) firstAt = r.occurred_at
+    if (lastAt == null || r.occurred_at > lastAt) lastAt = r.occurred_at
+  })
+  return { c: rows.length, inc: inc, exp: exp, firstAt: firstAt, lastAt: lastAt }
+}
+
+/** 清空全部业务数据（流水 + 分类），表结构保留 —— 供「重置数据」用 */
+export async function clearAll() {
+  data = blank()
+  persist()
+}
+
