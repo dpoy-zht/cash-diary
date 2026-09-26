@@ -1,6 +1,6 @@
 # 形象中心 · 图片素材
 
-本目录存放 `demo/nailong-gallery.html` 用到的图片。
+本目录存放 `demo/archive/nailong-gallery-v1.1.html` 用到的图片。
 
 ## ⚠️ 版权与使用范围
 
@@ -31,5 +31,5 @@ python fetch.py --only-opt   # 只重跑优化
 
 ## 依赖关系
 
-`demo/nailong-gallery.html` 的 `ITEMS` 数组按 `slug` 引用这些文件。
+`demo/archive/nailong-gallery-v1.1.html` 的 `ITEMS` 数组按 `slug` 引用这些文件。
 新增形象：把图片放进本目录（同名两档）→ 在 `ITEMS` 里加一条即可，无需改其他代码。

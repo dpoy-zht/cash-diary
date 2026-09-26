@@ -4,7 +4,10 @@
     <view class="navbar">
       <view class="icon-btn" @click="goHome"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">奶龙算账</text>
-      <view class="icon-btn" @click="toast('日历功能规划中')"><view class="ib" :style="iconCal" /></view>
+      <!-- 真正的月份选择器：统计页原先只能跟随首页月份，无法自己切换 -->
+      <picker mode="date" fields="month" :value="monthValue" @change="onMonthChange">
+        <view class="month-chip">{{ monthLabel }}</view>
+      </picker>
     </view>
 
     <!-- 日 / 周 / 月 / 年 -->
@@ -90,6 +93,20 @@ const period = ref('month')
 const rows = computed(function () {
   return expenseByCategory(txStore.records, categoryStore.list)
 })
+const monthLabel = computed(function () {
+  const parts = metaStore.ym.split('-')
+  return parts[0] + '/' + Number(parts[1])
+})
+const monthValue = computed(function () {
+  return metaStore.ym
+})
+/** 换月后立刻重算，统计页与首页共用 meta store 的月份，保持一致 */
+function onMonthChange(e) {
+  const v = e.detail.value
+  if (!/^\d{4}-\d{2}$/.test(v)) return
+  metaStore.ym = v
+  txStore.loadMonth(v)
+}
 const segments = computed(function () {
   return donutSegments(rows.value)
 })
@@ -110,12 +127,8 @@ function pickPeriod(s) {
 function goHome() {
   uni.reLaunch({ url: '/pages/home/home' })
 }
-function toast(msg) {
-  uni.showToast({ title: msg, icon: 'none' })
-}
 
 const iconBack = svgMaskStyle('M15.4 7.4L14 6l-6 6 6 6 1.4-1.4L10.8 12z')
-const iconCal = svgMaskStyle('M19 3h-1V1h-2v2H8V1H6v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H5V9h14v10z')
 
 onShow(function () {
   txStore.loadMonth(metaStore.ym)
@@ -154,6 +167,16 @@ onShow(function () {
   width: 18px;
   height: 18px;
   background: #8a7450;
+}
+/* 月份胶囊：统计页自己选分析哪个月 */
+.month-chip {
+  background: var(--cd-primary-lt);
+  color: #8a7450;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: var(--cd-r-pill);
+  font-variant-numeric: tabular-nums;
 }
 
 .seg {

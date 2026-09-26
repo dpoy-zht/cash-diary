@@ -1,9 +1,9 @@
 {
-  "name": "现金日记",
+  "name": "奶龙记账",
   "appid": "__UNI__CASHD1",
-  "description": "3秒记一笔的个人记账App（MVP：快速记账/明细/编辑删除/本地持久化）",
-  "versionName": "0.1.0",
-  "versionCode": 100,
+  "description": "奶龙风个人记账 App（首页余额卡 / 3 秒记一笔 / 分类统计，本地 SQLite 持久化）",
+  "versionName": "2.0.0",
+  "versionCode": 200,
   "transformPx": false,
   "app-plus": {
     "usingComponents": true,

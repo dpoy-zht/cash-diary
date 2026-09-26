@@ -11,29 +11,24 @@
       </view>
     </view>
 
+    <!-- 真实信息：两行都是可读数据，不是点了没反应的假按钮 -->
     <view class="me-card">
       <view class="me-row">
         <text class="mr-label">存储模式</text>
         <text class="mr-value">{{ storageLabel }}</text>
       </view>
       <view class="me-row">
-        <text class="mr-label">分类管理</text>
-        <view class="badge">P1</view>
+        <text class="mr-label">{{ monthText }}记录</text>
+        <text class="mr-value">{{ countText }} 笔</text>
       </view>
     </view>
 
+    <!-- 计划中的功能：诚实说明，不摆假按钮 -->
     <view class="me-card">
-      <view class="me-row">
-        <text class="mr-label">数据备份导出</text>
-        <view class="badge">P1</view>
-      </view>
-      <view class="me-row">
-        <text class="mr-label">预算与超支提醒</text>
-        <view class="badge">P2</view>
-      </view>
+      <text class="me-soon">分类管理、数据备份导出、预算提醒还在计划里，做好后会出现在这里。</text>
     </view>
 
-    <text class="me-tip">数据只保存在本机（App 端为 SQLite），卸载 App 前请先导出备份。</text>
+    <text class="me-tip">数据只保存在本机（App 端为 SQLite）。备份导出功能尚未完成，现阶段请勿卸载 App。</text>
     <text class="me-version">奶龙记账 · v2.0.0</text>
 
     <tab-bar current="me" />
@@ -144,14 +139,12 @@ onShow(function () {
   font-weight: 600;
   color: var(--cd-ink-2);
 }
-.badge {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 800;
-  color: #8a7450;
-  background: var(--cd-primary-lt);
-  padding: 4px 10px;
-  border-radius: var(--cd-r-pill);
+.me-soon {
+  display: block;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--cd-ink-2);
+  padding: 14px 0;
 }
 .me-tip {
   display: block;

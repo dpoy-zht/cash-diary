@@ -28,7 +28,7 @@
 | 组件 | `src/components/edit-sheet/edit-sheet.vue` | 重写样式；新增上滑入场与暖色遮罩 |
 | 组件 | `src/components/mascot/mascot.vue` | **新增**吉祥物（纯 CSS，零图片资源） |
 | 工具 | `src/utils/palette.js` | **新增**分类底色映射（纯展示层） |
-| 原型 | `demo/index.html` | CSS 与令牌同步，新增吉祥物与 CSS 变量说明 |
+| 原型 | `demo/archive/ledger-prototype-v1.2.html` | CSS 与令牌同步，新增吉祥物与 CSS 变量说明 |
 
 **明确未改动**：`src/stores/`、`src/services/`、`src/db/`、`src/utils/money.js`、`src/utils/date.js`、`tests/` 中的既有用例。
 页面 `<script setup>` 只增删了模板 class 绑定，业务函数体一字未动。
@@ -172,7 +172,7 @@
 
 ## 6. 改动后请重点查看的界面与状态
 
-建议按此顺序看（`demo/index.html` 可直接在浏览器交互，与真机表现一致）：
+建议按此顺序看（`demo/archive/ledger-prototype-v1.2.html` 可直接在浏览器交互，与真机表现一致）：
 
 | # | 界面 / 状态 | 怎么进入 | 看什么 |
 |---|---|---|---|
@@ -219,7 +219,7 @@
 
 ## 9. 附：形象中心（真实素材 Demo）
 
-`demo/nailong-gallery.html` —— 一个把「奶龙」**真实图片素材**嵌进 UI 的独立设计稿，用来验证
+`demo/archive/nailong-gallery-v1.1.html` —— 一个把「奶龙」**真实图片素材**嵌进 UI 的独立设计稿，用来验证
 "带图片的信息型界面"的布局、按钮层级与加载体验。它**不属于 App 发布路径**（`src/` 未改动一行）。
 
 ### 9.1 版权前置约束
@@ -303,7 +303,7 @@
 
 ## 10. 吸顶导航：半透明 + 毛玻璃，以及它的降级链
 
-适用文件：`demo/nailong-gallery.html` 的 `.app-bar`（顶栏）与 `.actionbar`（吸底操作栏）。
+适用文件：`demo/archive/nailong-gallery-v1.1.html` 的 `.app-bar`（顶栏）与 `.actionbar`（吸底操作栏）。
 
 ### 10.1 先决条件：顶栏必须真的"吸顶"
 
@@ -581,7 +581,7 @@ H5 端 `--status-bar-height` 为 0，所以下面这些只能在真机上看：
 | 页面 | `transactions.vue` | 月份圆钮、合计卡、按天卡全部玻璃化 |
 | 页面 | `me.vue` | 问候卡（挂 `.cd-glow`）、两张设置卡玻璃化 |
 | 工具 | `utils/palette.js` | 分类底色换成参考项目的马卡龙 6 色 + 2 支同族色 |
-| 原型 | `demo/index.html` | 令牌块整体同步（老令牌名留兼容映射，25 处旧引用无需逐条改） |
+| 原型 | `demo/archive/ledger-prototype-v1.2.html` | 令牌块整体同步（老令牌名留兼容映射，25 处旧引用无需逐条改） |
 
 ### 12.3 设计规范怎么"复用"：三条通道
 

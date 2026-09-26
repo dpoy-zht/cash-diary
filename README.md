@@ -20,12 +20,11 @@
 |---|---|
 | [`AGENTS.md`](./AGENTS.md) | 协作规范（每次改动必须 commit + 测试通过后交付） |
 | [`PLAN.md`](./PLAN.md) | 开发起步方案与 5 阶段路线图 |
-| [`docs/PRD.md`](./docs/PRD.md) | 产品设计文档（MVP 范围已冻结） |
+| [`docs/PRD.md`](./docs/PRD.md) | 产品设计文档 v2.0（信息架构 / 流程 / 设计规范 / 验收标准） |
 | [`docs/技术方案.md`](./docs/技术方案.md) | 技术方案（架构 / 数据层 / 测试 / 风险） |
-| [`docs/nailong-ui-spec.md`](./docs/nailong-ui-spec.md) | 视觉规范（奶龙风暖黄治愈系：令牌表 / 对比度 / 一致性规则） |
-| [`demo/index.html`](./demo/index.html) | HTML 可交互原型（界面与交互以此为准） |
-| [`demo/nailong-ledger.html`](./demo/nailong-ledger.html) | **「奶龙记账」设计基准原型 v2.0**（当前设计基准，复现自用户提供的参考包） |
-| [`demo/nailong-gallery.html`](./demo/nailong-gallery.html) | 「形象中心」设计稿（嵌入真实图片素材，含素材版权说明） |
+| [`docs/nailong-ui-spec.md`](./docs/nailong-ui-spec.md) | 视觉规范（**§1–§12 为已归档的 v1.x**，现行规范见 PRD §8） |
+| [`demo/nailong-ledger.html`](./demo/nailong-ledger.html) | **「奶龙记账」设计基准原型 v2.0**（当前唯一有效基准，复现自用户提供的参考包） |
+| [`demo/archive/`](./demo/archive/) | 已归档的旧原型（v1.2 记账原型、v1.1 形象中心）——勿作为基准 |
 
 ## 快速开始
 
@@ -59,10 +58,10 @@ npm run dev:h5
 │  ├─ App.vue          应用入口（启动初始化数据库与分类 + **全站设计令牌层 v2.0**）
 │  └─ pages.json / manifest.json
 ├─ tests/              vitest 单元与集成测试
-├─ demo/               HTML 交互原型（UX 基准）
-│  ├─ index.html            记账全流程可交互原型
-│  ├─ nailong-gallery.html  形象中心（真实图片素材，见 §图片素材）
-│  └─ assets/nailong/       图片素材目录（含 fetch.py；图片本身不入库）
+├─ demo/               设计原型与素材
+│  ├─ nailong-ledger.html   **v2.0 设计基准原型**（当前唯一有效）
+│  ├─ archive/              已归档旧原型（v1.2 记账原型 / v1.1 形象中心）
+│  └─ assets/               图片素材目录（nailong/ 与 milo/；图片本身不入库）
 └─ docs/               产品与技术文档
 ```
 

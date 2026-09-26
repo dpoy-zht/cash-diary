@@ -233,7 +233,7 @@ def main() -> None:
         print(f"下载完成 {n}/{len(SOURCES)}")
     print("\n优化为两档 WebP（白底自动抠透明）…")
     optimize()
-    print("\n完成。用浏览器打开 ../nailong-gallery.html 查看效果。")
+    print("\n完成。用浏览器打开 ../archive/nailong-gallery-v1.1.html 查看效果。")
 
 
 if __name__ == "__main__":

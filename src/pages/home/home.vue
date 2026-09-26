@@ -1,8 +1,7 @@
 <template>
   <view class="page">
-    <!-- 顶部导航 -->
+    <!-- 顶部导航：左侧标题，右侧两个有真实行为的小按钮 -->
     <view class="navbar">
-      <view class="icon-btn" @click="toast('菜单功能规划中')"><view class="ib" :style="iconMenu" /></view>
       <text class="nav-title">奶龙记账</text>
       <view class="nav-right">
         <view class="icon-btn" @click="showSalary"><view class="ib" :style="iconCoin" /></view>
@@ -186,9 +185,6 @@ function showSalary() {
 function showOver() {
   overShow.value = true
 }
-function openEdit(r) {
-  editing.value = r
-}
 function closeEdit() {
   editing.value = null
 }
@@ -215,11 +211,10 @@ function onRemove() {
     }
   })
 }
-function toast(msg) {
-  uni.showToast({ title: msg, icon: 'none' })
+function openEdit(r) {
+  editing.value = r
 }
 
-const iconMenu = svgMaskStyle('M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z')
 const iconCoin = svgMaskStyle('M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93V18h-2v1.93A8.01 8.01 0 014.07 13H6v-2H4.07A8.01 8.01 0 0111 4.07V6h2V4.07A8.01 8.01 0 0119.93 11H18v2h1.93A8.01 8.01 0 0113 19.93z')
 const iconBell = svgMaskStyle('M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z')
 const iconHeart = svgMaskStyle('M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z')
