@@ -136,3 +136,10 @@ export async function clearAll() {
   persist()
 }
 
+/** 某时间点之后的所有（未删除）流水时间戳 —— 算连续记账天数用 */
+export async function txRecentTimestamps(sinceTs) {
+  return data.transaction_record
+    .filter(function (r) { return r.deleted_at == null && r.occurred_at >= sinceTs })
+    .map(function (r) { return r.occurred_at })
+}
+

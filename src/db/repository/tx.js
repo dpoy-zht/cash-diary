@@ -72,3 +72,9 @@ export async function overview() {
     lastAt: row.lastAt == null ? null : Number(row.lastAt)
   }
 }
+
+/** 某时间点之后的所有（未删除）流水时间戳，供「连续记账天数」计算 */
+export async function recentTimestamps(sinceTs) {
+  const rows = await getStorage().txRecentTimestamps(sinceTs)
+  return rows.map(function (v) { return Number(v) })
+}

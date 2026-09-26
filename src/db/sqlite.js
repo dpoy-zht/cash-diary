@@ -122,3 +122,12 @@ export async function clearAll() {
   ])
 }
 
+/** 某时间点之后的所有（未删除）流水时间戳 —— 算连续记账天数用（本地日分组在 JS 做） */
+export async function txRecentTimestamps(sinceTs) {
+  const rows = await select(
+    'SELECT occurred_at FROM transaction_record ' +
+    'WHERE deleted_at IS NULL AND occurred_at >= ' + Number(sinceTs)
+  )
+  return rows.map(function (r) { return Number(r.occurred_at) })
+}
+

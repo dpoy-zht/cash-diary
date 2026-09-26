@@ -71,3 +71,8 @@ export async function monthSummary(ym) {
 export async function overview() {
   return txRepo.overview()
 }
+
+/** 某时间点之后的流水时间戳（我的页算连续记账天数用） */
+export async function recentTimestamps(sinceTs) {
+  return txRepo.recentTimestamps(sinceTs)
+}

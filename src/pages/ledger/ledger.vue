@@ -1,12 +1,19 @@
 <template>
   <view class="page">
-    <view class="navbar"><text class="nav-title">我的账本</text></view>
-
-    <!-- 当前账本卡（财神奶龙圆形裁切后趴在右上角） -->
-    <view class="ledger-card">
-      <view class="caishen">
-        <image class="caishen-img" src="/static/milo/milo-caishen.webp" mode="aspectFit" />
+    <!-- navbar：菜单 / 我的账本 / 新建 -->
+    <view class="navbar">
+      <view class="icon-btn" hover-class="ib-hover" @click="toast('菜单功能规划中')">
+        <view class="ib" :style="iconMenu" />
       </view>
+      <text class="nav-title">我的账本</text>
+      <view class="icon-btn" hover-class="ib-hover" @click="onCreateLedger">
+        <view class="ib" :style="iconPlus" />
+      </view>
+    </view>
+
+    <!-- 当前账本卡：财神奶龙圆形裁切后趴在右上角 -->
+    <view class="ledger-card">
+      <image class="caishen" src="/static/milo/milo-caishen.webp" mode="aspectFill" />
       <text class="lc-label">当前账本</text>
       <text class="lc-name">{{ ledgerName }}</text>
       <text class="lc-num">¥{{ balanceText }}</text>
@@ -16,32 +23,35 @@
       </view>
     </view>
 
-    <!-- 账本统计 -->
-    <view class="info-card">
-      <view class="info-row">
-        <text class="ir-label">累计记录</text>
-        <text class="ir-value">{{ overview.totalCount }} 笔</text>
+    <!-- 其他账本：当前数据层还没有多账本，这里给诚实的空态而不是编造数据 -->
+    <text class="section-label">其他账本（{{ others.length }}）</text>
+    <view class="list-card">
+      <view v-if="!others.length" class="empty-row">
+        <text class="empty-t">还没有其他账本</text>
+        <text class="empty-s">新建后可以把「日常」「旅行基金」这类钱分开记</text>
       </view>
-      <view class="info-row">
-        <text class="ir-label">最早一笔</text>
-        <text class="ir-value">{{ firstText }}</text>
-      </view>
-      <view class="info-row">
-        <text class="ir-label">最近一笔</text>
-        <text class="ir-value">{{ lastText }}</text>
+      <view
+        v-for="l in others"
+        :key="l.id"
+        class="list-row"
+        hover-class="row-hover"
+        @click="switchTo(l)"
+      >
+        <view class="list-ic" :style="{ background: l.color }" />
+        <view class="list-main">
+          <text class="list-name">{{ l.name }}</text>
+          <text class="list-sub">{{ l.sub }}</text>
+        </view>
+        <text class="list-amt">¥{{ l.amountText }}</text>
       </view>
     </view>
 
-    <view v-if="!overview.totalCount" class="tip-card cd-empty">
-      <image class="tip-img" src="/static/milo/milo-innocent.webp" mode="aspectFit" />
-      <text class="tip-text">这个账本还是空的，去记一笔吧~</text>
-    </view>
-
-    <!-- 多账本：诚实说明，不摆点了没反应的按钮 -->
-    <view class="tip-card">
-      <text class="tip-text">
-        多账本（如「日常」「旅行基金」分开记）还在计划里，做好后可以在这里新建与切换。
-      </text>
+    <!-- 新建账本行：金条奶龙 + 黄色胶囊按钮 -->
+    <view class="create-row">
+      <image class="gold-img" src="/static/milo/milo-gold.webp" mode="aspectFit" />
+      <view class="create-btn" hover-class="create-hover" @click="onCreateLedger">
+        <text class="create-t">+ 新建账本</text>
+      </view>
     </view>
 
     <tab-bar current="ledger" />
@@ -55,23 +65,22 @@ import { useTxStore } from '../../stores/tx.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { formatCents } from '../../utils/money.js'
 import { balanceCents } from '../../utils/stats.js'
+import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
- * 账本页（v2.0 风格）。
+ * 账本页（布局/组件/间距/配色逐项对齐 v2.0 参考包的 view-ledger）：
+ * navbar（菜单/标题/新建）→ 当前账本卡（财神奶龙趴右上角）→ 其他账本（N）→ 新建账本行。
  *
- * 诚实说明：当前数据层还没有多账本（schema 里没有 account 表，MVP 时省掉了），
- * 所以这一页是「当前账本 + 全量统计」的真实数据版；多账本属于后续功能。
- * 页面上不放"新建账本"按钮——没实现的功能不摆按钮。
+ * ⚠️ 与参考包的差异：参考包里「其他账本（3）」是写死的假数据（旅行基金/减肥基金/红包零钱），
+ * 本 App 的数据层**还没有多账本**（没有 account 表），所以这里是**诚实的空态**，
+ * 不编造账本。等做多账本时，把 others 接上真实数据即可，版式不用动。
  */
 const txStore = useTxStore()
 const metaStore = useMetaStore()
 
 const ledgerName = '日常账本'
-
-/** 全量概览（模板里直接用 overview.xxx，所以要在脚本里显式暴露一个绑定） */
-const overview = computed(function () {
-  return txStore.overview
-})
+/** 多账本未实现，恒为空数组；版式与列表行渲染逻辑已就绪 */
+const others = []
 
 const balanceText = computed(function () {
   return formatCents(balanceCents(txStore.overview))
@@ -83,17 +92,23 @@ const expenseText = computed(function () {
   return formatCents(txStore.overview.expenseCents)
 })
 
-function shortDate(ts) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  return d.getMonth() + 1 + '月' + d.getDate() + '日'
+function toast(msg) {
+  uni.showToast({ title: msg, icon: 'none' })
 }
-const firstText = computed(function () {
-  return shortDate(txStore.overview.firstAt)
-})
-const lastText = computed(function () {
-  return shortDate(txStore.overview.lastAt)
-})
+function switchTo(l) {
+  toast('切换到' + l.name)
+}
+function onCreateLedger() {
+  uni.showModal({
+    title: '新建账本',
+    content: '多账本（把「日常」「旅行基金」这类钱分开记）还在计划里，做好后就能在这里新建与切换。',
+    showCancel: false,
+    confirmText: '知道啦'
+  })
+}
+
+const iconMenu = svgMaskStyle('M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z')
+const iconPlus = svgMaskStyle('M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z')
 
 onShow(function () {
   txStore.refresh(metaStore.ym)
@@ -108,13 +123,34 @@ onShow(function () {
   padding-top: var(--status-bar-height, 0px);
 }
 
+/* ---- navbar ---- */
 .navbar {
-  padding: 12px 20px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 4px;
 }
 .nav-title {
   font-size: 20px;
   font-weight: 800;
   color: var(--cd-ink);
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--cd-primary-lt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ib-hover {
+  background: var(--cd-primary);
+}
+.ib {
+  width: 18px;
+  height: 18px;
+  background: #8a7450;
 }
 
 /* ---- 当前账本卡 ---- */
@@ -125,23 +161,17 @@ onShow(function () {
   background: var(--cd-grad-brand);
   box-shadow: 0 10px 24px rgba(255, 217, 61, 0.35);
   position: relative;
+  overflow: visible;
 }
-/* 场景底图用圆形裁切 + 白描边，避免方形照片边角 */
+/* 场景底图圆形裁切 + 白描边，露出卡片上沿（= 参考包写法） */
 .caishen {
   position: absolute;
-  top: -18px;
-  right: 14px;
-  width: 72px;
-  height: 72px;
+  top: -24px;
+  right: 12px;
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid #ffffff;
-  background: var(--cd-primary-lt);
-  box-shadow: 0 4px 10px rgba(93, 78, 55, 0.18);
-}
-.caishen-img {
-  width: 100%;
-  height: 100%;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
 }
 .lc-label {
   font-size: 12px;
@@ -176,59 +206,106 @@ onShow(function () {
   color: var(--cd-ink);
 }
 
-/* ---- 统计卡 ---- */
-.info-card {
-  margin: 12px 16px;
+/* ---- 其他账本 ---- */
+.section-label {
+  display: block;
+  margin: 16px 20px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cd-ink-2);
+}
+.list-card {
+  margin: 0 16px;
   background: var(--cd-surface);
-  border-radius: var(--cd-r-md);
+  border-radius: 20px;
   padding: 4px 16px;
-  box-shadow: var(--cd-sh-card);
 }
-.info-row {
+.empty-row {
+  padding: 18px 0;
   display: flex;
-  align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--cd-line);
+  flex-direction: column;
+  gap: 4px;
 }
-.info-row:last-child {
-  border-bottom: none;
-}
-.ir-label {
-  font-size: 15px;
+.empty-t {
+  font-size: 14px;
   font-weight: 700;
   color: var(--cd-ink);
 }
-.ir-value {
-  margin-left: auto;
-  font-size: 13px;
-  font-weight: 600;
+.empty-s {
+  font-size: 11px;
   color: var(--cd-ink-2);
+  line-height: 1.6;
+}
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--cd-line);
+}
+.list-row:last-child {
+  border-bottom: none;
+}
+.row-hover {
+  background: rgba(255, 233, 168, 0.35);
+}
+.list-ic {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: none;
+}
+.list-main {
+  flex: 1;
+  min-width: 0;
+}
+.list-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cd-ink);
+}
+.list-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--cd-ink-2);
+  margin-top: 2px;
+}
+.list-amt {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--cd-ink);
   font-variant-numeric: tabular-nums;
 }
 
-/* ---- 说明 / 空态卡 ---- */
-.tip-card {
-  margin: 12px 16px;
-  background: var(--cd-surface);
-  border-radius: var(--cd-r-md);
-  padding: 16px;
-  box-shadow: var(--cd-sh-card);
-}
-.cd-empty {
+/* ---- 新建账本行 ---- */
+.create-row {
+  margin: 20px 16px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 20px 16px;
+  gap: 10px;
 }
-.tip-img {
-  width: 110px;
-  height: 110px;
-  border-radius: 16px;
-  margin-bottom: 8px;
+.gold-img {
+  width: 56px;
+  height: 56px;
+  flex: none;
 }
-.tip-text {
-  font-size: 12.5px;
-  line-height: 1.7;
-  color: var(--cd-ink-2);
+.create-btn {
+  flex: 1;
+  background: var(--cd-primary);
+  border-radius: var(--cd-r-pill);
+  padding: 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 14px rgba(255, 201, 60, 0.4);
+}
+.create-hover {
+  opacity: 0.9;
+  transform: scale(0.985);
+}
+.create-t {
+  color: var(--cd-btn-ink);
+  font-size: 15px;
+  font-weight: 700;
 }
 </style>

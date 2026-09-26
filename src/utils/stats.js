@@ -75,3 +75,67 @@ export function balanceCents(summary) {
   const s = summary || {}
   return (s.incomeCents || 0) - (s.expenseCents || 0)
 }
+
+/** 本地日历日的起点（0 点），按手机本地时区 */
+function dayStartOf(ts) {
+  const d = new Date(ts)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+/**
+ * 连续记账天数：从今天（或昨天）往前数，有多少天是连续的"有记账"。
+ *
+ * 规则说明（避免出现"今天还没记就断签"的挫败感）：
+ * - 今天有记录 → 从今天起往前数
+ * - 今天还没记但昨天有 → 从昨天起往前数（今天算作"还没断"）
+ * - 昨天也没有 → 连续中断，返回 0
+ *
+ * @param {number[]} timestamps 最近的记录时间戳（需要覆盖到连续段起点）
+ * @param {number} nowTs 当前时间
+ * @returns {number} 连续天数
+ */
+export function streakDays(timestamps, nowTs) {
+  const list = Array.isArray(timestamps) ? timestamps : []
+  if (!list.length) return 0
+
+  const days = new Set(list.map(dayStartOf))
+  const today = dayStartOf(nowTs == null ? Date.now() : nowTs)
+  const DAY = 86400000
+
+  let cursor
+  if (days.has(today)) cursor = today
+  else if (days.has(today - DAY)) cursor = today - DAY
+  else return 0
+
+  let n = 0
+  while (days.has(cursor)) {
+    n += 1
+    cursor -= DAY
+  }
+  return n
+}
+
+/** 等级称号表：按累计记录笔数升级，每 10 笔一级 */
+const LEVEL_TITLES = [
+  '记账萌新',
+  '攒钱新手',
+  '攒钱小能手',
+  '记账达人',
+  '攒钱高手',
+  '理财小能龙',
+  '暴富预备役',
+  '奶龙财务官',
+  '金库守护者',
+  '奶龙首富'
+]
+
+/**
+ * 按累计记录笔数算等级（每 10 笔升一级，最高 10 级）。
+ * @returns {{level:number, title:string}}
+ */
+export function levelOf(totalCount) {
+  const n = Math.max(0, Math.floor(Number(totalCount) || 0))
+  const idx = Math.min(LEVEL_TITLES.length - 1, Math.floor(n / 10))
+  return { level: idx + 1, title: LEVEL_TITLES[idx] }
+}

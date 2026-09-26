@@ -3,7 +3,9 @@ import {
   expenseByCategory,
   donutSegments,
   conicGradient,
-  balanceCents
+  balanceCents,
+  streakDays,
+  levelOf
 } from '../src/utils/stats.js'
 
 const CATS = [
@@ -108,5 +110,78 @@ describe('balanceCents —— 余额', () => {
   it('缺字段按 0 处理，不抛错', () => {
     expect(balanceCents({})).toBe(0)
     expect(balanceCents(null)).toBe(0)
+  })
+})
+
+/** 用本地时间造时间戳，保证与 dayStartOf 的本地时区口径一致 */
+function at(y, m, d, h) {
+  return new Date(y, m - 1, d, h == null ? 12 : h, 0, 0).getTime()
+}
+const TODAY = at(2026, 9, 27)
+
+describe('streakDays —— 连续记账天数', () => {
+  it('没有记录返回 0', () => {
+    expect(streakDays([], TODAY)).toBe(0)
+    expect(streakDays(null, TODAY)).toBe(0)
+  })
+
+  it('只有今天一条 → 1 天', () => {
+    expect(streakDays([at(2026, 9, 27, 9)], TODAY)).toBe(1)
+  })
+
+  it('今天往前连续 3 天 → 3 天（同一天多条只算一天）', () => {
+    const ts = [at(2026, 9, 27, 9), at(2026, 9, 27, 20), at(2026, 9, 26, 8), at(2026, 9, 25, 22)]
+    expect(streakDays(ts, TODAY)).toBe(3)
+  })
+
+  it('今天还没记但昨天记了 → 连续不断，从昨天算起', () => {
+    const ts = [at(2026, 9, 26, 9), at(2026, 9, 25, 9)]
+    expect(streakDays(ts, TODAY)).toBe(2)
+  })
+
+  it('昨天与今天都没记 → 中断，返回 0', () => {
+    const ts = [at(2026, 9, 25, 9), at(2026, 9, 24, 9)]
+    expect(streakDays(ts, TODAY)).toBe(0)
+  })
+
+  it('中间断过 → 只数最近那一段', () => {
+    const ts = [
+      at(2026, 9, 27, 9),
+      at(2026, 9, 26, 9),
+      // 9/25 缺
+      at(2026, 9, 24, 9),
+      at(2026, 9, 23, 9)
+    ]
+    expect(streakDays(ts, TODAY)).toBe(2)
+  })
+
+  it('跨月也能连续数', () => {
+    const ts = [at(2026, 10, 1, 9), at(2026, 9, 30, 9), at(2026, 9, 29, 9)]
+    expect(streakDays(ts, at(2026, 10, 1))).toBe(3)
+  })
+})
+
+describe('levelOf —— 按累计笔数算等级', () => {
+  it('0 笔 = Lv.1', () => {
+    const r = levelOf(0)
+    expect(r.level).toBe(1)
+    expect(r.title).toBe('记账萌新')
+  })
+
+  it('每 10 笔升一级', () => {
+    expect(levelOf(9).level).toBe(1)
+    expect(levelOf(10).level).toBe(2)
+    expect(levelOf(25).level).toBe(3)
+  })
+
+  it('到顶后不再升（有上限，不会出现空称号）', () => {
+    expect(levelOf(1000).level).toBe(10)
+    expect(levelOf(1000).title).toBeTruthy()
+  })
+
+  it('非法入参不抛错', () => {
+    expect(levelOf(null).level).toBe(1)
+    expect(levelOf(-5).level).toBe(1)
+    expect(levelOf('abc').level).toBe(1)
   })
 })
