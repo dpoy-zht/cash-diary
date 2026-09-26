@@ -233,6 +233,8 @@ onShow(function () {
 .page {
   min-height: 100vh;
   padding-bottom: 90px; /* 让出底部 Tab */
+  /* navigationStyle:custom 下页面从 y=0 开始，必须自己让出状态栏（H5 端该变量为 0） */
+  padding-top: var(--status-bar-height, 0px);
 }
 
 /* ---- 顶部导航 ---- */

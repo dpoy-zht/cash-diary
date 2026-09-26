@@ -126,6 +126,8 @@ onShow(function () {
 .page {
   min-height: 100vh;
   padding-bottom: 90px;
+  /* 让出状态栏（同首页说明） */
+  padding-top: var(--status-bar-height, 0px);
 }
 
 .navbar {

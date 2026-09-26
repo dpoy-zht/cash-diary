@@ -158,10 +158,11 @@ if (cats.value.length) categoryId.value = cats.value[0].id
   flex-direction: column;
 }
 
-/* ---- 渐变头部 ---- */
+/* ---- 渐变头部 ----
+   状态栏留白放进 head 内部，让渐变一直铺到屏幕最顶端（H5 端变量为 0） */
 .add-head {
   background: var(--cd-grad-head);
-  padding: 10px 16px 24px;
+  padding: calc(10px + var(--status-bar-height, 0px)) 16px 24px;
   border-radius: 0 0 28px 28px;
 }
 .navbar {
