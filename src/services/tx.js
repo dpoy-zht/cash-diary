@@ -9,11 +9,19 @@ import { parseAmountToCents } from '../utils/money.js'
  * 构造一条待入库流水。校验失败抛错：
  * - 金额必须能解析为正整数分
  * - 分类必选
- * @param {object} input 可带 accountId（不传则落默认账本）
+ *
+ * ⚠️ 入参是**页面输入字段**（amountStr / categoryId / ts），不是数据库字段名。
+ * 曾因为页面直接传 amount_cents / category_id / occurred_at 而静默失败（点击无反应），
+ * 所以这里额外区分"用户没输"和"调用方字段名写错"，后者要能一眼看出来。
  */
 export function buildTx(input) {
   const cents = parseAmountToCents(input.amountStr)
-  if (!cents) throw new Error('金额无效')
+  if (!cents) {
+    if (input.amountStr === undefined) {
+      throw new Error('内部错误：缺少 amountStr（调用方应传页面输入，而不是数据库字段名）')
+    }
+    throw new Error('金额无效')
+  }
   if (!input.categoryId) throw new Error('请选择分类')
   const now = Date.now()
   return {
@@ -26,6 +34,22 @@ export function buildTx(input) {
     created_at: now,
     updated_at: now,
     deleted_at: null
+  }
+}
+
+/**
+ * 把「记一笔」页面的输入整理成 buildTx 需要的 DTO。
+ *
+ * 单独抽出来是为了让"页面字段 → 服务字段"的映射**只存在一处**，并且能被单测覆盖 ——
+ * 之前页面自己拼字段名拼成了数据库字段名，测试全绿但真机一点就炸。
+ */
+export function buildAddInput(input) {
+  return {
+    amountStr: input.amountText,
+    categoryId: input.categoryId,
+    type: input.type,
+    note: input.note,
+    ts: input.ts
   }
 }
 

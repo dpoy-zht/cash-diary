@@ -56,10 +56,11 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
+import { buildAddInput } from '../../services/tx.js'
 import { keypadInput, parseAmountToCents, displayAmount, formatCents } from '../../utils/money.js'
 import { toDateStr, tsFromDateStr } from '../../utils/date.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
@@ -84,6 +85,7 @@ const note = ref('')
 const dateStr = ref(toDateStr(Date.now()))
 const successShow = ref(false)
 const lastSaved = ref(null)
+const saving = ref(false)
 
 const cats = computed(function () {
   return type.value === 'expense' ? categoryStore.expenseCats : categoryStore.incomeCats
@@ -113,6 +115,7 @@ function onDateChange(e) {
 }
 
 async function save() {
+  if (saving.value) return // 防连点：写库期间再点不重复提交
   const cents = parseAmountToCents(current.value)
   if (!cents) {
     uni.showToast({ title: '先输个金额嘛~', icon: 'none' })
@@ -122,33 +125,68 @@ async function save() {
     uni.showToast({ title: '选一个分类嘛~', icon: 'none' })
     return
   }
-  await txStore.add(metaStore.ym, {
-    type: type.value,
-    amount_cents: cents,
-    category_id: categoryId.value,
-    note: note.value.trim(),
-    occurred_at: tsFromDateStr(dateStr.value)
-  })
+
   const cat = cats.value.find(function (c) { return c.id === categoryId.value })
-  lastSaved.value = { cents: cents, type: type.value, name: cat ? cat.name : '' }
-  current.value = ''
-  note.value = ''
-  successShow.value = true
+  saving.value = true
+  try {
+    // 字段名映射统一走 services/tx.js 的 buildAddInput，页面不直接拼字段
+    await txStore.add(
+      metaStore.ym,
+      buildAddInput({
+        amountText: current.value,
+        categoryId: categoryId.value,
+        type: type.value,
+        note: note.value.trim(),
+        ts: tsFromDateStr(dateStr.value)
+      })
+    )
+    lastSaved.value = { cents: cents, type: type.value, name: cat ? cat.name : '' }
+    current.value = ''
+    note.value = ''
+    successShow.value = true
+  } catch (err) {
+    // 关键：异常一定要变成用户看得见的提示，否则表现就是"点了没反应"
+    uni.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+  } finally {
+    saving.value = false
+  }
 }
 
 function successOK() {
   successShow.value = false
-  uni.navigateBack()
+  goHome()
 }
 function goBack() {
-  uni.navigateBack()
+  goHome()
+}
+/** 返回首页：正常是有返回栈的（navigateTo 进来），栈空时兜底 reLaunch */
+function goHome() {
+  uni.navigateBack({
+    fail: function () {
+      uni.reLaunch({ url: '/pages/home/home' })
+    }
+  })
 }
 
 const iconBack = svgMaskStyle('M15.4 7.4L14 6l-6 6 6 6 1.4-1.4L10.8 12z')
 const iconCheck = svgMaskStyle('M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z')
 
-// 初始化默认选中第一个支出分类
-if (cats.value.length) categoryId.value = cats.value[0].id
+/**
+ * 默认选中第一个分类。
+ * 必须用 watch 而不是 setup 里判一次：分类是异步从库里读的（App 端 SQLite 更慢），
+ * setup 执行时 cats 往往还是空的，那样 categoryId 会一直是 null → 点"记好啦"只会提示"选一个分类"。
+ * 同时兼顾切到收入时的兜底（list 变了但当前选中项不在新列表里）。
+ */
+watch(
+  cats,
+  function (list) {
+    if (!list.length) return
+    if (!list.some(function (c) { return c.id === categoryId.value })) {
+      categoryId.value = list[0].id
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

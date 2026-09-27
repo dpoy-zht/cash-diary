@@ -3,6 +3,7 @@ import { getStorage, resetStorageForTest } from '../src/db/index.js'
 import { seedIfEmpty, listAll as listCats, DEFAULT_CATEGORIES } from '../src/services/category.js'
 import { resetAll } from '../src/services/maintenance.js'
 import * as txService from '../src/services/tx.js'
+import { buildAddInput, buildTx } from '../src/services/tx.js'
 import { ymOf, monthRange } from '../src/utils/date.js'
 
 /**
@@ -104,6 +105,80 @@ describe('记账闭环（内存存储）', () => {
     const lastList = await txService.listByMonth(lastYm)
     expect(lastList.length).toBe(1)
     expect(lastList[0].amount_cents).toBe(10000)
+  })
+})
+
+describe('页面 → 服务 的字段契约（回归）', () => {
+  /**
+   * 真实事故：add.vue 的 save() 曾经直接传数据库字段名
+   * （amount_cents / category_id / occurred_at），而 buildTx 期望的是
+   * 页面输入字段名（amountStr / categoryId / ts）。
+   * 结果 buildTx 读到 undefined → 抛"金额无效"→ 异常发生在 @click 里没人接，
+   * 表现就是**真机上点"记好啦"毫无反应**，而所有单测都是绿的。
+   * 下面的用例专门钉住这条边界。
+   */
+  let ym
+  let expenseCat
+
+  beforeEach(async () => {
+    resetStorageForTest()
+    await getStorage().init()
+    await seedIfEmpty()
+    ym = ymOf(Date.now())
+    expenseCat = (await listCats()).find(function (c) { return c.type === 'expense' })
+  })
+
+  it('buildAddInput 产出的 DTO 能被 buildTx 接受，金额/分类/日期都对得上', () => {
+    const dto = buildAddInput({
+      amountText: '19.9',
+      categoryId: expenseCat.id,
+      type: 'expense',
+      note: '  午餐  ',
+      ts: 1730000000000
+    })
+    const rec = buildTx(dto)
+    expect(rec.amount_cents).toBe(1990)
+    expect(rec.category_id).toBe(expenseCat.id)
+    expect(rec.type).toBe('expense')
+    expect(rec.note).toBe('午餐')
+    expect(rec.occurred_at).toBe(1730000000000)
+  })
+
+  it('键盘缓冲的字符串（含前导 0、小数点）能正确转成分', () => {
+    expect(buildTx(buildAddInput({ amountText: '0.01', categoryId: 1, type: 'expense' })).amount_cents).toBe(1)
+    expect(buildTx(buildAddInput({ amountText: '8500', categoryId: 1, type: 'income' })).amount_cents).toBe(850000)
+  })
+
+  it('曾经踩过的坑：页面直接传数据库字段名会被拦下，并报出"内部错误"而不是"金额无效"', () => {
+    const wrong = {
+      amount_cents: 1990,
+      category_id: expenseCat.id,
+      type: 'expense',
+      occurred_at: Date.now()
+    }
+    expect(function () { buildTx(wrong) }).toThrow('内部错误')
+    // 让排查更快：错误信息要点出缺的是哪个字段
+    expect(function () { buildTx(wrong) }).toThrow('amountStr')
+  })
+
+  it('用户真的没输金额时，仍然是"金额无效"（不误报内部错误）', () => {
+    expect(function () { buildTx(buildAddInput({ amountText: '', categoryId: 1, type: 'expense' })) })
+      .toThrow('金额无效')
+  })
+
+  it('记一笔全链路：按页面的方式构造输入 → 落库 → 能查到', async () => {
+    await txService.addTx(buildAddInput({
+      amountText: '19.9',
+      categoryId: expenseCat.id,
+      type: 'expense',
+      note: '午餐',
+      ts: Date.now()
+    }))
+    const list = await txService.listByMonth(ym)
+    expect(list.length).toBe(1)
+    expect(list[0].amount_cents).toBe(1990)
+    expect(list[0].category_id).toBe(expenseCat.id)
+    expect(list[0].note).toBe('午餐')
   })
 })
 
