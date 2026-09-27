@@ -20,7 +20,7 @@
         },
         "distribute" : {
             "android" : {
-                "permissions" : [ "android.permission.POST_NOTIFICATIONS" ]
+                "permissions" : [ "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>" ]
             },
             "ios" : {},
             "sdkConfigs" : {}
