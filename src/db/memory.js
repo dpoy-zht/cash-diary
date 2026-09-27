@@ -288,6 +288,18 @@ export async function txRecentTimestamps(sinceTs, accountId) {
     .map(function (r) { return r.occurred_at })
 }
 
+/** 时间区间内的有效流水（左闭右开）—— 趋势图按区间一次取数，避免逐月查 6 次 */
+export async function txListByRange(start, end, accountId) {
+  const a = aid(accountId)
+  return data.transaction_record
+    .filter(function (r) {
+      return r.deleted_at == null && aid(r.account_id) === a &&
+        r.occurred_at >= start && r.occurred_at < end
+    })
+    .sort(function (x, y) { return x.occurred_at - y.occurred_at })
+    .map(function (r) { return Object.assign({}, r) })
+}
+
 /** 清空全部业务数据（流水 + 分类 + 账本 + 预算），表结构保留 —— 供「重置数据」用 */
 export async function clearAll() {
   data = blank()

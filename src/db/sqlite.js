@@ -231,6 +231,16 @@ export async function txRecentTimestamps(sinceTs, accountId) {
   return rows.map(function (r) { return Number(r.occurred_at) })
 }
 
+/** 时间区间内的有效流水（左闭右开）—— 趋势图按区间一次取数，避免逐月查 6 次 */
+export async function txListByRange(start, end, accountId) {
+  return select(
+    'SELECT * FROM transaction_record ' +
+    'WHERE deleted_at IS NULL AND account_id = ' + aid(accountId) + ' ' +
+    'AND occurred_at >= ' + Number(start) + ' AND occurred_at < ' + Number(end) + ' ' +
+    'ORDER BY occurred_at ASC'
+  )
+}
+
 /** 清空全部业务数据（流水 + 分类 + 账本），表结构不动 —— 供「重置数据」用
     sqlite_sequence 也要清，否则自增 id 会接着往下涨 */
 export async function clearAll() {

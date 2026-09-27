@@ -102,3 +102,8 @@ export async function overview(accountId) {
 export async function recentTimestamps(sinceTs, accountId) {
   return txRepo.recentTimestamps(sinceTs, accountId)
 }
+
+/** 时间区间内的流水（趋势图用；按发生时间正序） */
+export async function listByRange(startTs, endTs, accountId) {
+  return txRepo.listByRange(startTs, endTs, accountId)
+}

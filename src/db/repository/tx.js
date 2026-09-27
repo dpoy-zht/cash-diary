@@ -85,3 +85,9 @@ export async function recentTimestamps(sinceTs, accountId) {
   const rows = await getStorage().txRecentTimestamps(sinceTs, aid(accountId))
   return rows.map(function (v) { return Number(v) })
 }
+
+/** 时间区间内的有效流水（左闭右开；按发生时间正序）—— 趋势图用 */
+export async function listByRange(startTs, endTs, accountId) {
+  const rows = await getStorage().txListByRange(startTs, endTs, aid(accountId))
+  return rows.map(normalizeTx)
+}

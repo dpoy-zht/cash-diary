@@ -3,6 +3,7 @@
  * 与 DOM / uni 无关，可单测。
  */
 import { colorOf } from './palette.js'
+import { ymOf } from './date.js'
 
 /**
  * 把一个月内的支出流水聚合成"分类 → 金额"，按金额降序。
@@ -116,8 +117,65 @@ export function streakDays(timestamps, nowTs) {
   return n
 }
 
-/** 等级称号表：按累计记录笔数升级，每 10 笔一级 */
-const LEVEL_TITLES = [
+/**
+ * 把一批流水按**本地日历月**分桶（趋势图用）。
+ * 注意用 ymOf（本地时区）而不是 UTC 月份 —— 否则月初/月末的账会跑到隔壁月（铁律 2）。
+ *
+ * @param {Array} records 流水（含软删除的也没关系，这里会跳过）
+ * @param {string[]} ymList 要统计的月份，顺序即返回顺序
+ * @returns {Array<{ym:string, expenseCents:number, incomeCents:number}>}
+ */
+export function monthlySummaries(records, ymList) {
+  const months = Array.isArray(ymList) ? ymList : []
+  const buckets = {}
+  months.forEach(function (ym) {
+    buckets[ym] = { ym: ym, expenseCents: 0, incomeCents: 0 }
+  })
+  const list = Array.isArray(records) ? records : []
+  list.forEach(function (r) {
+    if (!r || r.deleted_at != null) return
+    const bucket = buckets[ymOf(r.occurred_at)]
+    if (!bucket) return // 不在统计区间内的记录直接忽略
+    if (r.type === 'expense') bucket.expenseCents += r.amount_cents
+    else if (r.type === 'income') bucket.incomeCents += r.amount_cents
+  })
+  return months.map(function (ym) { return buckets[ym] })
+}
+
+/**
+ * 柱状图高度百分比（以最大值为 100%）。
+ * 有值但很小的柱子给一个 4% 的下限，否则看起来像"没有数据"。
+ */
+export function barPercents(values) {
+  const list = Array.isArray(values) ? values : []
+  const max = list.reduce(function (m, v) {
+    const n = Math.max(0, Number(v) || 0)
+    return n > m ? n : m
+  }, 0)
+  if (!max) return list.map(function () { return 0 })
+  return list.map(function (v) {
+    const n = Math.max(0, Number(v) || 0)
+    if (!n) return 0
+    return Math.max(4, Math.round((n / max) * 100))
+  })
+}
+
+/** 命中最大值的下标（并列时取第一个）；全 0 返回 -1。趋势图用来高亮最高那根柱。 */
+export function maxIndex(values) {
+  const list = Array.isArray(values) ? values : []
+  let idx = -1
+  let best = -1
+  list.forEach(function (v, i) {
+    const n = Math.max(0, Number(v) || 0)
+    if (n > best) {
+      best = n
+      idx = i
+    }
+  })
+  return best > 0 ? idx : -1
+}
+
+/** 等级称号表：按累计记录笔数升级，每 10 笔一级 */const LEVEL_TITLES = [
   '记账萌新',
   '攒钱新手',
   '攒钱小能手',

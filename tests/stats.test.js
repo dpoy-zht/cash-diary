@@ -5,8 +5,12 @@ import {
   conicGradient,
   balanceCents,
   streakDays,
-  levelOf
+  levelOf,
+  monthlySummaries,
+  barPercents,
+  maxIndex
 } from '../src/utils/stats.js'
+import { lastNMonths, ymLabel } from '../src/utils/date.js'
 
 const CATS = [
   { id: 1, name: '午饭', icon: '🍜' },
@@ -118,6 +122,102 @@ function at(y, m, d, h) {
   return new Date(y, m - 1, d, h == null ? 12 : h, 0, 0).getTime()
 }
 const TODAY = at(2026, 9, 27)
+
+describe('lastNMonths / ymLabel', () => {
+  it('返回最近 n 个月（含当月），从旧到新', () => {
+    const t = new Date(2026, 8, 27).getTime() // 2026-09
+    expect(lastNMonths(6, t)).toEqual(['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'])
+  })
+
+  it('跨年正确（1 月往前数要落到去年）', () => {
+    const t = new Date(2026, 0, 15).getTime() // 2026-01
+    expect(lastNMonths(3, t)).toEqual(['2025-11', '2025-12', '2026-01'])
+  })
+
+  it('n=1 只有当月；非法 n 兜底为 1 个月', () => {
+    const t = new Date(2026, 8, 27).getTime()
+    expect(lastNMonths(1, t)).toEqual(['2026-09'])
+    expect(lastNMonths(0, t)).toEqual(['2026-09'])
+    expect(lastNMonths(null, t)).toEqual(['2026-09'])
+  })
+
+  it('月份标签去掉前导零', () => {
+    expect(ymLabel('2026-09')).toBe('9月')
+    expect(ymLabel('2026-12')).toBe('12月')
+    expect(ymLabel('')).toBe('NaN月')
+  })
+})
+
+describe('monthlySummaries —— 按本地日历月分桶（趋势图）', () => {
+  const MONTHS = ['2026-07', '2026-08', '2026-09']
+  function at(y, m, d, h) {
+    return new Date(y, m - 1, d, h == null ? 12 : h, 0, 0).getTime()
+  }
+
+  it('按发生时间落到各自月份，支出与收入分开累加', () => {
+    const rows = monthlySummaries([
+      { type: 'expense', amount_cents: 1000, occurred_at: at(2026, 9, 3) },
+      { type: 'expense', amount_cents: 500, occurred_at: at(2026, 9, 20) },
+      { type: 'income', amount_cents: 850000, occurred_at: at(2026, 9, 1) },
+      { type: 'expense', amount_cents: 2000, occurred_at: at(2026, 8, 31) }
+    ], MONTHS)
+    expect(rows.length).toBe(3)
+    expect(rows[2]).toEqual({ ym: '2026-09', expenseCents: 1500, incomeCents: 850000 })
+    expect(rows[1]).toEqual({ ym: '2026-08', expenseCents: 2000, incomeCents: 0 })
+    expect(rows[0]).toEqual({ ym: '2026-07', expenseCents: 0, incomeCents: 0 })
+  })
+
+  it('月份边界按本地时区归月（月初 0 点、月末 23 点都不跑偏）', () => {
+    const rows = monthlySummaries([
+      { type: 'expense', amount_cents: 100, occurred_at: at(2026, 9, 1, 0) },
+      { type: 'expense', amount_cents: 200, occurred_at: at(2026, 9, 30, 23) }
+    ], MONTHS)
+    expect(rows[2].expenseCents).toBe(300)
+  })
+
+  it('软删除的记录不计入', () => {
+    const rows = monthlySummaries([
+      { type: 'expense', amount_cents: 1000, occurred_at: at(2026, 9, 5) },
+      { type: 'expense', amount_cents: 9999, occurred_at: at(2026, 9, 6), deleted_at: 123 }
+    ], MONTHS)
+    expect(rows[2].expenseCents).toBe(1000)
+  })
+
+  it('不在统计区间内的记录被忽略，返回条数与月份表一致', () => {
+    const rows = monthlySummaries([
+      { type: 'expense', amount_cents: 1000, occurred_at: at(2025, 1, 5) }
+    ], MONTHS)
+    expect(rows.length).toBe(3)
+    expect(rows.every(function (r) { return r.expenseCents === 0 })).toBe(true)
+  })
+
+  it('空入参不抛错', () => {
+    expect(monthlySummaries(null, MONTHS).length).toBe(3)
+    expect(monthlySummaries([], null)).toEqual([])
+  })
+})
+
+describe('barPercents / maxIndex —— 柱状图几何', () => {
+  it('最大值占 100%，其余按比例', () => {
+    expect(barPercents([1000, 500, 0])).toEqual([100, 50, 0])
+  })
+
+  it('有值但极小的柱子给 4% 下限（否则看起来像没数据）', () => {
+    expect(barPercents([100000, 10])).toEqual([100, 4])
+  })
+
+  it('全为 0 时高度全是 0', () => {
+    expect(barPercents([0, 0, 0])).toEqual([0, 0, 0])
+    expect(barPercents([])).toEqual([])
+  })
+
+  it('maxIndex 指向最大值的下标；并列取第一个；全 0 返回 -1', () => {
+    expect(maxIndex([1, 5, 3])).toBe(1)
+    expect(maxIndex([5, 5, 3])).toBe(0)
+    expect(maxIndex([0, 0])).toBe(-1)
+    expect(maxIndex([])).toBe(-1)
+  })
+})
 
 describe('streakDays —— 连续记账天数', () => {
   it('没有记录返回 0', () => {

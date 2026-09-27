@@ -61,6 +61,27 @@ export function toDateStr(ts) {
   return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
 }
 
+/**
+ * 最近 n 个月的 'YYYY-MM' 列表（含当月），**从旧到新**。
+ * 用 Date 逐月回退，跨年/跨月由 Date 自己处理，不做手工进位。
+ */
+export function lastNMonths(n, nowTs) {
+  const count = Math.max(1, Math.floor(Number(n) || 1))
+  const base = new Date(nowTs == null ? Date.now() : nowTs)
+  const out = []
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const d = new Date(base.getFullYear(), base.getMonth() - i, 1)
+    out.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1))
+  }
+  return out
+}
+
+/** 月份标签：'2026-09' → '9月' */
+export function ymLabel(ym) {
+  const parts = String(ym || '').split('-')
+  return Number(parts[1]) + '月'
+}
+
 /** date 输入框字符串 → 毫秒时间戳（时间部分取当前时刻；空值返回当前时间） */
 export function tsFromDateStr(dstr) {
   const now = new Date()
