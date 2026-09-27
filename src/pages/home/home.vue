@@ -130,7 +130,8 @@ import { useBudgetStore } from '../../stores/budget.js'
 import { useAccountStore } from '../../stores/account.js'
 import { groupByDay, dayLabel } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
-import { budgetStatus as budgetStatusOf } from '../../utils/budget.js'
+import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
+import { requestNotifyPermission, notifyLocal } from '../../utils/notify.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -205,18 +206,23 @@ const overDetail = computed(function () {
 })
 
 /**
- * 超支自动提醒：每个月每个账本只弹一次（不然每次回首页都弹，很烦）。
- * 记账后返回首页也会走到这里，所以新记的一笔导致的超支同样能提醒到。
+ * 超支自动提醒：应用内弹窗 + 系统本地通知（App 端），每账本每月合计只来一次。
+ * 去重键两路共用 —— 弹过（发过）就都不再来第二次。
  */
 function maybeAlertOver() {
   const s = budgetStat.value
   if (s.level !== 'over') return
-  const key = 'cashDiary.overAlerted.' + metaStore.ym + '.' + accountStore.currentId
+  const key = overAlertKey(metaStore.ym, accountStore.currentId)
   try {
     if (uni.getStorageSync(key)) return
     uni.setStorageSync(key, 1)
-  } catch (e) { /* 存储不可用时也弹，只是可能重复 */ }
+  } catch (e) { /* 存储不可用时也提醒，只是可能重复 */ }
   overShow.value = true
+  // 系统通知：仅 App 端生效（H5 自动跳过）；权限失败也只是通知静默，弹窗照常
+  try {
+    requestNotifyPermission()
+    notifyLocal('奶龙记账 · 超预算啦', '本月已花 ¥' + formatCents(s.spentCents) + '，' + budgetLine.value)
+  } catch (e) { /* 通知失败不影响弹窗 */ }
 }
 
 const incomeText = computed(function () {

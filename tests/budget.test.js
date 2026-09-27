@@ -5,7 +5,7 @@ import * as accountService from '../src/services/account.js'
 import * as budgetService from '../src/services/budget.js'
 import * as txService from '../src/services/tx.js'
 import { resetAll } from '../src/services/maintenance.js'
-import { budgetStatus, progressPercent, overText, WARN_RATIO } from '../src/utils/budget.js'
+import { budgetStatus, progressPercent, overText, overAlertKey, WARN_RATIO } from '../src/utils/budget.js'
 import { ymOf } from '../src/utils/date.js'
 
 describe('budgetStatus —— 预算判断（纯函数）', () => {
@@ -185,5 +185,24 @@ describe('预算 × 流水：超支判断联动', () => {
     const all = await budgetService.getAll(1)
     expect(all.totalCents).toBe(0)
     expect(all.byCategory).toEqual({})
+  })
+})
+
+describe('overAlertKey —— 超支提醒去重键', () => {
+  it('格式：cashDiary.overAlerted.<ym>.<accountId>', () => {
+    expect(overAlertKey('2026-09', 1)).toBe('cashDiary.overAlerted.2026-09.1')
+    expect(overAlertKey('2026-12', 2)).toBe('cashDiary.overAlerted.2026-12.2')
+  })
+
+  it('非法月份兜底 unknown，不抛错', () => {
+    expect(overAlertKey('', 1)).toBe('cashDiary.overAlerted.unknown.1')
+    expect(overAlertKey('2026-9', 1)).toBe('cashDiary.overAlerted.unknown.1')
+    expect(overAlertKey(null, 1)).toBe('cashDiary.overAlerted.unknown.1')
+  })
+
+  it('非法账本兜底默认账本 1', () => {
+    expect(overAlertKey('2026-09')).toBe('cashDiary.overAlerted.2026-09.1')
+    expect(overAlertKey('2026-09', 0)).toBe('cashDiary.overAlerted.2026-09.1')
+    expect(overAlertKey('2026-09', -3)).toBe('cashDiary.overAlerted.2026-09.1')
   })
 })

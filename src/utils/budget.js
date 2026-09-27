@@ -65,3 +65,14 @@ export function overText(limitCents, spentCents) {
   if (s.level !== 'over') return ''
   return '超支了 ¥' + (Math.abs(s.remainCents) / 100).toFixed(2)
 }
+
+/**
+ * 超支提醒的去重键：每账本每月最多提醒一次。
+ * 应用内弹窗与系统通知共用同一个键 —— 弹过（发过）就都不再来第二次。
+ * 纯函数方便单测；格式变更 = 老用户会收到一次重复提醒，别随手改。
+ */
+export function overAlertKey(ym, accountId) {
+  const y = /^\d{4}-\d{2}$/.test(String(ym || '')) ? String(ym) : 'unknown'
+  const a = Math.max(1, Math.floor(Number(accountId) || 1))
+  return 'cashDiary.overAlerted.' + y + '.' + a
+}
