@@ -92,6 +92,28 @@ export async function txMonthSummary(start, end, accountId) {
   return Object.keys(agg).map(function (type) { return { type: type, total: agg[type] } })
 }
 
+/**
+ * 搜索：备注包含 noteKw（不区分大小写的包含匹配）或分类命中 categoryIds，
+ * 两个条件"或"；都为空返回空。与 sqlite.js 的 txSearch 签名一致。
+ */
+export async function txSearch(noteKw, categoryIds, accountId, limit) {
+  const a = aid(accountId)
+  const max = Math.max(1, Math.floor(Number(limit) || 100))
+  const kw = String(noteKw || '').toLowerCase()
+  const ids = (Array.isArray(categoryIds) ? categoryIds : []).map(Number)
+  if (!kw && !ids.length) return []
+  return data.transaction_record
+    .filter(function (r) {
+      if (r.deleted_at != null || aid(r.account_id) !== a) return false
+      const hitNote = kw && String(r.note || '').toLowerCase().indexOf(kw) !== -1
+      const hitCat = ids.indexOf(Number(r.category_id)) !== -1
+      return hitNote || hitCat
+    })
+    .sort(function (x, y) { return y.occurred_at - x.occurred_at })
+    .slice(0, max)
+    .map(function (r) { return Object.assign({}, r) })
+}
+
 export async function txInsert(rec) {
   const id = nid()
   const row = Object.assign({ account_id: DEFAULT_ACCOUNT_ID }, rec)

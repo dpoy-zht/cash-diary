@@ -43,6 +43,19 @@
       </view>
     </view>
 
+    <!-- 搜索：备注/分类名跨月匹配，输入即搜（防抖 300ms） -->
+    <view class="search-bar">
+      <view class="s-icon" :style="iconSearch" />
+      <input
+        class="s-input"
+        v-model="kw"
+        placeholder="搜备注或分类，比如 奶茶"
+        confirm-type="search"
+        @input="onKwInput"
+      />
+      <view v-if="kw" class="s-clear" @click="onClearSearch"><text class="s-clear-i">×</text></view>
+    </view>
+
     <!-- 全部 / 支出 / 收入 -->
     <view class="seg">
       <view
@@ -54,8 +67,12 @@
       >{{ s.name }}</view>
     </view>
 
-    <!-- 流水（按天分组） -->
+    <!-- 流水（按天分组；搜索时切换为跨月结果） -->
     <view class="txn-card">
+      <view v-if="searching" class="search-meta">
+        <text class="sm-txt">找到 {{ filtered.length }} 条「{{ kw }}」</text>
+        <text class="sm-clear" @click="onClearSearch">清除</text>
+      </view>
       <block v-if="filtered.length">
         <block v-for="g in groups" :key="g.day">
           <view class="day-label">{{ dayLabel(g.day) }}</view>
@@ -70,8 +87,8 @@
       </block>
       <view v-else class="empty">
         <image class="empty-img" src="/static/milo/milo-innocent.webp" mode="aspectFit" />
-        <text class="empty-title">今天还没记账哦~</text>
-        <text class="empty-sub">点下面的加号，记一笔今天的小花费吧</text>
+        <text class="empty-title">{{ emptyTitle }}</text>
+        <text class="empty-sub">{{ emptySub }}</text>
       </view>
     </view>
 
@@ -138,6 +155,28 @@ const salaryShow = ref(false)
 const overShow = ref(false)
 const editing = ref(null)
 
+/* ---- 搜索（防抖 300ms；搜索时流水区显示跨月结果，分段筛选继续生效） ---- */
+const kw = ref('')
+let kwTimer = null
+const searching = computed(function () {
+  return txStore.isSearching()
+})
+function onKwInput() {
+  clearTimeout(kwTimer)
+  kwTimer = setTimeout(async function () {
+    try {
+      await txStore.search(kw.value)
+    } catch (e) {
+      uni.showToast({ title: '搜索失败', icon: 'none' })
+    }
+  }, 300)
+}
+function onClearSearch() {
+  clearTimeout(kwTimer)
+  kw.value = ''
+  txStore.clearSearch()
+}
+
 const ymText = computed(function () {
   const parts = metaStore.ym.split('-')
   return parts[0] + '年' + Number(parts[1]) + '月'
@@ -188,8 +227,15 @@ const expenseText = computed(function () {
 })
 
 const filtered = computed(function () {
-  if (seg.value === 'all') return txStore.records
-  return txStore.records.filter(function (r) { return r.type === seg.value })
+  const source = searching.value ? txStore.searchResults : txStore.records
+  if (seg.value === 'all') return source
+  return source.filter(function (r) { return r.type === seg.value })
+})
+const emptyTitle = computed(function () {
+  return searching.value ? '没找到相关记录' : '今天还没记账哦~'
+})
+const emptySub = computed(function () {
+  return searching.value ? '换个关键词试试，支持备注和分类名' : '点下面的加号，记一笔今天的小花费吧'
 })
 const groups = computed(function () {
   return groupByDay(filtered.value)
@@ -254,6 +300,7 @@ function openEdit(r) {
 }
 
 const iconCoin = svgMaskStyle('M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93V18h-2v1.93A8.01 8.01 0 014.07 13H6v-2H4.07A8.01 8.01 0 0111 4.07V6h2V4.07A8.01 8.01 0 0119.93 11H18v2h1.93A8.01 8.01 0 0113 19.93z')
+const iconSearch = svgMaskStyle('M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z')
 const iconBell = svgMaskStyle('M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z')
 const iconHeart = svgMaskStyle('M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z')
 
@@ -430,6 +477,62 @@ onShow(function () {
   color: var(--cd-btn-ink);
   font-size: 13px;
   opacity: 0.95;
+}
+
+/* ---- 搜索框 ---- */
+.search-bar {
+  margin: 8px 16px 0;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-pill);
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--cd-sh-card);
+}
+.s-icon {
+  width: 16px;
+  height: 16px;
+  background: #b89968;
+  flex: none;
+}
+.s-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--cd-ink);
+  background: transparent;
+}
+.s-clear {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--cd-primary-lt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.s-clear-i {
+  font-size: 14px;
+  color: #8a7450;
+  line-height: 1;
+}
+/* 搜索结果计数行 */
+.search-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 2px;
+}
+.sm-txt {
+  font-size: 12px;
+  color: var(--cd-ink-2);
+}
+.sm-clear {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a7450;
 }
 
 /* ---- 分段 ---- */

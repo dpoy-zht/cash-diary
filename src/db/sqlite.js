@@ -2,7 +2,7 @@
  * App 端存储：HTML5+ plus.sqlite（原生 SQLite）。
  * 迁移机制：schema_migrations 表登记已执行版本，启动时按序补跑未执行的迁移脚本。
  */
-import { sqlValue } from './sql-value.js'
+import { sqlValue, likePattern } from './sql-value.js'
 import { MIGRATIONS } from './schema.js'
 import { DEFAULT_ACCOUNT_ID } from '../utils/constant.js'
 
@@ -238,6 +238,28 @@ export async function txListByRange(start, end, accountId) {
     'WHERE deleted_at IS NULL AND account_id = ' + aid(accountId) + ' ' +
     'AND occurred_at >= ' + Number(start) + ' AND occurred_at < ' + Number(end) + ' ' +
     'ORDER BY occurred_at ASC'
+  )
+}
+
+/**
+ * 搜索：备注包含 noteKw（LIKE 包含匹配，通配符已转义）或分类命中 categoryIds。
+ * 两个条件为"或"的关系；都为空则返回空（避免全表扫描式误用）。
+ */
+export async function txSearch(noteKw, categoryIds, accountId, limit) {
+  const max = Math.max(1, Math.floor(Number(limit) || 100))
+  const kw = String(noteKw || '')
+  const ids = (Array.isArray(categoryIds) ? categoryIds : [])
+    .map(Number)
+    .filter(function (n) { return n > 0 })
+  const conds = []
+  if (kw) conds.push('note LIKE ' + likePattern(kw) + " ESCAPE '\\'")
+  if (ids.length) conds.push('category_id IN (' + ids.join(',') + ')')
+  if (!conds.length) return []
+  return select(
+    'SELECT * FROM transaction_record ' +
+    'WHERE deleted_at IS NULL AND account_id = ' + aid(accountId) + ' ' +
+    'AND (' + conds.join(' OR ') + ') ' +
+    'ORDER BY occurred_at DESC LIMIT ' + max
   )
 }
 

@@ -91,3 +91,9 @@ export async function listByRange(startTs, endTs, accountId) {
   const rows = await getStorage().txListByRange(startTs, endTs, aid(accountId))
   return rows.map(normalizeTx)
 }
+
+/** 搜索（备注包含关键词或分类命中），按发生时间倒序、有上限 */
+export async function search(noteKw, categoryIds, accountId, limit) {
+  const rows = await getStorage().txSearch(noteKw, categoryIds, aid(accountId), limit)
+  return rows.map(normalizeTx)
+}

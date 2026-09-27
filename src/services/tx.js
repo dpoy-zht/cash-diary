@@ -3,6 +3,7 @@
  * 页面/Store 不得直接构造记录对象，必须经此层。
  */
 import * as txRepo from '../db/repository/tx.js'
+import * as categoryRepo from '../db/repository/category.js'
 import { parseAmountToCents } from '../utils/money.js'
 
 /**
@@ -106,4 +107,24 @@ export async function recentTimestamps(sinceTs, accountId) {
 /** 时间区间内的流水（趋势图用；按发生时间正序） */
 export async function listByRange(startTs, endTs, accountId) {
   return txRepo.listByRange(startTs, endTs, accountId)
+}
+
+/** 搜索返回条数上限（防止关键词太短时撑爆列表） */
+export const SEARCH_LIMIT = 100
+
+/**
+ * 流水搜索：关键词命中**备注**或**分类名**（都不区分大小写），
+ * 跨所有月份，按发生时间倒序，上限 SEARCH_LIMIT 条。
+ * 关键词为空白直接返回空数组；分类名命中转成分类 id 交给存储层查，
+ * 这样 SQLite 端可以一条 SQL 完成，不用把全表捞到 JS。
+ */
+export async function search(keyword, accountId) {
+  const kw = String(keyword == null ? '' : keyword).trim()
+  if (!kw) return []
+  const lower = kw.toLowerCase()
+  const cats = await categoryRepo.listAll()
+  const ids = cats
+    .filter(function (c) { return c.name && String(c.name).toLowerCase().indexOf(lower) !== -1 })
+    .map(function (c) { return c.id })
+  return txRepo.search(kw, ids, accountId, SEARCH_LIMIT)
 }

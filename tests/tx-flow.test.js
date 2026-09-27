@@ -274,3 +274,92 @@ describe('重置数据（我的页入口）', () => {
     expect((await listCats()).length).toBe(20)
   })
 })
+
+describe('流水搜索（首页搜索框）', () => {
+  let cats
+
+  beforeEach(async () => {
+    resetStorageForTest()
+    await getStorage().init()
+    await seedIfEmpty()
+    cats = await listCats()
+  })
+
+  async function addCat(note, catId, ts, accountId) {
+    const rec = buildTx({ amountStr: '10', categoryId: catId, type: 'expense', note: note, ts: ts })
+    rec.account_id = accountId || 1
+    const { getStorage: gs } = await import('../src/db/index.js')
+    return gs().txInsert(rec)
+  }
+
+  it('备注包含关键词即命中（跨月、倒序、不区分大小写）', async () => {
+    const cat = cats[0]
+    const now = Date.now()
+    await addCat('奶茶续命', cat.id, now)
+    await addCat('上周的奶茶', cat.id, now - 40 * 86400000)
+    await addCat('无关记录', cat.id, now)
+
+    const rows = await txService.search('奶茶')
+    expect(rows.length).toBe(2)
+    // 倒序：最近的发生时间在前
+    expect(rows[0].note).toBe('奶茶续命')
+    expect(rows[1].note).toBe('上周的奶茶')
+
+    const latin = await txService.search('COFFEE')
+    expect(latin.length).toBe(0)
+    await addCat('Morning Coffee', cat.id, now)
+    expect((await txService.search('coffee')).length).toBe(1)
+  })
+
+  it('分类名也能命中（红包分类下的账，搜"红包"能搜到）', async () => {
+    const gift = cats.find(function (c) { return c.name === '红包' && c.type === 'expense' })
+    const other = cats.find(function (c) { return c.name === '其他' && c.type === 'expense' })
+    const now = Date.now()
+    await addCat('', gift.id, now)       // 备注为空，仅靠分类名命中
+    await addCat('无关', other.id, now)
+
+    const rows = await txService.search('红包')
+    expect(rows.length).toBe(1)
+    expect(rows[0].category_id).toBe(gift.id)
+  })
+
+  it('备注与分类名同时命中只出现一次', async () => {
+    const milktea = cats.find(function (c) { return c.name === '奶茶' })
+    await addCat('奶茶自由', milktea.id, Date.now())
+    const rows = await txService.search('奶茶')
+    expect(rows.length).toBe(1)
+  })
+
+  it('软删除的不出现；账本隔离；空白关键词返回空', async () => {
+    const cat = cats[0]
+    const now = Date.now()
+    const id = await addCat('奶茶一条', cat.id, now)
+    await addCat('奶茶二号', cat.id, now, 2) // 另一个账本
+
+    // 软删除
+    const { getStorage: gs } = await import('../src/db/index.js')
+    await gs().txSoftDelete(id)
+
+    // 默认账本：被删的一条不可见，另一账本的一条也隔离在外
+    expect(await txService.search('奶茶')).toEqual([])
+
+    // 指定账本 2 才能看到自己账本的记录
+    const rows = await txService.search('奶茶', 2)
+    expect(rows.length).toBe(1)
+    expect(rows[0].account_id).toBe(2)
+
+    expect(await txService.search('   ')).toEqual([])
+    expect(await txService.search('')).toEqual([])
+  })
+
+  it('LIMIT 生效（防止短关键词撑爆列表）', async () => {
+    const cat = cats[0]
+    const now = Date.now()
+    for (let i = 0; i < 5; i++) {
+      await addCat('奶茶 ' + i, cat.id, now - i * 1000)
+    }
+    const { getStorage: gs } = await import('../src/db/index.js')
+    const rows = await gs().txSearch('奶茶', [], 1, 3)
+    expect(rows.length).toBe(3)
+  })
+})

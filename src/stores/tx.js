@@ -23,6 +23,30 @@ export const useTxStore = defineStore('tx', function () {
   const periodSummary = ref({ expenseCents: 0, incomeCents: 0 })
   const periodTrend = ref([])
 
+  /** 首页搜索：跨月流水（备注/分类名命中）。关键词为空时结果清空，回到月份视图 */
+  const searchKeyword = ref('')
+  const searchResults = ref([])
+
+  /** 搜索是否生效（列表区据此切换数据源） */
+  function isSearching() {
+    return searchKeyword.value.trim() !== ''
+  }
+
+  async function search(kw) {
+    const text = String(kw == null ? '' : kw)
+    searchKeyword.value = text
+    if (!text.trim()) {
+      searchResults.value = []
+      return
+    }
+    searchResults.value = await txService.search(text, currentAccount())
+  }
+
+  function clearSearch() {
+    searchKeyword.value = ''
+    searchResults.value = []
+  }
+
   /**
    * 所有查询都带上"当前账本"的过滤条件。
    * 页面因此完全不需要感知多账本，切换账本后调一次 refresh 即可。
@@ -115,6 +139,11 @@ export const useTxStore = defineStore('tx', function () {
     periodRecords,
     periodSummary,
     periodTrend,
+    searchKeyword,
+    searchResults,
+    isSearching,
+    search,
+    clearSearch,
     loadMonth,
     loadOverview,
     loadRecentTs,

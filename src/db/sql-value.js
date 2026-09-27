@@ -7,3 +7,18 @@ export function sqlValue(v) {
   if (typeof v === 'number') return String(Math.trunc(v))
   return "'" + String(v).replace(/'/g, "''") + "'"
 }
+
+/**
+ * LIKE 模式字面量：把用户输入变成"包含匹配"的安全模式串。
+ * 反斜杠/百分号/下划线都用反斜杠转义（SQL 侧要配 ESCAPE '\' 使用），
+ * 单引号按 SQL 规则双写。顺序必须先转反斜杠，否则会二次转义。
+ */
+export function likePattern(v) {
+  const s = String(v == null ? '' : v)
+  const escaped = s
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "''")
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+  return "'%" + escaped + "%'"
+}
