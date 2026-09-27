@@ -20,10 +20,16 @@
     <!-- 余额卡 -->
     <view class="balance-card">
       <image class="milo" src="/static/milo/milo.webp" mode="aspectFit" />
-      <text class="balance-num">¥{{ balanceText }}</text>
-      <view class="balance-row">
-        <text class="inc">已存 ¥{{ incomeText }}</text>
-        <text class="exp">已花 ¥{{ expenseText }}</text>
+      <!-- 只显示两个独立数值，不显示合计余额（合计容易被误当成"我能花多少"） -->
+      <view class="bal-cols">
+        <view class="bal-col">
+          <text class="bal-col-label">已存</text>
+          <text class="bal-col-num inc">¥{{ incomeText }}</text>
+        </view>
+        <view class="bal-col">
+          <text class="bal-col-label">已花</text>
+          <text class="bal-col-num">¥{{ expenseText }}</text>
+        </view>
       </view>
       <view class="heart" :style="iconHeart" />
     </view>
@@ -107,7 +113,6 @@ import { useBudgetStore } from '../../stores/budget.js'
 import { useAccountStore } from '../../stores/account.js'
 import { groupByDay, dayLabel } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
-import { balanceCents } from '../../utils/stats.js'
 import { budgetStatus as budgetStatusOf } from '../../utils/budget.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
@@ -180,9 +185,6 @@ const incomeText = computed(function () {
 })
 const expenseText = computed(function () {
   return formatCents(txStore.summary.expenseCents)
-})
-const balanceText = computed(function () {
-  return formatCents(balanceCents(txStore.summary))
 })
 
 const filtered = computed(function () {
@@ -347,32 +349,46 @@ onShow(function () {
   background: var(--cd-grad-brand);
   box-shadow: 0 10px 24px rgba(255, 217, 61, 0.35);
   position: relative;
+  overflow: visible;
 }
 .milo {
   position: absolute;
-  top: -24px;
-  right: 10px;
-  width: 84px;
-  height: 100px;
+  top: -26px;
+  right: 8px;
+  width: 72px;
+  height: 90px;
 }
-.balance-num {
-  font-size: 34px;
+/* 两列并排：标签在上、数字在下（数字是主角，字号接近标签的 2.2 倍）。
+   右侧留出奶龙的位置，避免数字压到它身上。 */
+.bal-cols {
+  display: flex;
+  gap: 12px;
+  padding-right: 76px;
+}
+.bal-col {
+  flex: 1;
+  min-width: 0;
+}
+.bal-col-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #8a7450;
+}
+.bal-col-num {
+  display: block;
+  margin-top: 6px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--cd-ink);
-  letter-spacing: -1px;
+  letter-spacing: -0.6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.balance-row {
-  display: flex;
-  gap: 16px;
-  margin-top: 8px;
-  font-size: 13px;
-}
-.inc {
+/* 已存用收入绿，和已花（主文字色）一眼分得开 */
+.bal-col-num.inc {
   color: var(--cd-income);
-  font-weight: 700;
-}
-.exp {
-  color: var(--cd-ink);
 }
 .heart {
   position: absolute;
