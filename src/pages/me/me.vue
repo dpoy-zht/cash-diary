@@ -183,6 +183,10 @@ function tapFn(f) {
     })
     return
   }
+  if (f.key === 'budget') {
+    uni.navigateTo({ url: '/pages/budget/budget' })
+    return
+  }
   uni.showToast({ title: f.name + ' 还在计划里', icon: 'none' })
 }
 

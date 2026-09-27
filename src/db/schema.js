@@ -49,8 +49,31 @@ ALTER TABLE transaction_record ADD COLUMN account_id INTEGER NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS idx_tx_account ON transaction_record(account_id);
 `
 
+/**
+ * v3：预算。
+ *
+ * 两个刻意的设计取舍（与 PLAN §3.2 的草案不同，改起来更方便用）：
+ * 1. **不存 month**：预算按账本设一次、每月都生效（"我每月预算 5000"），
+ *    比每月都要重设一遍友好得多。要改成按月可以后续加列。
+ * 2. **category_id 为 NULL 表示"总预算"**，非空表示"某个分类的预算"。
+ *    唯一性不靠数据库约束（SQLite 里 NULL 在 UNIQUE 索引中互不相等，约束不住），
+ *    由 services/budget.js 做"先查再改/插"。
+ */
+export const BUDGET_SQL = `
+CREATE TABLE IF NOT EXISTS budget (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id  INTEGER NOT NULL DEFAULT 1,
+  category_id INTEGER,
+  limit_cents INTEGER NOT NULL CHECK (limit_cents > 0),
+  updated_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_budget_acc ON budget(account_id);
+`
+
 /** 迁移登记：按版本号顺序执行。新增结构变更 → 追加一项，禁止修改已发布的版本。 */
 export const MIGRATIONS = [
   { version: 1, name: 'v1_init', sql: SCHEMA_SQL },
-  { version: 2, name: 'v2_multi_account', sql: ACCOUNT_SQL }
+  { version: 2, name: 'v2_multi_account', sql: ACCOUNT_SQL },
+  { version: 3, name: 'v3_budget', sql: BUDGET_SQL }
 ]

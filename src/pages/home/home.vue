@@ -5,7 +5,7 @@
       <text class="nav-title">奶龙记账</text>
       <view class="nav-right">
         <view class="icon-btn" @click="showSalary"><view class="ib" :style="iconCoin" /></view>
-        <view class="icon-btn" @click="showOver"><view class="ib" :style="iconBell" /></view>
+        <view class="icon-btn" @click="goBudget"><view class="ib" :style="iconBell" /></view>
       </view>
     </view>
 
@@ -15,7 +15,7 @@
       <text class="month-label">{{ ymText }}</text>
       <view class="arr" @click="shiftMonth(1)">›</view>
     </view>
-    <view class="month-sub">{{ isCurrentMonth ? '本月你还可以花' : '这个月你还可以花' }}</view>
+    <view class="month-sub" :class="{ over: budgetLineOver }">{{ budgetLine }}</view>
 
     <!-- 余额卡 -->
     <view class="balance-card">
@@ -72,15 +72,16 @@
     <!-- 右下 FAB -->
     <view class="fab" @click="goAdd"><text class="fab-i">+</text></view>
 
-    <!-- 超支弹窗 -->
+    <!-- 超支弹窗（真实预算判断触发，见 maybeAlertOver） -->
     <view v-if="overShow" class="mask" @click="overShow = false">
       <view class="modal" @click.stop>
         <image class="modal-img" src="/static/milo/milo-sad.webp" mode="aspectFit" />
         <text class="modal-title">哎呀，这个月要吃土咯…</text>
-        <text class="modal-tip">这个月花超啦，要不咱省着点花？</text>
+        <text class="modal-tip">{{ overDetail }}</text>
+        <text class="modal-tip" style="margin-top:6px">要不咱省着点花？</text>
         <view class="modal-row">
           <view class="btn-ghost" @click="overShow = false">以后再说</view>
-          <view class="btn-y" @click="goStats">去看看账单</view>
+          <view class="btn-y" @click="goBudget">去改预算</view>
         </view>
       </view>
     </view>
@@ -102,18 +103,24 @@ import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
+import { useBudgetStore } from '../../stores/budget.js'
+import { useAccountStore } from '../../stores/account.js'
 import { groupByDay, dayLabel } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
 import { balanceCents } from '../../utils/stats.js'
+import { budgetStatus as budgetStatusOf } from '../../utils/budget.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
  * 首页（v2.0）：月份切换 + 余额卡 + 全部/支出/收入分段 + 按日流水 + FAB。
  * 数据全部来自 store：txStore.loadMonth(metaStore.ym) 驱动余额与列表。
+ * 预算：月份下方那行显示真实剩余额度，超支时自动弹一次提醒（见 maybeAlertOver）。
  */
 const txStore = useTxStore()
 const categoryStore = useCategoryStore()
 const metaStore = useMetaStore()
+const budgetStore = useBudgetStore()
+const accountStore = useAccountStore()
 
 const seg = ref('all')
 const segs = [
@@ -130,11 +137,43 @@ const ymText = computed(function () {
   const parts = metaStore.ym.split('-')
   return parts[0] + '年' + Number(parts[1]) + '月'
 })
-const isCurrentMonth = computed(function () {
-  const d = new Date()
-  const now = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
-  return metaStore.ym === now
+/* ---- 预算：月份下面那行 + 超支提醒 ---- */
+const totalBudget = computed(function () {
+  return budgetStore.totalCents
 })
+const budgetStat = computed(function () {
+  return budgetStatusOf(totalBudget.value, txStore.summary.expenseCents)
+})
+const budgetLineOver = computed(function () {
+  return budgetStat.value.level === 'over'
+})
+/** 有预算就显示真实剩余；没预算不编数字，直接给个可操作的引导 */
+const budgetLine = computed(function () {
+  const s = budgetStat.value
+  if (!s.hasLimit) return '还没设预算 · 点右上角铃铛设置'
+  if (s.level === 'over') return '本月已超预算 ¥' + formatCents(-s.remainCents)
+  return '本月你还可以花 ¥' + formatCents(s.remainCents)
+})
+const overDetail = computed(function () {
+  const s = budgetStat.value
+  if (!s.hasLimit) return ''
+  return '本月已花 ¥' + formatCents(s.spentCents) + '，超出预算 ¥' + formatCents(-s.remainCents)
+})
+
+/**
+ * 超支自动提醒：每个月每个账本只弹一次（不然每次回首页都弹，很烦）。
+ * 记账后返回首页也会走到这里，所以新记的一笔导致的超支同样能提醒到。
+ */
+function maybeAlertOver() {
+  const s = budgetStat.value
+  if (s.level !== 'over') return
+  const key = 'cashDiary.overAlerted.' + metaStore.ym + '.' + accountStore.currentId
+  try {
+    if (uni.getStorageSync(key)) return
+    uni.setStorageSync(key, 1)
+  } catch (e) { /* 存储不可用时也弹，只是可能重复 */ }
+  overShow.value = true
+}
 
 const incomeText = computed(function () {
   return formatCents(txStore.summary.incomeCents)
@@ -171,9 +210,9 @@ function shiftMonth(d) {
 function goAdd() {
   uni.navigateTo({ url: '/pages/add/add' })
 }
-function goStats() {
+function goBudget() {
   overShow.value = false
-  uni.reLaunch({ url: '/pages/stats/stats' })
+  uni.navigateTo({ url: '/pages/budget/budget' })
 }
 
 let salaryTimer = null
@@ -181,9 +220,6 @@ function showSalary() {
   salaryShow.value = true
   clearTimeout(salaryTimer)
   salaryTimer = setTimeout(function () { salaryShow.value = false }, 3500)
-}
-function showOver() {
-  overShow.value = true
 }
 function closeEdit() {
   editing.value = null
@@ -220,7 +256,10 @@ const iconBell = svgMaskStyle('M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-
 const iconHeart = svgMaskStyle('M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z')
 
 onShow(function () {
-  txStore.loadMonth(metaStore.ym)
+  // 预算与流水一起加载完再判断超支，否则会拿旧数据算
+  Promise.all([budgetStore.load(), txStore.refresh(metaStore.ym)])
+    .then(maybeAlertOver)
+    .catch(function () { /* 首屏失败不阻塞页面 */ })
 })
 </script>
 
@@ -293,6 +332,11 @@ onShow(function () {
   font-size: 12px;
   color: var(--cd-ink-2);
   margin-top: 2px;
+}
+/* 超支时这行变成提醒色（对奶油底 >=4.5:1） */
+.month-sub.over {
+  color: var(--cd-danger-ink);
+  font-weight: 700;
 }
 
 /* ---- 余额卡 ---- */

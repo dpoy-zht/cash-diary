@@ -12,7 +12,7 @@ let data = null
 let memBackend = null
 
 function blank() {
-  return { nextId: 1, category: [], transaction_record: [], account: [] }
+  return { nextId: 1, category: [], transaction_record: [], account: [], budget: [] }
 }
 
 function backend() {
@@ -51,6 +51,7 @@ export async function init() {
         // 兼容旧结构：缺哪张表补哪张，避免老种子数据把页面打崩
         if (!Array.isArray(parsed.transaction_record)) parsed.transaction_record = []
         if (!Array.isArray(parsed.account)) parsed.account = []
+        if (!Array.isArray(parsed.budget)) parsed.budget = []
         if (typeof parsed.nextId !== 'number') parsed.nextId = 1
         data = parsed
         return
@@ -183,6 +184,52 @@ export async function accountStats() {
     agg[a] = cur
   })
   return Object.keys(agg).map(function (k) { return agg[k] })
+}
+
+/* ---------- 预算 CRUD ---------- */
+
+/** 某账本的全部预算（总预算 category_id = null + 各分类预算） */
+export async function budgetList(accountId) {
+  const a = aid(accountId)
+  return data.budget
+    .filter(function (b) { return aid(b.account_id) === a })
+    .map(function (b) { return Object.assign({}, b) })
+}
+
+/** 有则改、无则插（category_id 为 null 表示总预算） */
+export async function budgetUpsert(rec) {
+  const a = aid(rec.account_id)
+  const cid = rec.category_id == null ? null : Number(rec.category_id)
+  const row = data.budget.find(function (b) {
+    return aid(b.account_id) === a && (b.category_id == null ? null : Number(b.category_id)) === cid
+  })
+  if (row) {
+    row.limit_cents = rec.limit_cents
+    row.updated_at = rec.updated_at || Date.now()
+    persist()
+    return row.id
+  }
+  const id = nid()
+  data.budget.push({
+    id: id,
+    account_id: a,
+    category_id: cid,
+    limit_cents: rec.limit_cents,
+    updated_at: rec.updated_at || Date.now()
+  })
+  persist()
+  return id
+}
+
+/** 清除某条预算（总预算或某分类） */
+export async function budgetRemove(accountId, categoryId) {
+  const a = aid(accountId)
+  const cid = categoryId == null ? null : Number(categoryId)
+  data.budget = data.budget.filter(function (b) {
+    const same = aid(b.account_id) === a && (b.category_id == null ? null : Number(b.category_id)) === cid
+    return !same
+  })
+  persist()
 }
 
 /* ---------- 全量概览与维护 ---------- */

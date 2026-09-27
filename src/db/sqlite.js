@@ -150,6 +150,43 @@ export async function accountStats() {
   )
 }
 
+/* ---------- 预算 CRUD ---------- */
+
+/** 某账本的全部预算（总预算 category_id 为 NULL + 各分类预算） */
+export async function budgetList(accountId) {
+  return select(
+    'SELECT * FROM budget WHERE account_id = ' + aid(accountId) + ' ORDER BY category_id IS NULL DESC, id ASC'
+  )
+}
+
+/** 有则改、无则插（category_id 传 null 表示总预算） */
+export async function budgetUpsert(rec) {
+  const a = aid(rec.account_id)
+  const cid = rec.category_id == null ? null : Number(rec.category_id)
+  const where = 'account_id = ' + a + ' AND category_id ' + (cid == null ? 'IS NULL' : '= ' + cid)
+  const exists = await select('SELECT id FROM budget WHERE ' + where)
+  const ts = Number(rec.updated_at || Date.now())
+  if (exists && exists.length) {
+    await executeBatch([
+      'UPDATE budget SET limit_cents = ' + Number(rec.limit_cents) + ', updated_at = ' + ts + ' WHERE ' + where
+    ])
+    return Number(exists[0].id)
+  }
+  await executeBatch([
+    'INSERT INTO budget (account_id, category_id, limit_cents, updated_at) VALUES (' +
+    [a, cid == null ? 'NULL' : cid, Number(rec.limit_cents), ts].join(', ') + ')'
+  ])
+}
+
+/** 清除某条预算（总预算或某分类） */
+export async function budgetRemove(accountId, categoryId) {
+  const cid = categoryId == null ? null : Number(categoryId)
+  await executeBatch([
+    'DELETE FROM budget WHERE account_id = ' + aid(accountId) +
+    ' AND category_id ' + (cid == null ? 'IS NULL' : '= ' + cid)
+  ])
+}
+
 /* ---------- 全量概览与维护 ---------- */
 
 /** 全量（未删除）流水概览：笔数、累计收支、最早/最近时间；聚合交给 SQL，不在 JS 累加 */
