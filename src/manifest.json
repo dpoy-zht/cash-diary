@@ -23,7 +23,13 @@
             "android" : {
                 "permissions" : [
                     "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>"
-                ]
+                ],
+                "icons" : {
+                    "hdpi" : "unpackage/res/icons/72x72.png",
+                    "xhdpi" : "unpackage/res/icons/96x96.png",
+                    "xxhdpi" : "unpackage/res/icons/144x144.png",
+                    "xxxhdpi" : "unpackage/res/icons/192x192.png"
+                }
             },
             "ios" : {
                 "dSYMs" : false
