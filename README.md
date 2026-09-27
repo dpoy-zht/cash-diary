@@ -1,90 +1,96 @@
-# 现金日记 · cash-diary
+# 奶龙记账 · cash-diary
 
-> 3 秒记一笔的个人记账 App。离线优先，数据存本机。
+> 一只黄色小胖龙，盯着你花钱。
 
-目前处于 **MVP（阶段 1）**：快速记账 / 内置分类 / 流水列表 / 编辑删除 / 本地持久化。
+一个离线优先的个人记账 App。数据只存在你手机里，不上云、不联网、不分析你的消费习惯——因为根本没有服务器，想分析也分析不了。
 
-## 技术栈
+> 奶龙（那谁）温馨提示：记账不能让你变富，但能让你清楚地知道自己是**怎么穷的**。
 
-| 层次 | 选型 |
-|---|---|
-| 跨端框架 | uni-app（Vue3 + Vite），一套代码出 Android APK，预留微信小程序 |
-| 开发工具 | HBuilderX（真机运行 / 云打包） |
-| 状态管理 | Pinia |
-| 本地存储 | SQLite（`plus.sqlite`，App 端）/ 内存演示存储（H5 与单元测试） |
-| 单元测试 | vitest |
+## ✨ 功能亮点
 
-## 文档索引
+- **🚀 3 秒记一笔**：四列记账键盘 + 「记好啦」大按键，比外卖小哥摁门铃还快
+- **📊 日 / 周 / 月 / 年统计**：环形图中心有一只奶龙深情凝视你的钱包，想假装没花钱都不行
+- **📈 近 6 个月趋势柱状图**：每月花销一目了然，哪个月手最欠，柱子最高那根会替你尴尬
+- **🔍 流水搜索**：搜「奶茶」，本月喝掉的每一杯都会被拉出来公开处刑
+- **🧾 多账本**：默认账本管生活，「小金库」管私房钱（合法合规的那种）
+- **🎯 预算 + 超支弹窗**：花超了奶龙会露出 Sad 脸看着你，比我妈的眼神还有杀伤力
+- **🔔 超支系统通知**：App 在后台也不放过你，通知栏直接补刀（可关，关了就是自欺欺人模式）
+- **🔥 连续记账天数 & 等级**：从「记账萌新」一路升到「奶龙首富」，断签一天重新做人
+- **💾 备份 / 恢复**：JSON 文件导出，卸载重装不丢账；恢复前整包校验，坏文件一个字节都进不了库
+- **🌙 完全离线**：地铁里、深山里、飞行模式里都能记，没网是你的优势而不是它的缺陷
 
-| 文档 | 说明 |
-|---|---|
-| [`AGENTS.md`](./AGENTS.md) | 协作规范（每次改动必须 commit + 测试通过后交付） |
-| [`PLAN.md`](./PLAN.md) | 开发起步方案与 5 阶段路线图 |
-| [`docs/PRD.md`](./docs/PRD.md) | 产品设计文档 v2.0（信息架构 / 流程 / 设计规范 / 验收标准） |
-| [`docs/技术方案.md`](./docs/技术方案.md) | 技术方案（架构 / 数据层 / 测试 / 风险） |
-| [`docs/nailong-ui-spec.md`](./docs/nailong-ui-spec.md) | 视觉规范（**§1–§12 为已归档的 v1.x**，现行规范见 PRD §8） |
-| [`demo/nailong-ledger.html`](./demo/nailong-ledger.html) | **「奶龙记账」设计基准原型 v2.0**（当前唯一有效基准，复现自用户提供的参考包） |
-| [`demo/archive/`](./demo/archive/) | 已归档的旧原型（v1.2 记账原型、v1.1 形象中心）——勿作为基准 |
+## 🛠 技术栈
 
-## 快速开始
+| 层次 | 选型 | 一句话点评 |
+|---|---|---|
+| 跨端框架 | uni-app（Vue 3 + Vite） | 一套代码，Android APK 说走就走，微信小程序留了门 |
+| 状态管理 | Pinia | 比 Vuex 顺滑，比自律容易 |
+| 本地存储 | `plus.sqlite`（App 端）/ 内存适配器（H5 / 测试） | 双适配器同签名，测试跑得飞快 |
+| 单元测试 | vitest | 近 200 个用例看着你，改崩了别想合进去 |
+| 打包 | HBuilderX 云打包 / CLI | 命令行一键出包，适合懒人 |
+| 金额处理 | 整数分（`1990` = ¥19.90） | 浮点数算钱？哥们你胆子真大 |
+
+## 🚀 快速开始
 
 ```bash
-# 1. 安装依赖（Node ≥ 18）
+# 1. 拉代码
+git clone https://github.com/dpoy-zht/cash-diary.git
+cd cash-diary
+
+# 2. 装依赖（Node 18+；仓库内 .npmrc 已指向 npmmirror 镜像，装不动再研究）
 npm install
 
-# 2. 跑单元测试
-npm run test
+# 3. 跑测试（先看奶龙的脸色）
+npx vitest run
 
-# 3. 方式一：浏览器预览（走内存演示存储，快速验证界面）
+# 4. 浏览器里跑起来（内存存储，自带空白数据）
 npm run dev:h5
-
-# 4. 方式二：真机运行（推荐，走真正的 SQLite）
-#    用 HBuilderX 导入本目录 → 运行 → 运行到手机或模拟器
 ```
 
-依赖安装缓慢时可保留仓库内 `.npmrc`（npmmirror 镜像）；若要改用官方源，删除该文件即可。
+想在手机上跑 / 打出 APK：
 
-## 目录结构
+1. 用 **HBuilderX** 打开项目根目录
+2. 手机插 USB → 「运行 → 运行到手机或模拟器」（`plus.sqlite` 只在 App 端有，H5 是内存假数据）
+3. 出正式包：「发行 → 原生 App-云打包」，或者玩命令行：
 
-```
-├─ src/                uni-app 源码根（CLI 约定）
-│  ├─ pages/           页面：home（首页）/ add（记一笔）/ stats（统计）/ ledger（账本）/ me（我的）
-│  ├─ components/      公共组件：tab-bar（5 Tab 自定义导航）/ money-keyboard / category-grid / cat-icon / tx-item / edit-sheet / mascot
-│  ├─ stores/          Pinia：category / tx / meta
-│  ├─ services/        业务层：记账校验与编排、分类种子
-│  ├─ db/              数据层：schema + sqlite/memory 双存储 + repository
-│  ├─ utils/           money（分↔元换算）/ date（时间戳与分组）/ stats（聚合与环形图）/ palette（分类色与图标，纯展示）/ svg-icon
-│  ├─ static/milo/     milo 表情包（第三方 IP，仅个人自用；界面素材，见版权说明）
-│  ├─ App.vue          应用入口（启动初始化数据库与分类 + **全站设计令牌层 v2.0**）
-│  └─ pages.json / manifest.json
-├─ tests/              vitest 单元与集成测试
-├─ demo/               设计原型与素材
-│  ├─ nailong-ledger.html   **v2.0 设计基准原型**（当前唯一有效）
-│  ├─ archive/              已归档旧原型（v1.2 记账原型 / v1.1 形象中心）
-│  └─ assets/               图片素材目录（nailong/ 与 milo/；图片本身不入库）
-└─ docs/               产品与技术文档
+```bash
+# HBuilderX CLI 云打包（配置文件里填你自己的证书信息）
+E:/HBuilderX/cli.exe pack --config dist/pack-config.json
 ```
 
-> 采用 uni-app **CLI 工程结构**（源码在 `src/`）：`npm run dev:h5` / `npm run build:h5` / `npm run test` 是自动化验证通路；该结构同样可被 HBuilderX 打开并运行到手机。
+## 🗂 项目结构速览
 
-## 图片素材
+```
+src/
+├── pages/        # 首页 / 记一笔 / 统计 / 账本 / 我的（五页互相 reLaunch）
+├── stores/       # Pinia：流水、分类、账本、预算（账本过滤在这统一注入）
+├── services/     # 业务规则：金额校验、备份打包、搜索
+├── db/           # sqlite.js + memory.js 双适配器（方法签名严格一致）
+├── utils/        # 纯函数：金额、日期、统计分桶、预算判断、通知
+└── static/milo/  # 奶龙表情包（见下方版权声明）
+tests/            # vitest 用例：账本隔离 / 软删除 / 字段契约都有回归
+demo/             # 设计基准原型 nailong-ledger.html（改 UI 前先看它）
+```
 
-`demo/assets/nailong/` 与 `demo/assets/milo/` 的图片属于第三方版权素材（「奶龙」© 第七印象文化传媒（深圳）有限公司），
-**仅限本机原型验证与个人学习，不得商用或公开发布**，因此**不随仓库分发**。
+更多设计细节：[`docs/PRD.md`](./docs/PRD.md)（产品设计）、[`docs/技术方案.md`](./docs/技术方案.md)（架构与数据层）、[`AGENTS.md`](./AGENTS.md)（协作规范：改动必 commit + 测试全绿）。
 
-- `nailong/`（形象中心用）：`pip install pillow && python demo/assets/nailong/fetch.py` 重新获取
-- `milo/`（奶龙记账 v2.0 基准原型用）：从参考包目录复制 5 张 PNG（见该目录 README）
+## 📐 几条认真的设计铁律（奶龙严肃脸）
 
-细节与替换方案见 [`demo/assets/nailong/README.md`](./demo/assets/nailong/README.md)、[`demo/assets/milo/README.md`](./demo/assets/milo/README.md)。
+1. **金额一律整数分存储**，浮点数禁止入场——`0.1 + 0.2 !== 0.3` 的教训，记账 App 不配拥有
+2. **时间存毫秒时间戳**，统计按**手机本地日历月**分桶，月初 0 点的账不许跑到隔壁月
+3. **删除一律软删除**（`deleted_at`），为将来云同步留后路，备份文件也要保留这个字段
+4. **页面传输入字段名，数据库用 snake_case**，映射只走 `services/tx.js: buildAddInput()`——当年真机上「记好啦」点了没反应，就是字段名传串了
 
-## 三条数据铁律
+## 📄 开源协议
 
-1. **金额一律整数「分」存储**（1990 = ¥19.90），禁止浮点数参与存储与计算
-2. **时间一律毫秒时间戳**，展示时才按本地时区格式化
-3. **删除一律软删除**（`deleted_at`），为后续同步留后路
+[MIT](./LICENSE) —— 随便用、随便改、随便魔改，记得别删原作者署名。
 
-## 开发约定
+## ⚠️ 版权声明（这条一点都不好笑）
 
-- 任何改动都要有对应的 Git commit（见 `AGENTS.md`）
-- 任何改动都要更新测试，且 `npm run test` 全绿后才能交付
-- 架构级变更先改 `docs/技术方案.md`，再动代码
+「奶龙」是**第七印象文化传媒（深圳）有限公司**的商业 IP。本项目中的奶龙形象素材**仅限个人学习使用**，请勿商用、请勿上架应用商店、请勿做成手机壳钥匙扣发大财。真想商业化，先去找第七印象谈授权（谈成了记得请作者喝奶茶）。
+
+## 🙏 鸣谢
+
+- 第七印象：奶龙本龙
+- DCloud：uni-app 与 HBuilderX，让一个人也能全端出货
+- 我的钱包：为这个项目的数据采集做出了不可磨灭的贡献
