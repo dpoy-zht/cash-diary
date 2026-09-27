@@ -133,6 +133,31 @@ export async function categoryInsert(cat) {
   return id
 }
 
+/** 改分类（名称 / 图标 / 排序） */
+export async function categoryUpdate(id, patch) {
+  const row = data.category.find(function (c) { return c.id === id })
+  if (!row) return
+  Object.keys(patch).forEach(function (k) { row[k] = patch[k] })
+  persist()
+}
+
+/** 删分类。**不级联删流水**（调用方必须先确认该分类下没有记录），避免误删账目。 */
+export async function categoryDelete(id) {
+  data.category = data.category.filter(function (c) { return c.id !== id })
+  persist()
+}
+
+/** 每个分类的流水笔数（未删除），供列表展示与"删除前检查" */
+export async function categoryStats() {
+  const agg = {}
+  data.transaction_record.forEach(function (r) {
+    if (r.deleted_at != null) return
+    const k = String(r.category_id)
+    agg[k] = (agg[k] || 0) + 1
+  })
+  return Object.keys(agg).map(function (k) { return { category_id: Number(k), c: agg[k] } })
+}
+
 /* ---------- 账本 CRUD ---------- */
 
 export async function accountList() {

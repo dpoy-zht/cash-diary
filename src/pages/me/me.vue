@@ -194,6 +194,10 @@ function tapFn(f) {
     uni.navigateTo({ url: '/pages/budget/budget' })
     return
   }
+  if (f.key === 'category') {
+    uni.navigateTo({ url: '/pages/category/category' })
+    return
+  }
   if (f.key === 'export') {
     openBackupMenu()
     return

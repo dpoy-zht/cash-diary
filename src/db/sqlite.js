@@ -108,6 +108,26 @@ export async function categoryInsert(cat) {
   await executeBatch(['INSERT INTO category (' + cols.join(',') + ') VALUES (' + vals + ')'])
 }
 
+/** 改分类（名称 / 图标 / 排序） */
+export async function categoryUpdate(id, patch) {
+  const sets = Object.keys(patch).map(function (k) { return k + ' = ' + sqlValue(patch[k]) }).join(', ')
+  if (!sets) return
+  await executeBatch(['UPDATE category SET ' + sets + ' WHERE id = ' + Number(id)])
+}
+
+/** 删分类。**不级联删流水**（调用方必须先确认该分类下没有记录），避免误删账目。 */
+export async function categoryDelete(id) {
+  await executeBatch(['DELETE FROM category WHERE id = ' + Number(id)])
+}
+
+/** 每个分类的流水笔数（未删除），供列表展示与"删除前检查" */
+export async function categoryStats() {
+  return select(
+    'SELECT category_id, COUNT(*) AS c FROM transaction_record ' +
+    'WHERE deleted_at IS NULL GROUP BY category_id'
+  )
+}
+
 /* ---------- 账本 CRUD ---------- */
 
 export async function accountList() {
