@@ -3,7 +3,19 @@
  * 与 DOM / uni 无关，可单测。
  */
 import { colorOf } from './palette.js'
-import { ymOf } from './date.js'
+import {
+  ymOf,
+  dayStart,
+  weekStart,
+  dayRange,
+  weekRange,
+  yearRange,
+  monthRange,
+  lastNDayStarts,
+  lastNWeekStarts,
+  lastNMonths,
+  ymsOfYear
+} from './date.js'
 
 /**
  * 把一个月内的支出流水聚合成"分类 → 金额"，按金额降序。
@@ -196,4 +208,94 @@ export function levelOf(totalCount) {
   const n = Math.max(0, Math.floor(Number(totalCount) || 0))
   const idx = Math.min(LEVEL_TITLES.length - 1, Math.floor(n / 10))
   return { level: idx + 1, title: LEVEL_TITLES[idx] }
+}
+
+/* ================= 日 / 周 / 月 / 年 统计（2026-09-27） ================= */
+
+/** 一周的毫秒数 */
+const WEEK_MS = 7 * 86400000
+
+/**
+ * 统计期间 [start, end) 半开区间（本地时区）：
+ * day = 当天 0 点起；week = 周一 0 点起（周一为一周之始）；
+ * month = 该日所在月；year = 该日所在年。未知 key 兜底为月。
+ */
+export function periodRange(key, ts) {
+  const t = ts == null ? Date.now() : ts
+  if (key === 'day') return dayRange(t)
+  if (key === 'week') return weekRange(t)
+  if (key === 'year') return yearRange(new Date(t).getFullYear())
+  const d = new Date(t)
+  return monthRange(d.getFullYear(), d.getMonth() + 1)
+}
+
+/**
+ * 支出 / 收入合计（跳过软删除）。期间合计行、空状态判断共用。
+ * @returns {{expenseCents:number, incomeCents:number}}
+ */
+export function sumByType(records) {
+  const out = { expenseCents: 0, incomeCents: 0 }
+  for (const r of records || []) {
+    if (!r || r.deleted_at != null) continue
+    if (r.type === 'expense') out.expenseCents += r.amount_cents
+    else if (r.type === 'income') out.incomeCents += r.amount_cents
+  }
+  return out
+}
+
+/**
+ * 通用分桶（趋势柱）：keyOf(record) 决定落桶，keys 顺序即返回顺序。
+ * 落不进任何桶的记录忽略；软删除跳过。monthlySummaries 的月分桶是它的特例。
+ * @returns {Array<{key:any, expenseCents:number, incomeCents:number}>}
+ */
+export function bucketSummaries(records, keys, keyOf) {
+  const list = Array.isArray(keys) ? keys : []
+  const buckets = {}
+  list.forEach(function (k) {
+    buckets[k] = { key: k, expenseCents: 0, incomeCents: 0 }
+  })
+  const rows = Array.isArray(records) ? records : []
+  rows.forEach(function (r) {
+    if (!r || r.deleted_at != null) return
+    const bucket = buckets[keyOf(r.occurred_at)]
+    if (!bucket) return
+    if (r.type === 'expense') bucket.expenseCents += r.amount_cents
+    else if (r.type === 'income') bucket.incomeCents += r.amount_cents
+  })
+  return list.map(function (k) { return buckets[k] })
+}
+
+/**
+ * 各期间的趋势分桶规格（决定「近 7 天 / 近 4 周 / 近 6 个月 / 全年逐月」）：
+ * - day  → 最近 7 天，按天分桶
+ * - week → 最近 4 周，按周分桶（周一起点）
+ * - month→ 最近 6 个月，按月分桶（与首页趋势一致）
+ * - year → 当年 12 个月，按月分桶
+ * start/end 覆盖"期间本体 + 趋势区间"的超集，供一次区间查询用。
+ */
+export function trendSpecFor(key, anchorTs) {
+  const t = anchorTs == null ? Date.now() : anchorTs
+  if (key === 'day') {
+    const keys = lastNDayStarts(7, t)
+    return { keys: keys, keyOf: dayStart, start: keys[0], end: keys[keys.length - 1] + 86400000 }
+  }
+  if (key === 'week') {
+    const keys = lastNWeekStarts(4, t)
+    return { keys: keys, keyOf: weekStart, start: keys[0], end: keys[keys.length - 1] + WEEK_MS }
+  }
+  if (key === 'year') {
+    const y = new Date(t).getFullYear()
+    const range = yearRange(y)
+    return { keys: ymsOfYear(y), keyOf: ymOf, start: range[0], end: range[1] }
+  }
+  // month：近 6 个月
+  const months = lastNMonths(6, t)
+  const first = months[0].split('-').map(Number)
+  const last = months[months.length - 1].split('-').map(Number)
+  return {
+    keys: months,
+    keyOf: ymOf,
+    start: monthRange(first[0], first[1])[0],
+    end: monthRange(last[0], last[1])[1]
+  }
 }

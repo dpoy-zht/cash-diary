@@ -8,9 +8,13 @@ import {
   levelOf,
   monthlySummaries,
   barPercents,
-  maxIndex
+  maxIndex,
+  periodRange,
+  sumByType,
+  bucketSummaries,
+  trendSpecFor
 } from '../src/utils/stats.js'
-import { lastNMonths, ymLabel } from '../src/utils/date.js'
+import { lastNMonths, ymLabel, dayStart, weekStart, yearRange } from '../src/utils/date.js'
 
 const CATS = [
   { id: 1, name: '午饭', icon: '🍜' },
@@ -283,5 +287,131 @@ describe('levelOf —— 按累计笔数算等级', () => {
     expect(levelOf(null).level).toBe(1)
     expect(levelOf(-5).level).toBe(1)
     expect(levelOf('abc').level).toBe(1)
+  })
+})
+
+/* ================= 日 / 周 / 月 / 年 统计（2026-09-27） =================
+ * 已知锚点：2026-09-27 是周日（其周为 9/21 ~ 9/27）。
+ */
+
+describe('periodRange —— 期间半开区间', () => {
+  it('day = 当天 [0 点, 次日 0 点)', () => {
+    const [start, end] = periodRange('day', at(2026, 9, 27, 15))
+    expect(start).toBe(at(2026, 9, 27, 0))
+    expect(end).toBe(at(2026, 9, 28, 0))
+  })
+
+  it('week = 该日所在周 [周一 0 点, 下周一 0 点)（9/27 周日 → 9/21 起）', () => {
+    const [start, end] = periodRange('week', at(2026, 9, 27))
+    expect(start).toBe(at(2026, 9, 21, 0))
+    expect(end).toBe(at(2026, 9, 28, 0))
+  })
+
+  it('month = 该日所在月；year = 该日所在年', () => {
+    const [ms, me] = periodRange('month', at(2026, 9, 27))
+    expect(ms).toBe(new Date(2026, 8, 1).getTime())
+    expect(me).toBe(new Date(2026, 9, 1).getTime())
+
+    const [ys, ye] = periodRange('year', at(2026, 9, 27))
+    expect(ys).toBe(new Date(2026, 0, 1).getTime())
+    expect(ye).toBe(new Date(2027, 0, 1).getTime())
+  })
+
+  it('未知 key 兜底为月', () => {
+    const [start] = periodRange('whatever', at(2026, 9, 27))
+    expect(start).toBe(new Date(2026, 8, 1).getTime())
+  })
+})
+
+describe('sumByType —— 期间收支合计', () => {
+  it('支出与收入分开累加，软删除跳过', () => {
+    const s = sumByType([
+      { type: 'expense', amount_cents: 1000 },
+      { type: 'expense', amount_cents: 500 },
+      { type: 'income', amount_cents: 9000 },
+      { type: 'expense', amount_cents: 777, deleted_at: 123 },
+      { type: 'unknown', amount_cents: 42 }
+    ])
+    expect(s).toEqual({ expenseCents: 1500, incomeCents: 9000 })
+  })
+
+  it('空入参返回 0，不抛错', () => {
+    expect(sumByType([])).toEqual({ expenseCents: 0, incomeCents: 0 })
+    expect(sumByType(null)).toEqual({ expenseCents: 0, incomeCents: 0 })
+  })
+})
+
+describe('bucketSummaries —— 通用分桶', () => {
+  const DAY = 86400000
+  function byDay(ts) { return Math.floor(ts / DAY) }
+
+  it('按 keyOf 落桶，keys 顺序即返回顺序，支出收入分开', () => {
+    const keys = [100, 101, 102]
+    const rows = bucketSummaries([
+      { type: 'expense', amount_cents: 300, occurred_at: 100 * DAY + 5 },
+      { type: 'expense', amount_cents: 200, occurred_at: 100 * DAY + 9 },
+      { type: 'income', amount_cents: 8000, occurred_at: 101 * DAY + 1 }
+    ], keys, byDay)
+    expect(rows.map(function (r) { return r.key })).toEqual([100, 101, 102])
+    expect(rows[0]).toEqual({ key: 100, expenseCents: 500, incomeCents: 0 })
+    expect(rows[1]).toEqual({ key: 101, expenseCents: 0, incomeCents: 8000 })
+    expect(rows[2]).toEqual({ key: 102, expenseCents: 0, incomeCents: 0 })
+  })
+
+  it('软删除跳过；落不进桶的记录忽略', () => {
+    const rows = bucketSummaries([
+      { type: 'expense', amount_cents: 100, occurred_at: 100 * DAY, deleted_at: 1 },
+      { type: 'expense', amount_cents: 999, occurred_at: 999 * DAY }
+    ], [100], byDay)
+    expect(rows[0].expenseCents).toBe(0)
+  })
+
+  it('空入参不抛错', () => {
+    expect(bucketSummaries(null, [1, 2], byDay).length).toBe(2)
+    expect(bucketSummaries([], null, byDay)).toEqual([])
+  })
+})
+
+describe('trendSpecFor —— 各期间趋势分桶规格', () => {
+  it('day → 近 7 天（末桶 = 锚点当天 0 点，区间盖住整 7 天）', () => {
+    const anchor = at(2026, 9, 27, 15)
+    const spec = trendSpecFor('day', anchor)
+    expect(spec.keys.length).toBe(7)
+    expect(spec.keys[6]).toBe(at(2026, 9, 27, 0))
+    expect(spec.keys[0]).toBe(at(2026, 9, 21, 0))
+    expect(spec.end).toBe(at(2026, 9, 28, 0))
+    expect(spec.keyOf(anchor)).toBe(at(2026, 9, 27, 0))
+  })
+
+  it('week → 近 4 周（末桶 = 锚点所在周的周一）', () => {
+    const spec = trendSpecFor('week', at(2026, 9, 27))
+    expect(spec.keys.length).toBe(4)
+    expect(spec.keys[3]).toBe(at(2026, 9, 21, 0))
+    expect(spec.end).toBe(at(2026, 9, 28, 0))
+    expect(spec.keyOf(at(2026, 9, 22, 8))).toBe(at(2026, 9, 21, 0))
+  })
+
+  it('month → 近 6 个月（ym 字符串桶，与首页趋势一致）', () => {
+    const spec = trendSpecFor('month', at(2026, 9, 27))
+    expect(spec.keys).toEqual(lastNMonths(6, at(2026, 9, 27)))
+    expect(spec.keyOf(at(2026, 9, 1))).toBe('2026-09')
+    expect(spec.start).toBe(new Date(2026, 3, 1).getTime())
+    expect(spec.end).toBe(new Date(2026, 9, 1).getTime())
+  })
+
+  it('year → 当年 12 个月，区间 = 全年', () => {
+    const spec = trendSpecFor('year', at(2026, 9, 27))
+    expect(spec.keys.length).toBe(12)
+    expect(spec.keys[0]).toBe('2026-01')
+    expect(spec.keys[11]).toBe('2026-12')
+    expect([spec.start, spec.end]).toEqual(yearRange(2026))
+    expect(weekStart(at(2026, 9, 21))).toBe(at(2026, 9, 21, 0)) // 周一恒等 sanity
+  })
+
+  it('区间超集覆盖：period 本体 ⊆ spec 区间（day 锚点在月中也成立）', () => {
+    const anchor = at(2026, 9, 27, 15)
+    const pr = periodRange('day', anchor)
+    const spec = trendSpecFor('day', anchor)
+    expect(spec.start <= pr[0] && pr[1] <= spec.end).toBe(true)
   })
 })

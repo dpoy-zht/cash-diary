@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import * as txService from '../services/tx.js'
 import { useAccountStore } from './account.js'
 import { lastNMonths, monthRange } from '../utils/date.js'
-import { monthlySummaries } from '../utils/stats.js'
+import { monthlySummaries, periodRange, trendSpecFor, sumByType, bucketSummaries } from '../utils/stats.js'
 
 /** 趋势图统计的月份数 */
 export const TREND_MONTHS = 6
@@ -17,6 +17,11 @@ export const useTxStore = defineStore('tx', function () {
   const recentTs = ref([])
   /** 近 6 个月分桶： [{ ym, expenseCents, incomeCents }] —— 统计页趋势图用 */
   const trend = ref([])
+
+  /** 统计页期间数据（日/周/月/年）：期间内流水 + 收支合计 + 趋势分桶 */
+  const periodRecords = ref([])
+  const periodSummary = ref({ expenseCents: 0, incomeCents: 0 })
+  const periodTrend = ref([])
 
   /**
    * 所有查询都带上"当前账本"的过滤条件。
@@ -55,6 +60,29 @@ export const useTxStore = defineStore('tx', function () {
     trend.value = monthlySummaries(rows, months)
   }
 
+  /**
+   * 统计页期间统计（日 / 周 / 月 / 年）：
+   * **一次区间查询**覆盖「期间本体 + 趋势区间」的超集，再在 JS 里过滤与分桶 ——
+   * 桥接查询次数最少，分桶逻辑全部落在纯函数（可单测）。
+   * - day  → 近 7 天逐日
+   * - week → 近 4 周逐周
+   * - month→ 近 6 个月逐月
+   * - year → 当年 12 个月
+   */
+  async function loadStatsPeriod(key, anchorTs) {
+    const aid = currentAccount()
+    const pr = periodRange(key, anchorTs)
+    const spec = trendSpecFor(key, anchorTs)
+    const start = Math.min(pr[0], spec.start)
+    const end = Math.max(pr[1], spec.end)
+    const rows = await txService.listByRange(start, end, aid)
+    periodRecords.value = rows.filter(function (r) {
+      return r.occurred_at >= pr[0] && r.occurred_at < pr[1]
+    })
+    periodSummary.value = sumByType(periodRecords.value)
+    periodTrend.value = bucketSummaries(rows, spec.keys, spec.keyOf)
+  }
+
   async function add(ym, input) {
     await txService.addTx(Object.assign({}, input, { accountId: currentAccount() }))
     await refresh(ym)
@@ -84,10 +112,14 @@ export const useTxStore = defineStore('tx', function () {
     overview,
     recentTs,
     trend,
+    periodRecords,
+    periodSummary,
+    periodTrend,
     loadMonth,
     loadOverview,
     loadRecentTs,
     loadTrend,
+    loadStatsPeriod,
     refresh,
     add,
     update,

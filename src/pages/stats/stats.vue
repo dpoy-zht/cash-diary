@@ -4,9 +4,9 @@
     <view class="navbar">
       <view class="icon-btn" @click="goHome"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">奶龙算账</text>
-      <!-- 真正的月份选择器：统计页原先只能跟随首页月份，无法自己切换 -->
-      <picker mode="date" fields="month" :value="monthValue" @change="onMonthChange">
-        <view class="month-chip">{{ monthLabel }}</view>
+      <!-- 期间选择器：fields 随期间切换（日/周选日期、月选月、年选年） -->
+      <picker mode="date" :fields="pickerFields" :value="pickerValue" @change="onPickDate">
+        <view class="month-chip">{{ pickerLabel }}</view>
       </picker>
     </view>
 
@@ -21,11 +21,11 @@
       >{{ s.name }}</view>
     </view>
 
-    <!-- 当月收支合计 -->
+    <!-- 期间收支合计 -->
     <view class="month-totals">
-      <text class="mt-item">本月支出 <text class="mt-num">{{ monthExpenseText }}</text></text>
+      <text class="mt-item">{{ periodName }}支出 <text class="mt-num">{{ periodExpenseText }}</text></text>
       <text class="mt-sep">·</text>
-      <text class="mt-item">本月收入 <text class="mt-num inc">{{ monthIncomeText }}</text></text>
+      <text class="mt-item">{{ periodName }}收入 <text class="mt-num inc">{{ periodIncomeText }}</text></text>
     </view>
 
     <!-- 环形图卡 -->
@@ -46,7 +46,7 @@
       </block>
       <view v-else class="empty">
         <image class="empty-img" src="/static/milo/milo-innocent.webp" mode="aspectFit" />
-        <text class="empty-title">这个月还没有支出哦~</text>
+        <text class="empty-title">{{ emptyTitle }}</text>
         <text class="empty-sub">记几笔，奶龙帮你看看钱花哪了</text>
       </view>
     </view>
@@ -66,10 +66,10 @@
       </view>
     </view>
 
-    <!-- 近 6 个月趋势（支出/收入可切） -->
+    <!-- 趋势柱状图（维度随期间切换：近 7 天 / 近 4 周 / 近 6 个月 / 全年逐月） -->
     <view class="trend-card">
       <view class="trend-head">
-        <text class="trend-title">近 6 个月</text>
+        <text class="trend-title">{{ trendTitle }}</text>
         <view class="trend-seg">
           <text
             class="ts-item"
@@ -84,7 +84,7 @@
         </view>
       </view>
       <view class="bars">
-        <view v-for="(m, i) in trendRows" :key="m.ym" class="bar-col">
+        <view v-for="(m, i) in trendRows" :key="m.key" class="bar-col">
           <text class="bar-amt" :class="{ max: i === trendMaxIndex }">{{ amountLabel(m) }}</text>
           <view class="bar-track">
             <view
@@ -93,7 +93,7 @@
               :style="{ height: trendPercents[i] + '%' }"
             />
           </view>
-          <text class="bar-label" :class="{ max: i === trendMaxIndex }">{{ ymLabel(m.ym) }}</text>
+          <text class="bar-label" :class="{ max: i === trendMaxIndex }">{{ bucketLabel(m.key) }}</text>
         </view>
       </view>
       <text class="trend-foot">{{ trendFoot }}</text>
@@ -110,14 +110,24 @@ import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { expenseByCategory, donutSegments, conicGradient, barPercents, maxIndex } from '../../utils/stats.js'
-import { ymLabel } from '../../utils/date.js'
+import {
+  ymLabel,
+  toDateStr,
+  tsFromDateStr,
+  weekStart,
+  dayTrendLabel,
+  periodNameOf
+} from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
- * 统计（v2.0）：当月收支合计 + 环形图（conic-gradient，中心放奶龙）+ 分类排行 + 近 6 个月趋势柱状图。
- * 全部数据来自 store：当月部分看 txStore.records / summary，趋势看 txStore.trend（近 6 个月分桶）。
- * 日/周/年暂未实现（参考包也只有月有真实数据），点按提示规划中。
+ * 统计（v2.1）：日 / 周 / 月 / 年四种期间 —— 收支合计 + 环形图 + 分类排行 + 趋势柱状图。
+ * 数据全部来自 txStore.loadStatsPeriod（一次区间查询 + JS 分桶，分桶逻辑在 utils/stats.js 纯函数）：
+ * - day  → 当天，趋势看近 7 天逐日
+ * - week → 本周（周一为一周之始），趋势看近 4 周逐周
+ * - month→ 与首页共用 meta store 的月份，趋势看近 6 个月
+ * - year → 当年，趋势看全年逐月
  */
 const txStore = useTxStore()
 const categoryStore = useCategoryStore()
@@ -130,23 +140,110 @@ const periods = [
   { key: 'year', name: '年' }
 ]
 const period = ref('month')
+/** 日 / 周 / 年的锚点（月期间走 metaStore.ym，与首页保持同步） */
+const anchorTs = ref(Date.now())
 
 const rows = computed(function () {
-  return expenseByCategory(txStore.records, categoryStore.list)
+  return expenseByCategory(txStore.periodRecords, categoryStore.list)
 })
 
-/* ---- 当月收支合计 ---- */
-const monthExpenseText = computed(function () {
-  return '¥' + formatCents(txStore.summary.expenseCents)
+/* ---- 期间收支合计 ---- */
+const periodName = computed(function () {
+  return periodNameOf(period.value)
 })
-const monthIncomeText = computed(function () {
-  return '¥' + formatCents(txStore.summary.incomeCents)
+const periodExpenseText = computed(function () {
+  return '¥' + formatCents(txStore.periodSummary.expenseCents)
+})
+const periodIncomeText = computed(function () {
+  return '¥' + formatCents(txStore.periodSummary.incomeCents)
 })
 
-/* ---- 近 6 个月趋势 ---- */
+/* ---- 顶部选择器（胶囊 + picker，fields 随期间变化） ---- */
+const DAY_MS = 86400000
+const pickerFields = computed(function () {
+  if (period.value === 'month') return 'month'
+  if (period.value === 'year') return 'year'
+  return 'day'
+})
+const pickerValue = computed(function () {
+  if (period.value === 'month') return metaStore.ym
+  if (period.value === 'year') return String(new Date(anchorTs.value).getFullYear())
+  return toDateStr(anchorTs.value)
+})
+const pickerLabel = computed(function () {
+  if (period.value === 'month') {
+    const parts = metaStore.ym.split('-')
+    return parts[0] + '/' + Number(parts[1])
+  }
+  if (period.value === 'year') return new Date(anchorTs.value).getFullYear() + '年'
+  if (period.value === 'week') {
+    const s = new Date(weekStart(anchorTs.value))
+    const e = new Date(weekStart(anchorTs.value) + 6 * DAY_MS)
+    return (s.getMonth() + 1) + '.' + s.getDate() + '-' + (e.getMonth() + 1) + '.' + e.getDate()
+  }
+  const d = new Date(anchorTs.value)
+  return (d.getMonth() + 1) + '月' + d.getDate() + '日'
+})
+
+/** 期间或锚点变化后统一走这里；月期间的锚点从 metaStore.ym 派生 */
+function reload() {
+  const anchor = period.value === 'month' ? ymToAnchor(metaStore.ym) : anchorTs.value
+  txStore.loadStatsPeriod(period.value, anchor)
+}
+function ymToAnchor(ym) {
+  const p = String(ym || '').split('-').map(Number)
+  return new Date(p[0], (p[1] || 1) - 1, 15).getTime()
+}
+
+/** 选择器回调：月 → 'YYYY-MM'；年 → 'YYYY'；日 / 周 → 'YYYY-MM-DD' */
+function onPickDate(e) {
+  const v = e.detail.value
+  if (period.value === 'month') {
+    if (!/^\d{4}-\d{2}$/.test(v)) return
+    metaStore.ym = v
+  } else if (period.value === 'year') {
+    if (!/^\d{4}$/.test(v)) return
+    anchorTs.value = new Date(Number(v), 5, 15).getTime()
+  } else {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return
+    anchorTs.value = tsFromDateStr(v)
+  }
+  reload()
+}
+
+function pickPeriod(s) {
+  if (period.value === s.key) return
+  period.value = s.key
+  reload()
+}
+
+const segments = computed(function () {
+  return donutSegments(rows.value)
+})
+const donutBg = computed(function () {
+  return conicGradient(segments.value)
+})
+
+/* ---- 空状态文案随期间变化 ---- */
+const EMPTY_PREFIX = { day: '这一天', week: '这一周', month: '这个月', year: '这一年' }
+const emptyTitle = computed(function () {
+  return EMPTY_PREFIX[period.value] + '还没有支出哦~'
+})
+
+/* ---- 趋势柱状图（维度随期间切换） ---- */
+const TREND_META = {
+  day: { title: '近 7 天', span: '这 7 天', unit: '天' },
+  week: { title: '近 4 周', span: '这 4 周', unit: '周' },
+  month: { title: '近 6 个月', span: '6 个月', unit: '个月' },
+  year: { title: '全年逐月', span: '这一年', unit: '个月' }
+}
 const trendMode = ref('expense')
 const trendRows = computed(function () {
-  return txStore.trend
+  return txStore.periodTrend
+})
+const trendTitle = computed(function () {
+  if (period.value === 'year') return new Date(anchorTs.value).getFullYear() + ' 年逐月'
+  return TREND_META[period.value].title
 })
 const trendValues = computed(function () {
   const key = trendMode.value === 'income' ? 'incomeCents' : 'expenseCents'
@@ -163,14 +260,20 @@ function amountLabel(m) {
   const cents = trendMode.value === 'income' ? m.incomeCents : m.expenseCents
   return compactYuan(cents)
 }
+/** 柱子底部的标签：日/周桶键是时间戳 → '9/21'；月/年桶键是 'YYYY-MM' → '9月' */
+function bucketLabel(key) {
+  if (period.value === 'day' || period.value === 'week') return dayTrendLabel(key)
+  return ymLabel(key)
+}
 const trendFoot = computed(function () {
+  const meta = TREND_META[period.value]
   const total = trendValues.value.reduce(function (s, v) { return s + v }, 0)
   const word = trendMode.value === 'income' ? '收入' : '支出'
-  if (!total) return '这 6 个月还没有' + word + '记录'
-  const months = trendRows.value.filter(function (m) {
+  if (!total) return meta.span + '还没有' + word + '记录'
+  const n = trendRows.value.filter(function (m) {
     return (trendMode.value === 'income' ? m.incomeCents : m.expenseCents) > 0
   }).length
-  return '6 个月共' + word + ' ¥' + formatCents(total) + '（有记录的 ' + months + ' 个月）'
+  return meta.span + '共' + word + ' ¥' + formatCents(total) + '（有记录的 ' + n + ' ' + meta.unit + '）'
 })
 /** 金额紧凑写法：0 → ¥0；< 1 万 → ¥1,234；≥ 1 万 → ¥1.8万 */
 function compactYuan(cents) {
@@ -180,36 +283,9 @@ function compactYuan(cents) {
   if (yuan < 10000) return '¥' + Math.round(yuan).toLocaleString('en-US')
   return '¥' + (yuan / 10000).toFixed(1) + '万'
 }
-const monthLabel = computed(function () {
-  const parts = metaStore.ym.split('-')
-  return parts[0] + '/' + Number(parts[1])
-})
-const monthValue = computed(function () {
-  return metaStore.ym
-})
-/** 换月后立刻重算，统计页与首页共用 meta store 的月份，保持一致 */
-function onMonthChange(e) {
-  const v = e.detail.value
-  if (!/^\d{4}-\d{2}$/.test(v)) return
-  metaStore.ym = v
-  txStore.loadMonth(v)
-}
-const segments = computed(function () {
-  return donutSegments(rows.value)
-})
-const donutBg = computed(function () {
-  return conicGradient(segments.value)
-})
 
 function catOf(name) {
   return categoryStore.list.find(function (c) { return c.name === name }) || { name: name, icon: '📦' }
-}
-function pickPeriod(s) {
-  if (s.key !== 'month') {
-    uni.showToast({ title: s.name + '视图规划中', icon: 'none' })
-    return
-  }
-  period.value = s.key
 }
 function goHome() {
   uni.reLaunch({ url: '/pages/home/home' })
@@ -218,8 +294,7 @@ function goHome() {
 const iconBack = svgMaskStyle('M15.4 7.4L14 6l-6 6 6 6 1.4-1.4L10.8 12z')
 
 onShow(function () {
-  // 用 refresh 而不是 loadMonth：趋势卡要的是近 6 个月的分桶数据
-  txStore.refresh(metaStore.ym)
+  reload()
 })
 </script>
 

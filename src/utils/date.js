@@ -88,3 +88,76 @@ export function tsFromDateStr(dstr) {
   if (!dstr) return now.getTime()
   return new Date(dstr + 'T' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':00').getTime()
 }
+
+/* ================= 周期区间（统计页 日 / 周 / 月 / 年 用） ================= */
+
+const DAY_MS = 86400000
+const WEEK_MS = 7 * DAY_MS
+
+/** 周一 00:00（中国习惯：周一为一周之始；周日归到下一周，即落在上一周的周一之后） */
+export function weekStart(ts) {
+  const d = new Date(ts)
+  d.setHours(0, 0, 0, 0)
+  const dow = d.getDay() // 0 = 周日
+  const diff = dow === 0 ? 6 : dow - 1
+  d.setDate(d.getDate() - diff)
+  return d.getTime()
+}
+
+/** 当天 [00:00, 次日 00:00) —— 半开区间 */
+export function dayRange(ts) {
+  const start = dayStart(ts)
+  return [start, start + DAY_MS]
+}
+
+/** 该日所在周 [周一 00:00, 下周一 00:00) */
+export function weekRange(ts) {
+  const start = weekStart(ts)
+  return [start, start + WEEK_MS]
+}
+
+/** 某年 [1月1日 00:00, 次年 1月1日 00:00) */
+export function yearRange(year) {
+  const y = Math.floor(Number(year) || 0)
+  return [new Date(y, 0, 1).getTime(), new Date(y + 1, 0, 1).getTime()]
+}
+
+/** 最近 n 天的 0 点时间戳（含当天，从旧到新） */
+export function lastNDayStarts(n, ts) {
+  const count = Math.max(1, Math.floor(Number(n) || 1))
+  const base = dayStart(ts == null ? Date.now() : ts)
+  const out = []
+  for (let i = count - 1; i >= 0; i -= 1) out.push(base - i * DAY_MS)
+  return out
+}
+
+/** 最近 n 周的周一 0 点（含本周，从旧到新） */
+export function lastNWeekStarts(n, ts) {
+  const count = Math.max(1, Math.floor(Number(n) || 1))
+  const base = weekStart(ts == null ? Date.now() : ts)
+  const out = []
+  for (let i = count - 1; i >= 0; i -= 1) out.push(base - i * WEEK_MS)
+  return out
+}
+
+/** 某年的 12 个月 'YYYY-MM'（从 1 月到 12 月） */
+export function ymsOfYear(year) {
+  const y = Math.floor(Number(year) || 0)
+  const out = []
+  for (let m = 1; m <= 12; m += 1) out.push(y + '-' + pad2(m))
+  return out
+}
+
+/** 趋势柱标签（日/周分桶用）：'9月21日' → '9/21' */
+export function dayTrendLabel(ts) {
+  const d = new Date(ts)
+  return d.getMonth() + 1 + '/' + d.getDate()
+}
+
+/** 期间名：本日 / 本周 / 本月 / 本年（收支合计行用） */
+export function periodNameOf(key) {
+  if (key === 'day') return '本日'
+  if (key === 'week') return '本周'
+  if (key === 'year') return '本年'
+  return '本月'
+}

@@ -7,8 +7,22 @@ import {
   dayLabel,
   groupByDay,
   toDateStr,
-  tsFromDateStr
+  tsFromDateStr,
+  weekStart,
+  dayRange,
+  weekRange,
+  yearRange,
+  lastNDayStarts,
+  lastNWeekStarts,
+  ymsOfYear,
+  dayTrendLabel,
+  periodNameOf
 } from '../src/utils/date.js'
+
+/** 本地时间造时间戳（与工具函数的本地时区口径一致） */
+function at(y, m, d, h) {
+  return new Date(y, m - 1, d, h == null ? 12 : h, 0, 0).getTime()
+}
 
 describe('ymOf —— 月份键', () => {
   it('格式为 YYYY-MM 且补零', () => {
@@ -105,5 +119,85 @@ describe('pad2 / dayStart', () => {
     expect([d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()]).toEqual([0, 0, 0, 0])
     expect(d.getDate()).toBe(24)
     expect(s).toBeLessThanOrEqual(ts)
+  })
+})
+
+/* ================= 周期区间（统计页 日 / 周 / 年） =================
+ * 已知锚点：2026-09-27 是周日，其所在周（周一为始）是 9/21 ~ 9/27。
+ */
+
+describe('weekStart —— 周一 0 点', () => {
+  it('周日归到本周的周一（9/27 周日 → 9/21 周一）', () => {
+    const s = new Date(weekStart(at(2026, 9, 27)))
+    expect([s.getFullYear(), s.getMonth() + 1, s.getDate(), s.getDay()]).toEqual([2026, 9, 21, 1])
+  })
+  it('周一就是自己；周中归到本周一；周六也是本周一', () => {
+    expect(weekStart(at(2026, 9, 21))).toBe(at(2026, 9, 21, 0))
+    expect(new Date(weekStart(at(2026, 9, 23))).getDate()).toBe(21)
+    expect(new Date(weekStart(at(2026, 9, 26))).getDate()).toBe(21)
+  })
+})
+
+describe('dayRange / weekRange / yearRange —— 半开区间', () => {
+  it('dayRange = [当天 0 点, 次日 0 点)', () => {
+    const [start, end] = dayRange(at(2026, 9, 27, 15))
+    expect(start).toBe(at(2026, 9, 27, 0))
+    expect(end).toBe(at(2026, 9, 28, 0))
+    expect(at(2026, 9, 27, 23, 59) < end).toBe(true)
+  })
+
+  it('weekRange = [周一 0 点, 下周一 0 点)', () => {
+    const [start, end] = weekRange(at(2026, 9, 27))
+    expect(start).toBe(at(2026, 9, 21, 0))
+    expect(end).toBe(at(2026, 9, 28, 0))
+  })
+
+  it('yearRange = [1月1日, 次年 1月1日)，跨年正确', () => {
+    const [start, end] = yearRange(2026)
+    expect(new Date(start).getMonth()).toBe(0)
+    expect(new Date(start).getDate()).toBe(1)
+    expect(new Date(end).getFullYear()).toBe(2027)
+    expect(at(2026, 12, 31, 23) < end).toBe(true)
+  })
+})
+
+describe('lastNDayStarts / lastNWeekStarts —— 分桶键序列', () => {
+  it('最近 n 天的 0 点，从旧到新，含当天', () => {
+    expect(lastNDayStarts(3, at(2026, 9, 27, 15))).toEqual([
+      at(2026, 9, 25, 0), at(2026, 9, 26, 0), at(2026, 9, 27, 0)
+    ])
+  })
+
+  it('最近 n 周的周一 0 点，从旧到新，含本周', () => {
+    expect(lastNWeekStarts(3, at(2026, 9, 27))).toEqual([
+      at(2026, 9, 7, 0), at(2026, 9, 14, 0), at(2026, 9, 21, 0)
+    ])
+  })
+
+  it('非法 n 兜底为 1', () => {
+    expect(lastNDayStarts(0, at(2026, 9, 27))).toEqual([at(2026, 9, 27, 0)])
+    expect(lastNWeekStarts(null, at(2026, 9, 27))).toEqual([at(2026, 9, 21, 0)])
+  })
+})
+
+describe('ymsOfYear / dayTrendLabel / periodNameOf', () => {
+  it('ymsOfYear 返回 12 个月键，补零', () => {
+    const yms = ymsOfYear(2026)
+    expect(yms.length).toBe(12)
+    expect(yms[0]).toBe('2026-01')
+    expect(yms[11]).toBe('2026-12')
+  })
+
+  it('dayTrendLabel 去掉前导零', () => {
+    expect(dayTrendLabel(at(2026, 9, 27))).toBe('9/27')
+    expect(dayTrendLabel(at(2026, 10, 5))).toBe('10/5')
+  })
+
+  it('periodNameOf 各期间前缀；未知 key 兜底本月', () => {
+    expect(periodNameOf('day')).toBe('本日')
+    expect(periodNameOf('week')).toBe('本周')
+    expect(periodNameOf('month')).toBe('本月')
+    expect(periodNameOf('year')).toBe('本年')
+    expect(periodNameOf('xxx')).toBe('本月')
   })
 })
