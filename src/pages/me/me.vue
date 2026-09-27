@@ -85,7 +85,12 @@ import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { useCategoryStore } from '../../stores/category.js'
+import { useAccountStore } from '../../stores/account.js'
+import { useBudgetStore } from '../../stores/budget.js'
 import { resetAll } from '../../services/maintenance.js'
+import * as backupService from '../../services/backup.js'
+import { backupFileName, validateBackup } from '../../utils/backup.js'
+import { saveTextFile, pickBackupText } from '../../utils/backup-file.js'
 import { formatCents, parseAmountToCents } from '../../utils/money.js'
 import { streakDays, levelOf } from '../../utils/stats.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
@@ -101,6 +106,8 @@ import { svgMaskStyle } from '../../utils/svg-icon.js'
 const txStore = useTxStore()
 const metaStore = useMetaStore()
 const categoryStore = useCategoryStore()
+const accountStore = useAccountStore()
+const budgetStore = useBudgetStore()
 
 const GOAL_KEY = 'cashDiary.goalCents'
 const goalCents = ref(0)
@@ -163,7 +170,7 @@ function editGoal() {
 const fns = [
   { key: 'budget', name: '预算设置', color: '#ffd93d', icon: 'M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 15l-4-4 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z' },
   { key: 'category', name: '分类管理', color: '#ff8a65', icon: 'M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.41l9 9c.37.36.87.59 1.41.59s1.04-.23 1.41-.59l7-7c.36-.37.59-.87.59-1.41s-.23-1.04-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z' },
-  { key: 'export', name: '导出账单 Excel', color: '#81c784', icon: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z' },
+  { key: 'export', name: '数据备份与恢复', color: '#81c784', icon: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z' },
   { key: 'remind', name: '记账提醒', color: '#4dd0e1', icon: 'M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z' },
   { key: 'skin', name: '皮肤（当前：奶龙黄）', color: '#ba68c8', icon: 'M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7-1c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5L6.89 16.5c.8 2.04 2.78 3.5 5.11 3.5z' },
   { key: 'about', name: '关于', color: '#a1887f', right: 'v2.0.0', icon: 'M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z' }
@@ -187,7 +194,104 @@ function tapFn(f) {
     uni.navigateTo({ url: '/pages/budget/budget' })
     return
   }
+  if (f.key === 'export') {
+    openBackupMenu()
+    return
+  }
   uni.showToast({ title: f.name + ' 还在计划里', icon: 'none' })
+}
+
+/* ---- 数据备份与恢复 ---- */
+function openBackupMenu() {
+  uni.showActionSheet({
+    itemList: ['导出备份（JSON 文件）', '从备份恢复'],
+    success: function (res) {
+      if (res.tapIndex === 0) doExport()
+      else if (res.tapIndex === 1) doRestore()
+    }
+  })
+}
+
+async function doExport() {
+  uni.showLoading({ title: '正在打包…', mask: true })
+  try {
+    const text = await backupService.exportJson()
+    const where = await saveTextFile(backupFileName(Date.now()), text)
+    const b = backupService.parseBackupText(text)
+    uni.hideLoading()
+    uni.showModal({
+      title: '导出成功',
+      content:
+        '包含 ' + b.account.length + ' 个账本、' + b.category.length + ' 个分类、' +
+        b.transaction_record.length + ' 笔流水、' + b.budget.length + ' 条预算。\n' + where,
+      showCancel: false,
+      confirmText: '好'
+    })
+  } catch (err) {
+    uni.hideLoading()
+    uni.showToast({ title: (err && err.message) || '导出失败', icon: 'none' })
+  }
+}
+
+function fmtTs(ts) {
+  const d = new Date(Number(ts) || Date.now())
+  function p(n) { return String(n).padStart(2, '0') }
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes())
+}
+
+async function doRestore() {
+  let picked
+  try {
+    picked = await pickBackupText()
+  } catch (err) {
+    if (!err || !err.cancelled) uni.showToast({ title: (err && err.message) || '读取失败', icon: 'none' })
+    return
+  }
+  let obj
+  try {
+    obj = backupService.parseBackupText(picked.text)
+  } catch (err) {
+    uni.showToast({ title: err.message, icon: 'none' })
+    return
+  }
+  // 先只读校验，再让用户确认 —— 校验不过绝不碰数据库
+  const check = validateBackup(obj)
+  if (!check.ok) {
+    uni.showModal({ title: '这份备份不能用', content: check.error, showCancel: false, confirmText: '好' })
+    return
+  }
+  const c = check.counts
+  uni.showModal({
+    title: '从备份恢复',
+    content:
+      '备份时间：' + fmtTs(obj.exportedAt) + '\n' +
+      '包含：' + c.account + ' 个账本、' + c.category + ' 个分类、' +
+      c.transaction_record + ' 笔流水、' + c.budget + ' 条预算\n\n' +
+      '⚠️ 恢复会覆盖当前全部数据，无法撤销。',
+    confirmText: '覆盖并恢复',
+    confirmColor: '#b93b39',
+    cancelText: '取消',
+    success: function (res) {
+      if (res.confirm) doRestoreApply(obj)
+    }
+  })
+}
+
+async function doRestoreApply(obj) {
+  uni.showLoading({ title: '恢复中…', mask: true })
+  try {
+    const counts = await backupService.restoreBackup(obj)
+    // 四张表都换了，store 必须整体重读（account 的 init 有 ready 守卫，要用 reload）
+    await categoryStore.init()
+    await accountStore.reload()
+    await budgetStore.load()
+    await txStore.refresh(metaStore.ym)
+    uni.hideLoading()
+    uni.showToast({ title: '已恢复 ' + counts.transaction_record + ' 笔流水', icon: 'none' })
+  } catch (err) {
+    uni.hideLoading()
+    uni.showToast({ title: (err && err.message) || '恢复失败', icon: 'none' })
+  }
 }
 
 /* ---- 重置数据（开发期工具，两次确认）---- */

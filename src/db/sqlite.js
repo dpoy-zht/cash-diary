@@ -218,6 +218,46 @@ export async function clearAll() {
     'DELETE FROM transaction_record',
     'DELETE FROM category',
     'DELETE FROM account',
-    "DELETE FROM sqlite_sequence WHERE name IN ('transaction_record','category','account')"
+    'DELETE FROM budget',
+    "DELETE FROM sqlite_sequence WHERE name IN ('transaction_record','category','account','budget')"
   ])
+}
+
+/* ---------- 备份：整库导出 / 整库恢复 ---------- */
+
+/** 各表列名（导出/恢复共用，保证列顺序一致） */
+const TABLE_COLS = {
+  account: ['id', 'name', 'created_at'],
+  category: ['id', 'name', 'type', 'icon', 'sort'],
+  transaction_record: [
+    'id', 'account_id', 'category_id', 'type', 'amount_cents', 'note',
+    'occurred_at', 'created_at', 'updated_at', 'deleted_at'
+  ],
+  budget: ['id', 'account_id', 'category_id', 'limit_cents', 'updated_at']
+}
+
+function insertRow(table, row) {
+  const cols = TABLE_COLS[table]
+  const vals = cols.map(function (c) { return sqlValue(row[c]) }).join(', ')
+  return 'INSERT INTO ' + table + ' (' + cols.join(',') + ') VALUES (' + vals + ')'
+}
+
+/** 导出用：原样返回四张表（**含软删除记录**，否则恢复后已删数据会"复活"） */
+export async function dumpAll() {
+  const out = {}
+  for (const table of Object.keys(TABLE_COLS)) {
+    out[table] = await select('SELECT * FROM ' + table)
+  }
+  return out
+}
+
+/** 恢复用：整库替换（先清空，再按原 id 写回，保证表间关系不变）。调用方必须已校验过数据。 */
+export async function restoreAll(tables) {
+  const t = tables || {}
+  await clearAll()
+  for (const table of Object.keys(TABLE_COLS)) {
+    const rows = Array.isArray(t[table]) ? t[table] : []
+    if (!rows.length) continue
+    await executeBatch(rows.map(function (row) { return insertRow(table, row) }))
+  }
 }

@@ -263,8 +263,39 @@ export async function txRecentTimestamps(sinceTs, accountId) {
     .map(function (r) { return r.occurred_at })
 }
 
-/** 清空全部业务数据（流水 + 分类 + 账本），表结构保留 —— 供「重置数据」用 */
+/** 清空全部业务数据（流水 + 分类 + 账本 + 预算），表结构保留 —— 供「重置数据」用 */
 export async function clearAll() {
   data = blank()
+  persist()
+}
+
+/* ---------- 备份：整库导出 / 整库恢复 ---------- */
+
+const TABLES = ['account', 'category', 'transaction_record', 'budget']
+
+/** 导出用：原样返回四张表（**含软删除记录**，否则恢复后已删数据会"复活"） */
+export async function dumpAll() {
+  const out = {}
+  TABLES.forEach(function (k) {
+    out[k] = data[k].map(function (r) { return Object.assign({}, r) })
+  })
+  return out
+}
+
+/** 恢复用：整库替换（按原样写回，保留 id 关系）。调用方必须已校验过数据。 */
+export async function restoreAll(tables) {
+  const t = tables || {}
+  data = blank()
+  let maxId = 0
+  TABLES.forEach(function (k) {
+    const rows = Array.isArray(t[k]) ? t[k] : []
+    rows.forEach(function (row) {
+      data[k].push(Object.assign({}, row))
+      const id = Number(row.id)
+      if (Number.isFinite(id) && id > maxId) maxId = id
+    })
+  })
+  // 自增起点必须大于已用的最大 id，否则之后新增记录会撞 id
+  data.nextId = maxId + 1
   persist()
 }

@@ -28,6 +28,15 @@ export const useAccountStore = defineStore('account', function () {
   async function init() {
     if (ready) return
     ready = true
+    await reload()
+  }
+
+  /**
+   * 重新读取账本（可重复调用）。
+   * 「从备份恢复」后必须走这个，否则 store 里还是恢复前的账本列表 ——
+   * init() 有 ready 守卫，光调它是不生效的。
+   */
+  async function reload() {
     await accountService.seedDefaultIfEmpty()
     let saved = 0
     try {
@@ -36,7 +45,7 @@ export const useAccountStore = defineStore('account', function () {
       saved = 0
     }
     await refresh()
-    // 存过的账本已不存在（比如被删了）→ 回落到第一个
+    // 存过的账本已不存在（比如被删了/被备份覆盖了）→ 回落到第一个
     if (list.value.some(function (a) { return a.id === saved })) currentId.value = saved
     else if (list.value.length) currentId.value = list.value[0].id
     persistCurrent()
@@ -81,5 +90,5 @@ export const useAccountStore = defineStore('account', function () {
     }
   }
 
-  return { list, currentId, current, others, init, refresh, setCurrent, create, rename, remove }
+  return { list, currentId, current, others, init, reload, refresh, setCurrent, create, rename, remove }
 })
