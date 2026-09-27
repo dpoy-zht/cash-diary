@@ -14,6 +14,7 @@ import {
   BACKUP_VERSION
 } from '../src/utils/backup.js'
 import { ymOf } from '../src/utils/date.js'
+import { expenseByCategory } from '../src/utils/stats.js'
 
 describe('buildBackup / backupFileName（纯函数）', () => {
   it('打包带上身份与版本号，缺表时补空数组', () => {
@@ -220,5 +221,71 @@ describe('备份往返：导出 → 清空 → 恢复', () => {
   it('空备份（没有任何账本）拒绝恢复', async () => {
     const empty = buildBackup({}, Date.now())
     await expect(backupService.restoreBackup(empty)).rejects.toThrow('没有任何账本')
+  })
+})
+
+describe('老格式备份兼容（emoji 分类时代的备份文件）', () => {
+  beforeEach(async () => {
+    resetStorageForTest()
+    await getStorage().init()
+  })
+
+  /**
+   * 旧版种子是「餐饮/交通…」等名称 + emoji 图标；新 App 的 icon 是参考包 key。
+   * 这里验证：老备份能通过校验、能恢复、恢复后记账与统计链路不崩溃（icon 走兜底渲染）。
+   */
+  function buildLegacyBackup() {
+    const now = Date.now()
+    return {
+      app: BACKUP_APP,
+      version: BACKUP_VERSION,
+      exportedAt: now - 30 * 86400000,
+      account: [{ id: 1, name: '默认账本', created_at: now - 60 * 86400000 }],
+      category: [
+        { id: 1, name: '餐饮', icon: '🍜', type: 'expense', sort: 1, created_at: now, updated_at: now, deleted_at: null },
+        { id: 2, name: '交通', icon: '🚌', type: 'expense', sort: 2, created_at: now, updated_at: now, deleted_at: null },
+        { id: 3, name: '工资', icon: '💰', type: 'income', sort: 1, created_at: now, updated_at: now, deleted_at: null }
+      ],
+      transaction_record: [
+        { id: 1, account_id: 1, category_id: 1, type: 'expense', amount_cents: 2500, note: '午饭',
+          occurred_at: now - 86400000, created_at: now, updated_at: now, deleted_at: null },
+        { id: 2, account_id: 1, category_id: 3, type: 'income', amount_cents: 500000, note: '',
+          occurred_at: now - 2 * 86400000, created_at: now, updated_at: now, deleted_at: null }
+      ],
+      budget: []
+    }
+  }
+
+  it('老备份通过校验并成功恢复（结构兼容，emoji icon 不校验）', async () => {
+    const b = buildLegacyBackup()
+    const check = validateBackup(b)
+    expect(check.ok).toBe(true)
+    const counts = await backupService.restoreBackup(b)
+    expect(counts.category).toBe(3)
+    expect(counts.transaction_record).toBe(2)
+
+    const cats = await listCats()
+    expect(cats.length).toBe(3)
+    expect(cats.find(function (c) { return c.name === '餐饮' }).icon).toBe('🍜')
+  })
+
+  it('恢复后的老分类能正常记账、统计与搜索（icon 兜底渲染不崩溃）', async () => {
+    await backupService.restoreBackup(buildLegacyBackup())
+    const cats = await listCats()
+    const canyin = cats.find(function (c) { return c.name === '餐饮' })
+
+    // 记账闭环照常
+    await txService.addTx({ amountStr: '12', categoryId: canyin.id, type: 'expense', note: '面', ts: Date.now() })
+    const list = await txService.listByMonth(ymOf(Date.now()))
+    expect(list.length).toBe(3) // 老备份两笔都在本月 + 新记 1 笔
+
+    // 统计纯函数对 emoji icon 分类也能取到兜底色
+    const rows = expenseByCategory(list, cats)
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows[0].color).toMatch(/^#[0-9a-f]{6}$/)
+
+    // 搜索链路照常
+    const hit = await txService.search('午饭')
+    expect(hit.length).toBe(1)
   })
 })

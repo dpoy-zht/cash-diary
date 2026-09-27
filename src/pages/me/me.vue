@@ -66,8 +66,8 @@
     <!-- 6. 版权说明（素材为第三方 IP，必须常驻） -->
     <text class="copyright">奶龙形象版权归第七印象所有，本页面仅个人学习使用</text>
 
-    <!-- 7. 开发期工具：重置数据（放在最底部，尽量不影响上面按参考包排的版式） -->
-    <view class="dev-card">
+    <!-- 7. 开发期工具：重置数据（仅开发构建可见，发行打包 import.meta.env.DEV=false 自动消失） -->
+    <view v-if="isDev" class="dev-card">
       <view class="dev-row" hover-class="fn-hover" @click="confirmReset">
         <text class="dev-label">重置数据</text>
         <text class="dev-value">清空全部流水并恢复内置分类</text>
@@ -108,6 +108,8 @@ const metaStore = useMetaStore()
 const categoryStore = useCategoryStore()
 const accountStore = useAccountStore()
 const budgetStore = useBudgetStore()
+/** 重置数据是开发期工具：HBuilderX「运行」（dev 构建）可见，「发行/云打包」构建下隐藏 */
+const isDev = import.meta.env.DEV
 
 const GOAL_KEY = 'cashDiary.goalCents'
 const goalCents = ref(0)
