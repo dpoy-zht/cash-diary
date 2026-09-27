@@ -20,9 +20,13 @@
         },
         "distribute" : {
             "android" : {
-                "permissions" : [ "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>" ]
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>"
+                ]
             },
-            "ios" : {},
+            "ios" : {
+                "dSYMs" : false
+            },
             "sdkConfigs" : {}
         }
     },
