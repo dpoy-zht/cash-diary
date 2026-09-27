@@ -16,7 +16,8 @@
             "delay" : 0
         },
         "modules" : {
-            "Push" : {}
+            "Push" : {},
+            "SQLite" : {}
         },
         "distribute" : {
             "android" : {
