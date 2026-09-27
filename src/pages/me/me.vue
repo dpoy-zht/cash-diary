@@ -50,7 +50,12 @@
           <view class="fn-glyph" :style="maskOf(f)" />
         </view>
         <text class="fn-name">{{ f.name }}</text>
-        <text class="fn-arrow">{{ f.right || '›' }}</text>
+        <!-- 记账提醒：开关样式替代箭头，点击整行切换 -->
+        <view v-if="f.key === 'remind'" class="fn-right">
+          <text class="fn-switch-label">{{ remindOn ? '已开启' : '已关闭' }}</text>
+          <view class="fn-switch" :class="{ on: remindOn }"><view class="fn-switch-dot" /></view>
+        </view>
+        <text v-else class="fn-arrow">{{ f.right || '›' }}</text>
       </view>
     </view>
 
@@ -93,6 +98,11 @@ import { backupFileName, validateBackup } from '../../utils/backup.js'
 import { saveTextFile, pickBackupText } from '../../utils/backup-file.js'
 import { formatCents, parseAmountToCents } from '../../utils/money.js'
 import { streakDays, levelOf } from '../../utils/stats.js'
+import {
+  requestNotifyPermission,
+  REMIND_PREF_KEY,
+  normalizeRemindEnabled
+} from '../../utils/notify.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -192,6 +202,10 @@ function tapFn(f) {
     })
     return
   }
+  if (f.key === 'remind') {
+    toggleRemind()
+    return
+  }
   if (f.key === 'budget') {
     uni.navigateTo({ url: '/pages/budget/budget' })
     return
@@ -205,6 +219,34 @@ function tapFn(f) {
     return
   }
   uni.showToast({ title: f.name + ' 还在计划里', icon: 'none' })
+}
+
+/* ---- 记账提醒开关（控制超支系统通知；状态持久化，重装/清数据后回到默认开启） ---- */
+const remindOn = ref(true)
+
+function loadRemindPref() {
+  try {
+    remindOn.value = normalizeRemindEnabled(uni.getStorageSync(REMIND_PREF_KEY))
+  } catch (e) { /* 读不到就保持默认开启，不打扰用户 */ }
+}
+
+function toggleRemind() {
+  const prev = remindOn.value
+  const next = !prev
+  remindOn.value = next
+  try {
+    uni.setStorageSync(REMIND_PREF_KEY, next)
+  } catch (e) {
+    remindOn.value = prev // 存储失败回滚界面状态，假装没点过
+    uni.showToast({ title: '保存失败，请重试', icon: 'none' })
+    return
+  }
+  if (next) {
+    requestNotifyPermission() // 开启时顺带申请通知权限（App 端；H5 自动跳过）
+    uni.showToast({ title: '超支系统通知已开启', icon: 'none' })
+  } else {
+    uni.showToast({ title: '超支系统通知已关闭', icon: 'none' })
+  }
 }
 
 /* ---- 数据备份与恢复 ---- */
@@ -348,6 +390,7 @@ onShow(function () {
   } catch (e) {
     goalCents.value = 0
   }
+  loadRemindPref()
   txStore.refresh(metaStore.ym)
 })
 </script>
@@ -532,6 +575,42 @@ onShow(function () {
 .fn-arrow {
   color: #d4c4a0;
   font-size: 18px;
+}
+/* 记账提醒开关：胶囊滑块，开启用主题黄，与页面开关/分段控件同一套视觉 */
+.fn-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fn-switch-label {
+  font-size: 12px;
+  color: var(--cd-ink-2);
+}
+.fn-switch {
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--cd-line);
+  position: relative;
+  flex: none;
+  transition: background 0.2s var(--cd-ease);
+}
+.fn-switch.on {
+  background: var(--cd-primary);
+}
+.fn-switch-dot {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s var(--cd-ease);
+}
+.fn-switch.on .fn-switch-dot {
+  transform: translateX(20px);
 }
 
 /* ---- 5. 底部问候 ---- */

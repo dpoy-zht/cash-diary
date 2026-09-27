@@ -18,6 +18,18 @@ export function notifySupported() {
   }
 }
 
+/** 「记账提醒」系统通知开关的存储键（me 页写入并展示，home 页发送通知前读取） */
+export const REMIND_PREF_KEY = 'cashDiary.remind.enabled'
+
+/**
+ * 归一化提醒开关：**默认开启**（没存过 = 开）。
+ * 只把明确的"关"值当关，其余一律视为开 —— 防止存储异常/脏数据把提醒静默关掉。
+ * 纯函数可单测。
+ */
+export function normalizeRemindEnabled(raw) {
+  return !(raw === false || raw === 0 || raw === '0' || raw === 'false')
+}
+
 /**
  * 申请 Android 13+ 的通知权限（POST_NOTIFICATIONS）。
  * - 非 Android / 低版本 / 无 plus 环境：直接返回 true（默认视为可用）。

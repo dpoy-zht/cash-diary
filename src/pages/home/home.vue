@@ -131,7 +131,7 @@ import { useAccountStore } from '../../stores/account.js'
 import { groupByDay, dayLabel } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
-import { requestNotifyPermission, notifyLocal } from '../../utils/notify.js'
+import { requestNotifyPermission, notifyLocal, REMIND_PREF_KEY, normalizeRemindEnabled } from '../../utils/notify.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -205,9 +205,19 @@ const overDetail = computed(function () {
   return '本月已花 ¥' + formatCents(s.spentCents) + '，超出预算 ¥' + formatCents(-s.remainCents)
 })
 
+/** 「记账提醒」开关：我的页可关。读不到/异常时默认开（与 normalizeRemindEnabled 的默认语义一致） */
+function remindEnabled() {
+  try {
+    return normalizeRemindEnabled(uni.getStorageSync(REMIND_PREF_KEY))
+  } catch (e) {
+    return true
+  }
+}
+
 /**
  * 超支自动提醒：应用内弹窗 + 系统本地通知（App 端），每账本每月合计只来一次。
  * 去重键两路共用 —— 弹过（发过）就都不再来第二次。
+ * 系统通知受「记账提醒」开关控制（我的页）；应用内弹窗是预算功能本身，不受开关影响。
  */
 function maybeAlertOver() {
   const s = budgetStat.value
@@ -219,10 +229,12 @@ function maybeAlertOver() {
   } catch (e) { /* 存储不可用时也提醒，只是可能重复 */ }
   overShow.value = true
   // 系统通知：仅 App 端生效（H5 自动跳过）；权限失败也只是通知静默，弹窗照常
-  try {
-    requestNotifyPermission()
-    notifyLocal('奶龙记账 · 超预算啦', '本月已花 ¥' + formatCents(s.spentCents) + '，' + budgetLine.value)
-  } catch (e) { /* 通知失败不影响弹窗 */ }
+  if (remindEnabled()) {
+    try {
+      requestNotifyPermission()
+      notifyLocal('奶龙记账 · 超预算啦', '本月已花 ¥' + formatCents(s.spentCents) + '，' + budgetLine.value)
+    } catch (e) { /* 通知失败不影响弹窗 */ }
+  }
 }
 
 const incomeText = computed(function () {
