@@ -15,9 +15,15 @@
       "autoclose": true,
       "delay": 0
     },
-    "modules": {},
+    "modules": {
+      "Push": {}
+    },
     "distribute": {
-      "android": { "permissions": [] },
+      "android": {
+        "permissions": [
+          "android.permission.POST_NOTIFICATIONS"
+        ]
+      },
       "ios": {},
       "sdkConfigs": {}
     }
