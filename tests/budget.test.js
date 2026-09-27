@@ -5,7 +5,7 @@ import * as accountService from '../src/services/account.js'
 import * as budgetService from '../src/services/budget.js'
 import * as txService from '../src/services/tx.js'
 import { resetAll } from '../src/services/maintenance.js'
-import { budgetStatus, progressPercent, overText, overAlertKey, WARN_RATIO } from '../src/utils/budget.js'
+import { budgetStatus, progressPercent, overText, overAlertKey, pickOverAlertKeys, WARN_RATIO } from '../src/utils/budget.js'
 import { ymOf } from '../src/utils/date.js'
 
 describe('budgetStatus —— 预算判断（纯函数）', () => {
@@ -204,5 +204,27 @@ describe('overAlertKey —— 超支提醒去重键', () => {
     expect(overAlertKey('2026-09')).toBe('cashDiary.overAlerted.2026-09.1')
     expect(overAlertKey('2026-09', 0)).toBe('cashDiary.overAlerted.2026-09.1')
     expect(overAlertKey('2026-09', -3)).toBe('cashDiary.overAlerted.2026-09.1')
+  })
+})
+
+describe('pickOverAlertKeys —— 重置数据时挑选要清的去重键', () => {
+  it('只挑出带前缀的键，其余不动', () => {
+    const keys = [
+      'cashDiary.overAlerted.2026-09.1',
+      'cashDiary.overAlerted.2026-08.2',
+      'cashDiary.memory.v1',
+      'user-theme',
+      'cashDiary.overAlertedX.1'
+    ]
+    expect(pickOverAlertKeys(keys)).toEqual([
+      'cashDiary.overAlerted.2026-09.1',
+      'cashDiary.overAlerted.2026-08.2'
+    ])
+  })
+
+  it('非法入参不抛错', () => {
+    expect(pickOverAlertKeys(null)).toEqual([])
+    expect(pickOverAlertKeys('not-array')).toEqual([])
+    expect(pickOverAlertKeys([1, null, {}])).toEqual([])
   })
 })

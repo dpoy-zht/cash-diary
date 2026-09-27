@@ -60,3 +60,18 @@ export function notifyLocal(title, content) {
     return false
   }
 }
+
+/**
+ * 清空通知栏（重置数据时调用）：
+ * 本地通知不会自动过期，重置后残留的「超预算」通知会误导用户以为又超支了。
+ * 仅 App 端有效，其他端 no-op。
+ */
+export function clearNotifyTray() {
+  try {
+    if (typeof plus === 'undefined' || !plus.push || typeof plus.push.clear !== 'function') return false
+    plus.push.clear()
+    return true
+  } catch (e) {
+    return false
+  }
+}

@@ -76,3 +76,18 @@ export function overAlertKey(ym, accountId) {
   const a = Math.max(1, Math.floor(Number(accountId) || 1))
   return 'cashDiary.overAlerted.' + y + '.' + a
 }
+
+/** 去重键前缀（与 overAlertKey 保持一致，勿单独改动） */
+export const OVER_ALERT_PREFIX = 'cashDiary.overAlerted.'
+
+/**
+ * 从一批 storage 键里挑出"超支提醒去重键"，供「重置数据」清除用。
+ * 重置 = 全新的账本，去重键必须跟着失效，否则重置后的新超支会被误判为已提醒过。
+ * 纯函数可单测；uni.getStorageInfoSync 的枚举在 maintenance.js 里做（有平台差异）。
+ */
+export function pickOverAlertKeys(allKeys) {
+  const list = Array.isArray(allKeys) ? allKeys : []
+  return list.filter(function (k) {
+    return typeof k === 'string' && k.indexOf(OVER_ALERT_PREFIX) === 0
+  })
+}
