@@ -263,6 +263,45 @@ export async function txSearch(noteKw, categoryIds, accountId, limit) {
   )
 }
 
+/* ---------- 固定支出 CRUD（每月自动补记的配置，v5） ---------- */
+
+/** 当前账本的固定支出配置（启用在前，同组内按记账日升序） */
+export async function fixedExpenseList(accountId) {
+  return select(
+    'SELECT * FROM fixed_expense WHERE account_id = ' + aid(accountId) + ' ' +
+    'ORDER BY enabled DESC, day_of_month ASC, id ASC'
+  )
+}
+
+export async function fixedExpenseInsert(rec) {
+  await executeBatch([
+    'INSERT INTO fixed_expense (account_id, category_id, amount_cents, note, day_of_month, ' +
+    'last_posted_ym, enabled, created_at, updated_at) VALUES (' +
+    aid(rec.account_id) + ', ' + Number(rec.category_id) + ', ' + Number(rec.amount_cents) + ', ' +
+    sqlValue(rec.note) + ', ' + Number(rec.day_of_month) + ', ' + sqlValue(rec.last_posted_ym) + ', ' +
+    (rec.enabled ? 1 : 0) + ', ' + Number(rec.created_at) + ', ' + Number(rec.updated_at) + ')'
+  ])
+  const rows = await select('SELECT MAX(id) AS id FROM fixed_expense')
+  return rows && rows[0] ? Number(rows[0].id) : 0
+}
+
+export async function fixedExpenseUpdate(id, patch) {
+  const sets = []
+  if (patch.category_id !== undefined) sets.push('category_id = ' + Number(patch.category_id))
+  if (patch.amount_cents !== undefined) sets.push('amount_cents = ' + Number(patch.amount_cents))
+  if (patch.note !== undefined) sets.push('note = ' + sqlValue(patch.note))
+  if (patch.day_of_month !== undefined) sets.push('day_of_month = ' + Number(patch.day_of_month))
+  if (patch.last_posted_ym !== undefined) sets.push('last_posted_ym = ' + sqlValue(patch.last_posted_ym))
+  if (patch.enabled !== undefined) sets.push('enabled = ' + (patch.enabled ? 1 : 0))
+  if (!sets.length) return
+  sets.push('updated_at = ' + Date.now())
+  await executeBatch(['UPDATE fixed_expense SET ' + sets.join(', ') + ' WHERE id = ' + Number(id)])
+}
+
+export async function fixedExpenseRemove(id) {
+  await executeBatch(['DELETE FROM fixed_expense WHERE id = ' + Number(id)])
+}
+
 /** 清空全部业务数据（流水 + 分类 + 账本），表结构不动 —— 供「重置数据」用
     sqlite_sequence 也要清，否则自增 id 会接着往下涨 */
 export async function clearAll() {
@@ -271,7 +310,8 @@ export async function clearAll() {
     'DELETE FROM category',
     'DELETE FROM account',
     'DELETE FROM budget',
-    "DELETE FROM sqlite_sequence WHERE name IN ('transaction_record','category','account','budget')"
+    'DELETE FROM fixed_expense',
+    "DELETE FROM sqlite_sequence WHERE name IN ('transaction_record','category','account','budget','fixed_expense')"
   ])
 }
 
@@ -285,7 +325,11 @@ const TABLE_COLS = {
     'id', 'account_id', 'category_id', 'type', 'amount_cents', 'note',
     'occurred_at', 'created_at', 'updated_at', 'deleted_at'
   ],
-  budget: ['id', 'account_id', 'category_id', 'limit_cents', 'updated_at']
+  budget: ['id', 'account_id', 'category_id', 'limit_cents', 'updated_at'],
+  fixed_expense: [
+    'id', 'account_id', 'category_id', 'amount_cents', 'note',
+    'day_of_month', 'last_posted_ym', 'enabled', 'created_at', 'updated_at'
+  ]
 }
 
 function insertRow(table, row) {

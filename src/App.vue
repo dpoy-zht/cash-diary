@@ -4,6 +4,7 @@ import { initDB } from './db/index.js'
 import { useCategoryStore } from './stores/category.js'
 import { useAccountStore } from './stores/account.js'
 import { listenPushClick } from './utils/notify.js'
+import { checkForUpdate, openReleasePage } from './services/update.js'
 
 onLaunch(() => {
   const categoryStore = useCategoryStore()
@@ -22,6 +23,22 @@ onLaunch(() => {
       } catch (e) { /* 跳转失败落在首页，可接受 */ }
     }, 800)
   })
+
+  // 应用内更新检查：24h 节流 + 静默失败，只在新版本可用时弹窗
+  checkForUpdate()
+    .then(function (r) {
+      if (!r.hasUpdate) return
+      uni.showModal({
+        title: '发现新版本 ' + r.tag,
+        content: '覆盖安装即可升级，账目数据都在。去下载最新安装包吧！',
+        confirmText: '去下载',
+        cancelText: '下次再说',
+        success: function (res) {
+          if (res.confirm) openReleasePage(r.url)
+        }
+      })
+    })
+    .catch(function () { /* 离线/超时静默 */ })
 })
 </script>
 

@@ -12,7 +12,7 @@ let data = null
 let memBackend = null
 
 function blank() {
-  return { nextId: 1, category: [], transaction_record: [], account: [], budget: [] }
+  return { nextId: 1, category: [], transaction_record: [], account: [], budget: [], fixed_expense: [] }
 }
 
 function backend() {
@@ -52,6 +52,7 @@ export async function init() {
         if (!Array.isArray(parsed.transaction_record)) parsed.transaction_record = []
         if (!Array.isArray(parsed.account)) parsed.account = []
         if (!Array.isArray(parsed.budget)) parsed.budget = []
+        if (!Array.isArray(parsed.fixed_expense)) parsed.fixed_expense = []
         if (typeof parsed.nextId !== 'number') parsed.nextId = 1
         data = parsed
         return
@@ -322,6 +323,40 @@ export async function txListByRange(start, end, accountId) {
     .map(function (r) { return Object.assign({}, r) })
 }
 
+/* ---------- 固定支出 CRUD（每月自动补记的配置，v5） ---------- */
+
+/** 当前账本的全部固定支出配置（启用在前，同组内按记账日升序） */
+export async function fixedExpenseList(accountId) {
+  const a = aid(accountId)
+  return data.fixed_expense
+    .filter(function (r) { return aid(r.account_id) === a })
+    .sort(function (x, y) { return (y.enabled - x.enabled) || (x.day_of_month - y.day_of_month) || (x.id - y.id) })
+    .map(function (r) { return Object.assign({}, r) })
+}
+
+export async function fixedExpenseInsert(rec) {
+  const id = nid()
+  data.fixed_expense.push(Object.assign({ id: id, account_id: DEFAULT_ACCOUNT_ID }, rec))
+  persist()
+  return id
+}
+
+export async function fixedExpenseUpdate(id, patch) {
+  const row = data.fixed_expense.find(function (r) { return r.id === id })
+  if (!row) return
+  Object.keys(patch).forEach(function (k) { row[k] = patch[k] })
+  row.updated_at = Date.now()
+  persist()
+}
+
+export async function fixedExpenseRemove(id) {
+  const idx = data.fixed_expense.findIndex(function (r) { return r.id === id })
+  if (idx !== -1) {
+    data.fixed_expense.splice(idx, 1)
+    persist()
+  }
+}
+
 /** 清空全部业务数据（流水 + 分类 + 账本 + 预算），表结构保留 —— 供「重置数据」用 */
 export async function clearAll() {
   data = blank()
@@ -330,7 +365,7 @@ export async function clearAll() {
 
 /* ---------- 备份：整库导出 / 整库恢复 ---------- */
 
-const TABLES = ['account', 'category', 'transaction_record', 'budget']
+const TABLES = ['account', 'category', 'transaction_record', 'budget', 'fixed_expense']
 
 /** 导出用：原样返回四张表（**含软删除记录**，否则恢复后已删数据会"复活"） */
 export async function dumpAll() {

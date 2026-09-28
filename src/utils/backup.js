@@ -9,13 +9,13 @@
  *   否则恢复后另一端又会把已删数据同步回来（数据铁律 3）
  */
 
-export const BACKUP_VERSION = 1
+export const BACKUP_VERSION = 2
 /** 备份文件里的身份标记，用来挡掉"随便一个 json" */
 export const BACKUP_APP = 'cash-diary'
 
 /**
  * 打包成可序列化的备份对象。
- * @param {{account:Array, category:Array, transaction_record:Array, budget:Array}} tables
+ * @param {{account:Array, category:Array, transaction_record:Array, budget:Array, fixed_expense?:Array}} tables
  * @param {number} exportedAt 导出时间（毫秒时间戳）
  */
 export function buildBackup(tables, exportedAt) {
@@ -27,7 +27,8 @@ export function buildBackup(tables, exportedAt) {
     account: Array.isArray(t.account) ? t.account : [],
     category: Array.isArray(t.category) ? t.category : [],
     transaction_record: Array.isArray(t.transaction_record) ? t.transaction_record : [],
-    budget: Array.isArray(t.budget) ? t.budget : []
+    budget: Array.isArray(t.budget) ? t.budget : [],
+    fixed_expense: Array.isArray(t.fixed_expense) ? t.fixed_expense : []
   }
 }
 
@@ -118,6 +119,10 @@ export function validateBackup(obj) {
     if (!Array.isArray(obj[k])) return { ok: false, error: '备份内容不完整（缺少 ' + k + '）' }
   }
   const budgets = Array.isArray(obj.budget) ? obj.budget : []
+  const fixedExpenses = Array.isArray(obj.fixed_expense) ? obj.fixed_expense : []
+  if (version >= 2 && !Array.isArray(obj.fixed_expense)) {
+    return { ok: false, error: '备份内容不完整（缺少 fixed_expense）' }
+  }
   const accounts = obj.account
   if (!accounts.length) return { ok: false, error: '备份里没有任何账本，无法恢复' }
 
@@ -140,6 +145,11 @@ export function validateBackup(obj) {
       return { ok: false, error: '备份里的预算金额不合法（必须是正整数分）' }
     }
   }
+  for (const f of fixedExpenses) {
+    if (!f || !isPositiveInt(f.amount_cents) || !isPositiveInt(f.day_of_month) || f.day_of_month > 28) {
+      return { ok: false, error: '备份里的固定支出配置不合法' }
+    }
+  }
 
   return {
     ok: true,
@@ -147,7 +157,8 @@ export function validateBackup(obj) {
       account: accounts.length,
       category: obj.category.length,
       transaction_record: obj.transaction_record.length,
-      budget: budgets.length
+      budget: budgets.length,
+      fixed_expense: fixedExpenses.length
     }
   }
 }

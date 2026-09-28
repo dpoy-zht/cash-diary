@@ -243,7 +243,7 @@ describe('老格式备份兼容（emoji 分类时代的备份文件）', () => {
     const now = Date.now()
     return {
       app: BACKUP_APP,
-      version: BACKUP_VERSION,
+      version: 1, // emoji 时代的备份是 v1 格式（没有 fixed_expense 字段）
       exportedAt: now - 30 * 86400000,
       account: [{ id: 1, name: '默认账本', created_at: now - 60 * 86400000 }],
       category: [
@@ -340,5 +340,44 @@ describe('自动备份 —— 触发判断 / 文件名 / 清理计划', () => {
     expect(keepAutoBackupFiles(['奶龙记账-自动备份-2026-09-28-0012.json'], 3).remove).toEqual([])
     expect(keepAutoBackupFiles(null, 3)).toEqual({ keep: [], remove: [] })
     expect(keepAutoBackupFiles(['x'], 'abc').remove).toEqual([])
+  })
+})
+
+describe('备份 v2 —— fixed_expense 表', () => {
+  beforeEach(async () => {
+    resetStorageForTest()
+    await getStorage().init()
+  })
+
+  it('v2 备份包含 fixed_expense；v1 老备份没有该字段也能通过校验（兼容）', () => {
+    const v1 = {
+      app: BACKUP_APP, version: 1, exportedAt: 1700000000000,
+      account: [{ id: 1, name: '默认账本', created_at: 1 }],
+      category: [{ id: 1, name: '午餐', icon: 'lunch', type: 'expense', sort: 1 }],
+      transaction_record: [], budget: []
+    }
+    expect(validateBackup(v1).ok).toBe(true)
+
+    const v2 = Object.assign({}, buildBackup({
+      account: v1.account, category: v1.category, transaction_record: [], budget: [],
+      fixed_expense: [{ id: 1, account_id: 1, category_id: 1, amount_cents: 150000, note: '房租', day_of_month: 5, last_posted_ym: '2026-09', enabled: 1, created_at: 1, updated_at: 1 }]
+    }), { exportedAt: 1700000000000 })
+    expect(v2.version).toBe(2)
+    expect(v2.fixed_expense.length).toBe(1)
+    expect(validateBackup(v2).ok).toBe(true)
+  })
+
+  it('v2 备份缺 fixed_expense 字段被拒绝；非法记账日被拒绝', () => {
+    const base = {
+      app: BACKUP_APP, version: 2, exportedAt: 1700000000000,
+      account: [{ id: 1, name: '默认账本', created_at: 1 }],
+      category: [{ id: 1, name: '午餐', icon: 'lunch', type: 'expense', sort: 1 }],
+      transaction_record: [], budget: []
+    }
+    expect(validateBackup(base).ok).toBe(false) // v2 必须带 fixed_expense
+
+    const bad = buildBackup({ account: base.account, category: base.category,
+      fixed_expense: [{ id: 1, account_id: 1, category_id: 1, amount_cents: 100, note: '', day_of_month: 31, last_posted_ym: '', enabled: 1, created_at: 1, updated_at: 1 }] })
+    expect(validateBackup(bad).ok).toBe(false) // 31 号不合法
   })
 })

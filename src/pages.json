@@ -6,7 +6,8 @@
     { "path": "pages/ledger/ledger", "style": { "navigationStyle": "custom" } },
     { "path": "pages/me/me", "style": { "navigationStyle": "custom" } },
     { "path": "pages/budget/budget", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/category/category", "style": { "navigationStyle": "custom" } }
+    { "path": "pages/category/category", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/fixed/fixed", "style": { "navigationStyle": "custom" } }
   ],
   "globalStyle": {
     "navigationStyle": "custom",

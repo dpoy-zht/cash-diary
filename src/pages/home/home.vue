@@ -129,6 +129,7 @@ import { useMetaStore } from '../../stores/meta.js'
 import { useBudgetStore } from '../../stores/budget.js'
 import { useAccountStore } from '../../stores/account.js'
 import * as backupService from '../../services/backup.js'
+import * as fixedService from '../../services/fixed.js'
 import { groupByDay, dayLabel } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
@@ -323,11 +324,23 @@ const iconSearch = svgMaskStyle('M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5
 const iconBell = svgMaskStyle('M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z')
 const iconHeart = svgMaskStyle('M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z')
 
-onShow(function () {
+onShow(async function () {
+  // 固定支出自动补记：当月还没记的先补上，下面的刷新就会把新流水带出来
+  let autoPosted = 0
+  try {
+    const r = await fixedService.postDueFixed(accountStore.currentId)
+    autoPosted = r.posted
+  } catch (e) { /* 补记失败不阻塞页面，下次打开会再试 */ }
+
   // 预算与流水一起加载完再判断超支，否则会拿旧数据算
-  Promise.all([budgetStore.load(), txStore.refresh(metaStore.ym)])
-    .then(maybeAlertOver)
-    .catch(function () { /* 首屏失败不阻塞页面 */ })
+  try {
+    await Promise.all([budgetStore.load(), txStore.refresh(metaStore.ym)])
+    maybeAlertOver()
+    if (autoPosted > 0) {
+      uni.showToast({ title: '已自动记入 ' + autoPosted + ' 笔固定支出', icon: 'none' })
+    }
+  } catch (err) { /* 首屏失败不阻塞页面 */ }
+
   // 自动备份：每 24h 静默写一份到应用私有目录（仅 App 端，失败不打扰）
   backupService.autoBackupIfNeeded().catch(function () { /* 静默 */ })
 })

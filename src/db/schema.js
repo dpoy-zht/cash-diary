@@ -83,10 +83,37 @@ export const INDEX_SQL = `
 CREATE INDEX IF NOT EXISTS idx_tx_account_time ON transaction_record(account_id, occurred_at);
 `
 
+/**
+ * v5：固定支出（房租/会员费这类每月固定要记的账）。
+ *
+ * 设计要点：
+ * - **day_of_month 限 1~28**：避开 2 月没有 30/31 号的坑，永远能落到当月
+ * - **last_posted_ym 记"最近一次已记账的月份"**（'YYYY-MM'）：
+ *   打开 App 时补记当月一笔，靠它防重复记账；空串 = 从没记过
+ * - **enabled 软开关**：停用不删记录，配置保留
+ */
+export const FIXED_EXPENSE_SQL = `
+CREATE TABLE IF NOT EXISTS fixed_expense (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id     INTEGER NOT NULL DEFAULT 1,
+  category_id    INTEGER NOT NULL,
+  amount_cents   INTEGER NOT NULL CHECK (amount_cents > 0),
+  note           TEXT    NOT NULL DEFAULT '',
+  day_of_month   INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 28),
+  last_posted_ym TEXT    NOT NULL DEFAULT '',
+  enabled        INTEGER NOT NULL DEFAULT 1,
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fixed_acc ON fixed_expense(account_id);
+`
+
 /** 迁移登记：按版本号顺序执行。新增结构变更 → 追加一项，禁止修改已发布的版本。 */
 export const MIGRATIONS = [
   { version: 1, name: 'v1_init', sql: SCHEMA_SQL },
   { version: 2, name: 'v2_multi_account', sql: ACCOUNT_SQL },
   { version: 3, name: 'v3_budget', sql: BUDGET_SQL },
-  { version: 4, name: 'v4_query_index', sql: INDEX_SQL }
+  { version: 4, name: 'v4_query_index', sql: INDEX_SQL },
+  { version: 5, name: 'v5_fixed_expense', sql: FIXED_EXPENSE_SQL }
 ]

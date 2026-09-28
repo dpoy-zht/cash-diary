@@ -4,7 +4,7 @@ import { MIGRATIONS, SCHEMA_SQL, INDEX_SQL } from '../src/db/schema.js'
 describe('MIGRATIONS —— 迁移登记表', () => {
   it('版本号严格递增且唯一（云打包升级按序补跑）', () => {
     const versions = MIGRATIONS.map(function (m) { return m.version })
-    expect(versions).toEqual([1, 2, 3, 4])
+    expect(versions).toEqual([1, 2, 3, 4, 5])
   })
 
   it('v4：为 (account_id, occurred_at) 建复合索引，IF NOT EXISTS 幂等', () => {
@@ -28,5 +28,20 @@ describe('MIGRATIONS —— 迁移登记表', () => {
       expect(typeof m.sql).toBe('string')
       expect(m.sql.length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('v5 —— 固定支出表', () => {
+  it('v5：fixed_expense 表 + 记账日 CHECK(1~28) + 账本索引', () => {
+    const v5 = MIGRATIONS.find(function (m) { return m.version === 5 })
+    expect(v5.name).toBe('v5_fixed_expense')
+    expect(v5.sql).toContain('CREATE TABLE IF NOT EXISTS fixed_expense')
+    expect(v5.sql).toContain("day_of_month   INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 28)")
+    expect(v5.sql).toContain('idx_fixed_acc')
+  })
+
+  it('last_posted_ym 默认空串（从没记过 → 首次必补记）', () => {
+    const v5 = MIGRATIONS.find(function (m) { return m.version === 5 })
+    expect(v5.sql).toContain("last_posted_ym TEXT    NOT NULL DEFAULT ''")
   })
 })
