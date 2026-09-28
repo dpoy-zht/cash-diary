@@ -103,6 +103,7 @@ import {
   REMIND_PREF_KEY,
   normalizeRemindEnabled
 } from '../../utils/notify.js'
+import { checkForUpdate, currentAppVersion, openReleasePage } from '../../services/update.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -196,10 +197,13 @@ function maskOf(f) {
 function tapFn(f) {
   if (f.key === 'about') {
     uni.showModal({
-      title: '奶龙记账 v2.0.0',
+      title: '奶龙记账 v' + (currentAppVersion() || '2.1.0'),
       content: '个人自用记账 App，离线优先，数据只存在本机。',
-      showCancel: false,
-      confirmText: '知道啦'
+      confirmText: '检查更新',
+      cancelText: '知道啦',
+      success: function (res) {
+        if (res.confirm) checkUpdateManual()
+      }
     })
     return
   }
@@ -224,6 +228,43 @@ function tapFn(f) {
     return
   }
   uni.showToast({ title: f.name + ' 还在计划里', icon: 'none' })
+}
+
+/* ---- 手动检查更新（关于弹窗入口）：每种结果都给用户明确反馈 ---- */
+function checkUpdateManual() {
+  uni.showLoading({ title: '正在检查更新…', mask: true })
+  checkForUpdate({ force: true })
+    .then(function (r) {
+      uni.hideLoading()
+      if (r.hasUpdate) {
+        uni.showModal({
+          title: '发现新版本 ' + r.tag,
+          content: r.notes + '\n\n覆盖安装即可升级，账目数据都在。',
+          confirmText: '去下载',
+          cancelText: '下次再说',
+          success: function (res) {
+            if (!res.confirm) return
+            if (!openReleasePage(r.url)) {
+              uni.showToast({ title: '浏览器打开失败，请到项目主页手动下载', icon: 'none' })
+            }
+          }
+        })
+        return
+      }
+      if (r.reason === 'offline') {
+        uni.showToast({ title: '网络不可用，稍后再试', icon: 'none' })
+        return
+      }
+      if (r.reason === 'not-app') {
+        uni.showToast({ title: '请在手机 App 内检查更新', icon: 'none' })
+        return
+      }
+      uni.showToast({ title: '已是最新版本 ' + (r.current || currentAppVersion()), icon: 'none' })
+    })
+    .catch(function () {
+      uni.hideLoading()
+      uni.showToast({ title: '检查失败，稍后再试', icon: 'none' })
+    })
 }
 
 /* ---- 记账提醒开关（控制超支系统通知；状态持久化，重装/清数据后回到默认开启） ---- */

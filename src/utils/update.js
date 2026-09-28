@@ -29,3 +29,29 @@ export function isNewerVersion(latestTag, currentVersion) {
   }
   return false
 }
+
+/**
+ * 把 GitHub Release 的 markdown 说明压成弹窗能放的纯文本。
+ * 去 标题号、粗体斜体标记、列表符、分隔线、代码引号；链接保留文字；压掉多余空行后截断。
+ * 纯函数可单测；空说明返回空串（调用方给兜底文案）。
+ */
+export function stripReleaseNotes(body, maxLen) {
+  const limit = Math.max(20, Math.floor(Number(maxLen) || 120))
+  const text = String(body == null ? '' : body)
+    .split('\n')
+    .map(function (line) {
+      let l = line.trim()
+      if (!l || /^(---|===|\*\*\*|-{3,})$/.test(l)) return '' // 分隔线整行去掉
+      l = l.replace(/^#{1,6}\s*/, '') // 标题
+      l = l.replace(/^\s*[-*+]\s+/, '· ') // 列表符
+      l = l.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // [文字](链接) → 文字
+      l = l.replace(/[*_`~]/g, '') // 粗体/斜体/代码标记
+      return l
+    })
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  if (!text) return ''
+  return text.length > limit ? text.slice(0, limit - 1) + '…' : text
+}

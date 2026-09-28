@@ -7,7 +7,7 @@
  * - 每 24h 最多自动检查一次（节流键存 uni storage）；也可从「关于」手动触发
  * - 无网络 / 超时 / H5 端全部静默失败——检查更新是锦上添花，绝不能打扰使用
  */
-import { isNewerVersion } from '../utils/update.js'
+import { isNewerVersion, stripReleaseNotes } from '../utils/update.js'
 
 const UPDATE_LAST_KEY = 'cashDiary.updateCheck.lastAt'
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000
@@ -63,8 +63,17 @@ export async function checkForUpdate(opts) {
       })
     })
     const tag = res && res.tag_name
-    if (!isNewerVersion(tag, current)) return { hasUpdate: false, reason: 'latest' }
-    return { hasUpdate: true, tag: tag, url: (res && res.html_url) || RELEASE_PAGE }
+    const notes = stripReleaseNotes(res && res.body, 120)
+    if (!isNewerVersion(tag, current)) {
+      return { hasUpdate: false, reason: 'latest', current: current }
+    }
+    return {
+      hasUpdate: true,
+      tag: tag,
+      url: (res && res.html_url) || RELEASE_PAGE,
+      notes: notes || '覆盖安装即可升级，账目数据都在。',
+      current: current
+    }
   } catch (e) {
     return { hasUpdate: false, reason: 'offline' }
   }

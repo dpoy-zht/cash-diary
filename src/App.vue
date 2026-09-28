@@ -24,17 +24,20 @@ onLaunch(() => {
     }, 800)
   })
 
-  // 应用内更新检查：24h 节流 + 静默失败，只在新版本可用时弹窗
+  // 应用内更新检查：24h 节流 + 静默失败，只在新版本可用时弹窗（含版本号与更新说明）
   checkForUpdate()
     .then(function (r) {
       if (!r.hasUpdate) return
       uni.showModal({
         title: '发现新版本 ' + r.tag,
-        content: '覆盖安装即可升级，账目数据都在。去下载最新安装包吧！',
+        content: r.notes,
         confirmText: '去下载',
         cancelText: '下次再说',
         success: function (res) {
-          if (res.confirm) openReleasePage(r.url)
+          if (!res.confirm) return
+          if (!openReleasePage(r.url)) {
+            uni.showToast({ title: '浏览器打开失败，请到项目主页手动下载', icon: 'none' })
+          }
         }
       })
     })

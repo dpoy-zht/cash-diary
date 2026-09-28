@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTagVersion, isNewerVersion } from '../src/utils/update.js'
+import { parseTagVersion, isNewerVersion, stripReleaseNotes } from '../src/utils/update.js'
 
 describe('应用内更新检查 —— 版本比较（纯函数）', () => {
   it('parseTagVersion：带 v 前缀 / 不带 / 位数不齐都能解析', () => {
@@ -27,5 +27,36 @@ describe('应用内更新检查 —— 版本比较（纯函数）', () => {
     expect(isNewerVersion('abc', '2.0.1')).toBe(false)
     expect(isNewerVersion(null, '2.0.1')).toBe(false)
     expect(isNewerVersion('v2.1.0', '')).toBe(false)
+  })
+})
+
+describe('stripReleaseNotes —— Release 说明压成弹窗纯文本', () => {
+  it('去标题/粗体/列表符/链接，保留文字', () => {
+    const md = [
+      '## 奶龙记账 v2.1.0',
+      '',
+      '### 🆕 固定支出自动记账',
+      '- 配置一次就行',
+      '- **同一个月绝不会重复记**',
+      '详见 [Releases](https://github.com/x) 页面',
+      '---'
+    ].join('\n')
+    const out = stripReleaseNotes(md, 200)
+    expect(out).not.toContain('#')
+    expect(out).not.toContain('**')
+    expect(out).not.toContain('https://')
+    expect(out).toContain('奶龙记账 v2.1.0')
+    expect(out).toContain('· 配置一次就行')
+    expect(out).toContain('同一个月绝不会重复记')
+    expect(out).toContain('Releases')
+  })
+
+  it('超长截断加省略号；空说明返回空串；非法入参不抛错', () => {
+    const long = stripReleaseNotes('x'.repeat(500), 120)
+    expect(long.length).toBe(120)
+    expect(long.endsWith('…')).toBe(true)
+    expect(stripReleaseNotes('', 120)).toBe('')
+    expect(stripReleaseNotes(null, 120)).toBe('')
+    expect(stripReleaseNotes(undefined)).toBe('')
   })
 })
