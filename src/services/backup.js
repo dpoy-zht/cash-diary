@@ -8,7 +8,16 @@
  *    明确告知"会覆盖当前数据"，并让用户二次确认。
  */
 import * as maintenanceRepo from '../db/repository/maintenance.js'
-import { buildBackup, validateBackup } from '../utils/backup.js'
+import {
+  buildBackup,
+  validateBackup,
+  shouldAutoBackup,
+  autoBackupFileName,
+  keepAutoBackupFiles,
+  AUTO_BACKUP_INTERVAL,
+  AUTO_KEEP_COUNT
+} from '../utils/backup.js'
+import { saveTextFile, listAutoBackupNames, removeDocFile } from '../utils/backup-file.js'
 import { seedIfEmpty } from './category.js'
 import { seedDefaultIfEmpty } from './account.js'
 
@@ -44,4 +53,51 @@ export async function restoreBackup(obj) {
   await seedIfEmpty()
   await seedDefaultIfEmpty()
   return check.counts
+}
+
+/* ---------------- 自动备份（打开 App 时静默执行） ---------------- */
+
+const AUTO_LAST_KEY = 'cashDiary.autoBackup.lastAt'
+
+/**
+ * 自动备份：距上次成功备份超过 24h 时，把整库写进应用私有目录（保留最近 3 份）。
+ *
+ * - **仅 App 端执行**（plus.io 写私有目录）；H5 / 测试环境直接跳过，
+ *   避免"每次打开网页都弹一个下载"的灾难体验
+ * - 全程静默：成功不提示，失败不打扰——备份是保险，不是打扰
+ * - 只清理带自动前缀的文件，用户手动导出的备份绝不碰
+ *
+ * @param {number} [nowTs] 当前时间（测试注入用）
+ * @returns {Promise<{ran:boolean, reason?:string, error?:string}>}
+ */
+export async function autoBackupIfNeeded(nowTs) {
+  if (typeof plus === 'undefined') return { ran: false, reason: 'not-app' }
+
+  let lastAt = 0
+  try {
+    lastAt = Number(uni.getStorageSync(AUTO_LAST_KEY)) || 0
+  } catch (e) { /* 读不到按从未备份处理 */ }
+  if (!shouldAutoBackup(lastAt, nowTs, AUTO_BACKUP_INTERVAL)) {
+    return { ran: false, reason: 'fresh' }
+  }
+
+  try {
+    const text = await exportJson()
+    await saveTextFile(autoBackupFileName(nowTs), text)
+    try {
+      uni.setStorageSync(AUTO_LAST_KEY, nowTs == null ? Date.now() : Number(nowTs))
+    } catch (e) { /* 标记写失败最多导致下次多备一份，不致命 */ }
+
+    // 清理旧自动备份：只留最近 AUTO_KEEP_COUNT 份（失败不影响本次备份结果）
+    try {
+      const names = await listAutoBackupNames()
+      const plan = keepAutoBackupFiles(names, AUTO_KEEP_COUNT)
+      for (const n of plan.remove) {
+        await removeDocFile(n)
+      }
+    } catch (e) { /* 清理失败忽略 */ }
+    return { ran: true }
+  } catch (e) {
+    return { ran: false, reason: 'error', error: (e && e.message) || '备份失败' }
+  }
 }

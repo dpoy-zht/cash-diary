@@ -3,6 +3,7 @@ import { onLaunch } from '@dcloudio/uni-app'
 import { initDB } from './db/index.js'
 import { useCategoryStore } from './stores/category.js'
 import { useAccountStore } from './stores/account.js'
+import { listenPushClick } from './utils/notify.js'
 
 onLaunch(() => {
   const categoryStore = useCategoryStore()
@@ -11,6 +12,16 @@ onLaunch(() => {
   initDB()
     .then(() => Promise.all([categoryStore.init(), accountStore.init()]))
     .catch((err) => console.error('[cash-diary] 初始化失败：', err))
+
+  // 点系统通知直达对应页面：超支通知 → 预算页（等路由就绪后再跳，冷启动直接跳会丢）
+  listenPushClick(function (payload) {
+    if (payload !== 'over-budget') return
+    setTimeout(function () {
+      try {
+        uni.navigateTo({ url: '/pages/budget/budget' })
+      } catch (e) { /* 跳转失败落在首页，可接受 */ }
+    }, 800)
+  })
 })
 </script>
 
@@ -44,9 +55,9 @@ uni-page-body {
   --cd-line: #fff3d6; /* 卡内分隔线 */
 
   /* ---- 文字（暖棕系）----
-     注意：--cd-ink-2 对比度仅约 2.6:1，按参考包原样保留，只用于次要/占位文字 */
+     --cd-ink-2 已从参考包原值 #b8a584（2.3:1）加深到 #856f4d，奶油底上实测 4.53:1，达 AA */
   --cd-ink: #5d4e37; /* 主文字 */
-  --cd-ink-2: #b8a584; /* 次文字 / 占位 */
+  --cd-ink-2: #856f4d; /* 次文字 / 占位 */
   --cd-ink-3: #cbb999; /* 弱化（吉祥物细节等装饰，不承载正文） */
 
   /* ---- 语义色 ----

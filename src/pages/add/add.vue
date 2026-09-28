@@ -63,6 +63,7 @@ import { useMetaStore } from '../../stores/meta.js'
 import { buildAddInput } from '../../services/tx.js'
 import { keypadInput, parseAmountToCents, displayAmount, formatCents } from '../../utils/money.js'
 import { toDateStr, tsFromDateStr } from '../../utils/date.js'
+import { haptic } from '../../utils/notify.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -108,6 +109,7 @@ function switchType(t) {
   }
 }
 function onKey(k) {
+  haptic(10) // 按键轻振：形成"输入生效了"的手感（不支持振动的环境静默）
   current.value = keypadInput(current.value, k)
 }
 function onDateChange(e) {
@@ -144,6 +146,7 @@ async function save() {
     current.value = ''
     note.value = ''
     successShow.value = true
+    haptic(30) // 保存成功长振一下，跟按键的轻振区分开
   } catch (err) {
     // 关键：异常一定要变成用户看得见的提示，否则表现就是"点了没反应"
     uni.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })

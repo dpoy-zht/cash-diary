@@ -10,6 +10,11 @@ import {
   buildBackup,
   validateBackup,
   backupFileName,
+  shouldAutoBackup,
+  autoBackupFileName,
+  keepAutoBackupFiles,
+  AUTO_BACKUP_INTERVAL,
+  AUTO_BACKUP_PREFIX,
   BACKUP_APP,
   BACKUP_VERSION
 } from '../src/utils/backup.js'
@@ -287,5 +292,53 @@ describe('老格式备份兼容（emoji 分类时代的备份文件）', () => {
     // 搜索链路照常
     const hit = await txService.search('午饭')
     expect(hit.length).toBe(1)
+  })
+})
+
+describe('自动备份 —— 触发判断 / 文件名 / 清理计划', () => {
+  const DAY = 86400000
+
+  it('shouldAutoBackup：没备份过必须备；24h 内不重复备；超时要备', () => {
+    const now = 1700000000000
+    expect(shouldAutoBackup(null, now, AUTO_BACKUP_INTERVAL)).toBe(true)
+    expect(shouldAutoBackup(0, now, AUTO_BACKUP_INTERVAL)).toBe(true)
+    expect(shouldAutoBackup(-1, now, AUTO_BACKUP_INTERVAL)).toBe(true)
+    expect(shouldAutoBackup(now - DAY + 60000, now, AUTO_BACKUP_INTERVAL)).toBe(false)
+    expect(shouldAutoBackup(now - DAY - 1000, now, AUTO_BACKUP_INTERVAL)).toBe(true)
+  })
+
+  it('shouldAutoBackup：非法入参不抛错，interval 非法兜底为默认值', () => {
+    expect(shouldAutoBackup('abc', 1700000000000)).toBe(true)
+    expect(shouldAutoBackup(1700000000000 - 25 * DAY, 1700000000000, 0)).toBe(true)
+    expect(shouldAutoBackup(1700000000000 - 1000, 1700000000000, 0)).toBe(false) // 0 → 兜底 24h
+  })
+
+  it('autoBackupFileName：带自动前缀 + 日期时间戳 + .json', () => {
+    const name = autoBackupFileName(new Date(2026, 8, 28, 0, 7).getTime())
+    expect(name).toBe('奶龙记账-自动备份-2026-09-28-0007.json')
+    expect(name.indexOf(AUTO_BACKUP_PREFIX)).toBe(0)
+  })
+
+  it('keepAutoBackupFiles：只清自动前缀，按时间保留最新 N 份', () => {
+    const names = [
+      '奶龙记账-自动备份-2026-09-26-1200.json',
+      '奶龙记账-备份-2026-09-27-0900.json',      // 手动导出，绝不清理
+      '奶龙记账-自动备份-2026-09-27-0800.json',
+      'cashDiary.memory.v1',                      // 无关键
+      '奶龙记账-自动备份-2026-09-28-0012.json',
+      '奶龙记账-自动备份-2026-09-27-2359.json'
+    ]
+    const plan = keepAutoBackupFiles(names, 3)
+    expect(plan.keep).toEqual([
+      '奶龙记账-自动备份-2026-09-27-2359.json',
+      '奶龙记账-自动备份-2026-09-28-0012.json',
+      '奶龙记账-自动备份-2026-09-26-1200.json' === plan.keep[0] ? '' : '奶龙记账-自动备份-2026-09-27-0800.json'
+    ].filter(Boolean).sort())
+  })
+
+  it('keepAutoBackupFiles：不足 N 份全保留；非法入参不抛错', () => {
+    expect(keepAutoBackupFiles(['奶龙记账-自动备份-2026-09-28-0012.json'], 3).remove).toEqual([])
+    expect(keepAutoBackupFiles(null, 3)).toEqual({ keep: [], remove: [] })
+    expect(keepAutoBackupFiles(['x'], 'abc').remove).toEqual([])
   })
 })

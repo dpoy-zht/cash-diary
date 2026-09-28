@@ -128,6 +128,7 @@ import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { useBudgetStore } from '../../stores/budget.js'
 import { useAccountStore } from '../../stores/account.js'
+import * as backupService from '../../services/backup.js'
 import { groupByDay, dayLabel } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
@@ -327,6 +328,8 @@ onShow(function () {
   Promise.all([budgetStore.load(), txStore.refresh(metaStore.ym)])
     .then(maybeAlertOver)
     .catch(function () { /* 首屏失败不阻塞页面 */ })
+  // 自动备份：每 24h 静默写一份到应用私有目录（仅 App 端，失败不打扰）
+  backupService.autoBackupIfNeeded().catch(function () { /* 静默 */ })
 })
 </script>
 

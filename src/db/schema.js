@@ -71,9 +71,22 @@ CREATE TABLE IF NOT EXISTS budget (
 CREATE INDEX IF NOT EXISTS idx_budget_acc ON budget(account_id);
 `
 
+/**
+ * v4：查询性能索引。
+ *
+ * 高频查询模式（首页/统计/搜索/趋势）都是
+ * `WHERE deleted_at IS NULL AND account_id = ? AND occurred_at ∈ [start, end)`。
+ * v1/v2 的单列索引（idx_tx_time、idx_tx_account）在多账本 + 时间范围下需要二次过滤，
+ * 复合索引 (account_id, occurred_at) 一次命中。IF NOT EXISTS 保证幂等。
+ */
+export const INDEX_SQL = `
+CREATE INDEX IF NOT EXISTS idx_tx_account_time ON transaction_record(account_id, occurred_at);
+`
+
 /** 迁移登记：按版本号顺序执行。新增结构变更 → 追加一项，禁止修改已发布的版本。 */
 export const MIGRATIONS = [
   { version: 1, name: 'v1_init', sql: SCHEMA_SQL },
   { version: 2, name: 'v2_multi_account', sql: ACCOUNT_SQL },
-  { version: 3, name: 'v3_budget', sql: BUDGET_SQL }
+  { version: 3, name: 'v3_budget', sql: BUDGET_SQL },
+  { version: 4, name: 'v4_query_index', sql: INDEX_SQL }
 ]

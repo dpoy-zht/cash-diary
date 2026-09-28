@@ -160,4 +160,57 @@ function readDocFile(name) {
     )
   })
 }
+
 // #endif
+
+/* ---------------- 自动备份的清理（App 端私有目录；H5 无文件系统，全部空操作） ---------------- */
+
+/** 列出应用目录里的自动备份文件名（仅带自动前缀的；H5 返回空数组） */
+export async function listAutoBackupNames() {
+  // #ifdef H5
+  return []
+  // #endif
+
+  // #ifndef H5
+  try {
+    if (typeof plus === 'undefined') return []
+    const files = await listBackupFiles()
+    return files
+      .map(function (f) { return f.name })
+      .filter(function (n) { return n.indexOf('奶龙记账-自动备份-') === 0 })
+  } catch (e) {
+    return []
+  }
+  // #endif
+}
+
+/** 删除应用文档目录里的指定文件。删不掉（不存在/占用）返回 false，不抛错。 */
+export async function removeDocFile(name) {
+  // #ifdef H5
+  return false
+  // #endif
+
+  // #ifndef H5
+  try {
+    if (typeof plus === 'undefined' || !name) return false
+    return await new Promise(function (resolve) {
+      plus.io.requestFileSystem(
+        plus.io.PRIVATE_DOC,
+        function (fs) {
+          fs.root.getFile(
+            name,
+            { create: false },
+            function (entry) {
+              entry.remove(function () { resolve(true) }, function () { resolve(false) })
+            },
+            function () { resolve(false) }
+          )
+        },
+        function () { resolve(false) }
+      )
+    })
+  } catch (e) {
+    return false
+  }
+  // #endif
+}

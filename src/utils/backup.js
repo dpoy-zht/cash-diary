@@ -42,6 +42,51 @@ export function backupFileName(nowTs) {
   return '奶龙记账-备份-' + stamp + '.json'
 }
 
+/* ---------------- 自动备份（打开 App 时静默写入私有目录） ---------------- */
+
+/** 自动备份间隔：24 小时 */
+export const AUTO_BACKUP_INTERVAL = 24 * 60 * 60 * 1000
+/** 自动备份文件名前缀：清理旧文件时只动带此前缀的，用户手动导出的备份绝不碰 */
+export const AUTO_BACKUP_PREFIX = '奶龙记账-自动备份-'
+/** 自动备份保留份数（清理时只留最新 N 份） */
+export const AUTO_KEEP_COUNT = 3
+
+/** 自动备份文件名：奶龙记账-自动备份-2026-09-28-0012.json（前缀定长，字典序=时间序） */
+export function autoBackupFileName(nowTs) {
+  const d = new Date(nowTs == null ? Date.now() : nowTs)
+  function p(n) {
+    return String(n).padStart(2, '0')
+  }
+  const stamp =
+    d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes())
+  return AUTO_BACKUP_PREFIX + stamp + '.json'
+}
+
+/**
+ * 判断是否该做自动备份：没备份过 / 距上次已超过间隔 → true。
+ * lastAt 非法（0/null/NaN）视为从未备份，避免异常数据把备份静默关掉。
+ */
+export function shouldAutoBackup(lastAt, nowTs, interval) {
+  const gap = Math.max(1, Math.floor(Number(interval) || AUTO_BACKUP_INTERVAL))
+  const now = Number(nowTs == null ? Date.now() : nowTs)
+  const last = Number(lastAt)
+  if (!Number.isFinite(last) || last <= 0) return true
+  return now - last >= gap
+}
+
+/**
+ * 清理计划：从一批文件名里挑出该保留和该删除的自动备份。
+ * 只处理带 AUTO_BACKUP_PREFIX 的文件，按字典序（=时间序）保留最新 keep 份。
+ * @returns {{keep:string[], remove:string[]}}
+ */
+export function keepAutoBackupFiles(names, keep) {
+  const list = (Array.isArray(names) ? names : [])
+    .filter(function (n) { return typeof n === 'string' && n.indexOf(AUTO_BACKUP_PREFIX) === 0 })
+    .sort()
+  const n = Math.max(1, Math.floor(Number(keep) || 3))
+  return { keep: list.slice(-n), remove: list.slice(0, Math.max(0, list.length - n)) }
+}
+
 /** 整数分且为正（数据铁律 1） */
 function isPositiveInt(v) {
   return typeof v === 'number' && Number.isInteger(v) && v > 0

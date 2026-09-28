@@ -87,3 +87,49 @@ export function clearNotifyTray() {
     return false
   }
 }
+
+/**
+ * 监听系统通知的点击（仅 App 端）。
+ * 点击本地通知会唤醒/前置 App，payload 由 notifyLocal 写入（如 'over-budget'），
+ * 调用方据此决定跳转到哪个页面。回调异常内部消化，绝不让通知点击把 App 搞崩。
+ * @returns {boolean} 是否成功注册监听
+ */
+export function listenPushClick(handler) {
+  try {
+    if (typeof plus === 'undefined' || !plus.push || typeof plus.push.addEventListener !== 'function') {
+      return false
+    }
+    plus.push.addEventListener('click', function (msg) {
+      try {
+        const payload = msg && msg.payload
+        if (typeof handler === 'function') handler(payload)
+      } catch (e) { /* 回调异常不外抛 */ }
+    }, false)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+/**
+ * 轻触反馈：App 端设备振动，H5 走浏览器 Vibration API，都不支持时静默。
+ * 用于记账键盘按键、保存成功等需要"确认感"的瞬间。
+ * @param {number} [ms] 振动时长毫秒，默认 15
+ * @returns {boolean} 是否实际触发了振动
+ */
+export function haptic(ms) {
+  const t = Math.max(1, Math.floor(Number(ms) || 15))
+  try {
+    if (typeof plus !== 'undefined' && plus.device && typeof plus.device.vibrate === 'function') {
+      plus.device.vibrate(t)
+      return true
+    }
+  } catch (e) { /* 继续尝试浏览器通道 */ }
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(t)
+      return true
+    }
+  } catch (e) { /* 都不支持就静默 */ }
+  return false
+}
