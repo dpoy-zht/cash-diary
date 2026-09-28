@@ -4,7 +4,7 @@ import { initDB } from './db/index.js'
 import { useCategoryStore } from './stores/category.js'
 import { useAccountStore } from './stores/account.js'
 import { listenPushClick } from './utils/notify.js'
-import { checkForUpdate, openReleasePage } from './services/update.js'
+import { checkForUpdate, updateNow } from './services/update.js'
 
 onLaunch(() => {
   const categoryStore = useCategoryStore()
@@ -25,19 +25,17 @@ onLaunch(() => {
   })
 
   // 应用内更新检查：24h 节流 + 静默失败，只在新版本可用时弹窗（含版本号与更新说明）
+  // 确认后自动执行更新：有 wgt 静默热更（重启生效），否则打开下载页走整包
   checkForUpdate()
     .then(function (r) {
       if (!r.hasUpdate) return
       uni.showModal({
         title: '发现新版本 ' + r.tag,
         content: r.notes,
-        confirmText: '去下载',
+        confirmText: '立即更新',
         cancelText: '下次再说',
         success: function (res) {
-          if (!res.confirm) return
-          if (!openReleasePage(r.url)) {
-            uni.showToast({ title: '浏览器打开失败，请到项目主页手动下载', icon: 'none' })
-          }
+          if (res.confirm) updateNow(r)
         }
       })
     })

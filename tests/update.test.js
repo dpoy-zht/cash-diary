@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTagVersion, isNewerVersion, stripReleaseNotes } from '../src/utils/update.js'
+import { parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtVersionFromName, WGT_ASSET_PREFIX } from '../src/utils/update.js'
 
 describe('应用内更新检查 —— 版本比较（纯函数）', () => {
   it('parseTagVersion：带 v 前缀 / 不带 / 位数不齐都能解析', () => {
@@ -58,5 +58,42 @@ describe('stripReleaseNotes —— Release 说明压成弹窗纯文本', () => {
     expect(stripReleaseNotes('', 120)).toBe('')
     expect(stripReleaseNotes(null, 120)).toBe('')
     expect(stripReleaseNotes(undefined)).toBe('')
+  })
+})
+
+describe('wgt 资产解析（pickUpdateAssets / parseWgtVersionFromName）', () => {
+  const P = 'nailong-ledger-v'
+
+  it('parseWgtVersionFromName：标准名解析，不匹配返回空串', () => {
+    expect(parseWgtVersionFromName('nailong-ledger-v2.2.0.wgt', P)).toBe('2.2.0')
+    expect(parseWgtVersionFromName('nailong-ledger-v3.0.0.wgt', P)).toBe('3.0.0')
+    expect(parseWgtVersionFromName('其他文件.wgt', P)).toBe('')
+    expect(parseWgtVersionFromName('nailong-ledger-v2.2.0.apk', P)).toBe('')
+    expect(parseWgtVersionFromName(null, P)).toBe('')
+  })
+
+  it('pickUpdateAssets：wgt 与 apk 分别挑出（各取第一个）', () => {
+    const assets = [
+      { name: 'nailong-ledger-v2.2.0.wgt', browser_download_url: 'https://x/wgt1' },
+      { name: 'nailong-ledger-v2.2.0.apk', browser_download_url: 'https://x/apk1' },
+      { name: '源码.zip', browser_download_url: 'https://x/src' }
+    ]
+    const r = pickUpdateAssets(assets, P)
+    expect(r.wgtUrl).toBe('https://x/wgt1')
+    expect(r.wgtVersion).toBe('2.2.0')
+    expect(r.apkUrl).toBe('https://x/apk1')
+  })
+
+  it('pickUpdateAssets：无 wgt 时 apkUrl 仍被挑出（走整包回退）', () => {
+    const r = pickUpdateAssets([
+      { name: 'nailong-ledger-v2.2.0.apk', browser_download_url: 'https://x/apk' }
+    ], P)
+    expect(r.wgtUrl).toBe('')
+    expect(r.apkUrl).toBe('https://x/apk')
+  })
+
+  it('非法 assets 不抛错', () => {
+    expect(pickUpdateAssets(null, P)).toEqual({ wgtUrl: '', wgtVersion: '', apkUrl: '' })
+    expect(pickUpdateAssets([1, 'x'], P)).toEqual({ wgtUrl: '', wgtVersion: '', apkUrl: '' })
   })
 })

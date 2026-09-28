@@ -103,7 +103,7 @@ import {
   REMIND_PREF_KEY,
   normalizeRemindEnabled
 } from '../../utils/notify.js'
-import { checkForUpdate, currentAppVersion, openReleasePage } from '../../services/update.js'
+import { checkForUpdate, currentAppVersion, updateNow } from '../../services/update.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -240,13 +240,10 @@ function checkUpdateManual() {
         uni.showModal({
           title: '发现新版本 ' + r.tag,
           content: r.notes + '\n\n覆盖安装即可升级，账目数据都在。',
-          confirmText: '去下载',
+          confirmText: '立即更新',
           cancelText: '下次再说',
           success: function (res) {
-            if (!res.confirm) return
-            if (!openReleasePage(r.url)) {
-              uni.showToast({ title: '浏览器打开失败，请到项目主页手动下载', icon: 'none' })
-            }
+            if (res.confirm) updateNow(r)
           }
         })
         return

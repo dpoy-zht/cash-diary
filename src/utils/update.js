@@ -55,3 +55,43 @@ export function stripReleaseNotes(body, maxLen) {
   if (!text) return ''
   return text.length > limit ? text.slice(0, limit - 1) + '…' : text
 }
+
+/* ---------------- wgt 热更新：资产解析（纯函数） ---------------- */
+
+/** wgt 资产文件名的固定前缀（发版脚本约定，中文名会被 GitHub 消毒所以用英文） */
+export const WGT_ASSET_PREFIX = 'nailong-ledger-v'
+
+/**
+ * 从 wgt 文件名解析版本号：'nailong-ledger-v2.2.0.wgt' → 'v2.2.0'。
+ * 不匹配返回空串。
+ */
+export function parseWgtVersionFromName(name, prefix) {
+  const pre = String(prefix || WGT_ASSET_PREFIX)
+  const n = String(name || '')
+  if (n.indexOf(pre) !== 0 || n.slice(-4) !== '.wgt') return ''
+  return n.slice(pre.length, -4)
+}
+
+/**
+ * 从 Release 的 assets 里挑出更新所需资产（纯函数）。
+ * 约定：有 .wgt 资产 = 纯前端更新（走热更）；只有 .apk = 原生变更（走整包）。
+ * @param {Array} assets GitHub release assets
+ * @param {string} [prefix] wgt 文件名前缀
+ * @returns {{wgtUrl:string, wgtVersion:string, apkUrl:string}}
+ */
+export function pickUpdateAssets(assets, prefix) {
+  const result = { wgtUrl: '', wgtVersion: '', apkUrl: '' }
+  const list = Array.isArray(assets) ? assets : []
+  for (const a of list) {
+    const name = (a && a.name) || ''
+    const url = a && (a.browser_download_url || a.url)
+    if (!url) continue
+    if (!result.wgtUrl && name.indexOf(String(prefix || WGT_ASSET_PREFIX)) === 0 && name.slice(-4) === '.wgt') {
+      result.wgtUrl = url
+      result.wgtVersion = parseWgtVersionFromName(name, prefix)
+    } else if (!result.apkUrl && name.slice(-4) === '.apk') {
+      result.apkUrl = url
+    }
+  }
+  return result
+}

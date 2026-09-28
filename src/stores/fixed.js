@@ -22,7 +22,7 @@ export const useFixedStore = defineStore('fixed', function () {
   }
 
   async function remove(id) {
-    await fixedService.remove(id)
+    await fixedService.removeFixed(id)
     await load()
   }
 
