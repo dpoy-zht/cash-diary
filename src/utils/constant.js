@@ -10,3 +10,12 @@ export const TYPE_INCOME = 'income'
  * - 流水查询/写入不带 accountId 时的兜底值
  */
 export const DEFAULT_ACCOUNT_ID = 1
+
+/**
+ * 账本过滤兜底：不传/非法值一律落到默认账本。
+ * 原来 db/sqlite.js、db/memory.js、db/repository/tx.js、db/repository/fixed.js 四处各有一份
+ * 一模一样的实现，收敛到这里统一维护（行为约定见 DEFAULT_ACCOUNT_ID）。
+ */
+export function aid(v) {
+  return typeof v === 'number' && v > 0 ? v : DEFAULT_ACCOUNT_ID
+}

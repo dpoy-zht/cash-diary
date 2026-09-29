@@ -4,15 +4,10 @@
  */
 import { sqlValue, likePattern } from './sql-value.js'
 import { MIGRATIONS } from './schema.js'
-import { DEFAULT_ACCOUNT_ID } from '../utils/constant.js'
+import { aid } from '../utils/constant.js'
 
 const DB_NAME = 'cash-diary'
 const DB_PATH = '_doc/cash-diary.db'
-
-/** 账本过滤：不传/非法值一律落到默认账本 */
-function aid(v) {
-  return typeof v === 'number' && v > 0 ? v : DEFAULT_ACCOUNT_ID
-}
 
 function openDatabase() {
   return new Promise(function (resolve, reject) {

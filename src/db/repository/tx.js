@@ -4,12 +4,7 @@
  */
 import { getStorage } from '../index.js'
 import { monthRange } from '../../utils/date.js'
-import { DEFAULT_ACCOUNT_ID } from '../../utils/constant.js'
-
-/** 账本过滤：不传/非法值一律落到默认账本 */
-function aid(v) {
-  return typeof v === 'number' && v > 0 ? v : DEFAULT_ACCOUNT_ID
-}
+import { DEFAULT_ACCOUNT_ID, aid } from '../../utils/constant.js'
 
 function normalizeTx(row) {
   return {

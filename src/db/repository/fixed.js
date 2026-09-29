@@ -3,12 +3,7 @@
  * 与其他仓储同一规矩：方法签名在 sqlite / memory 两适配器间严格一致。
  */
 import { getStorage } from '../index.js'
-import { DEFAULT_ACCOUNT_ID } from '../../utils/constant.js'
-
-/** 账本过滤：不传/非法值一律落到默认账本 */
-function aid(v) {
-  return typeof v === 'number' && v > 0 ? v : DEFAULT_ACCOUNT_ID
-}
+import { aid } from '../../utils/constant.js'
 
 function normalizeFixed(row) {
   return {

@@ -4,7 +4,7 @@
  * 让 App 正式版（SQLite）与浏览器预览共用同一套上层代码。
  */
 
-import { DEFAULT_ACCOUNT_ID } from '../utils/constant.js'
+import { DEFAULT_ACCOUNT_ID, aid } from '../utils/constant.js'
 
 const LS_KEY = 'cashDiary.memory.v1'
 
@@ -35,11 +35,6 @@ function persist() {
 
 function nid() {
   return data.nextId++
-}
-
-/** 账本过滤：不传/非法值一律落到默认账本 */
-function aid(v) {
-  return typeof v === 'number' && v > 0 ? v : DEFAULT_ACCOUNT_ID
 }
 
 export async function init() {
