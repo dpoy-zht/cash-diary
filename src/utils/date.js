@@ -82,6 +82,38 @@ export function ymLabel(ym) {
   return Number(parts[1]) + '月'
 }
 
+/** 完整月份标签：'2026-09' → '2026年9月'（月度报告标题用） */
+export function ymLabelFull(ym) {
+  const parts = String(ym == null ? '' : ym).split('-')
+  const y = Number(parts[0])
+  const m = Number(parts[1])
+  if (!y || !m) return ''
+  return y + '年' + m + '月'
+}
+
+/**
+ * 某月有多少天（本地时区）：'2026-02' → 28。
+ * 用 `new Date(y, m, 0)` 取"下个月的第 0 天"= 本月最后一天，闰年由 Date 自己算。
+ * 非法输入返回 0（调用方据此跳过依赖天数的计算，而不是算出 NaN）。
+ */
+export function daysInMonth(ym) {
+  const parts = String(ym == null ? '' : ym).split('-')
+  const y = Number(parts[0])
+  const m = Number(parts[1])
+  if (!y || !m || m < 1 || m > 12) return 0
+  return new Date(y, m, 0).getDate()
+}
+
+/** 上一个月的 'YYYY-MM'（跨年自动处理）；非法输入返回空串 */
+export function prevYmOf(ym) {
+  const parts = String(ym == null ? '' : ym).split('-')
+  const y = Number(parts[0])
+  const m = Number(parts[1])
+  if (!y || !m || m < 1 || m > 12) return ''
+  const d = new Date(y, m - 2, 1)
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1)
+}
+
 /**
  * 'YYYY-MM-DD' → 当天 00:00 的毫秒时间戳；非法（含 2026-02-30 这种不存在的日期）返回 null。
  * 与 tsFromDateStr 的区别：那个会把时间部分顶成"此刻"，这个固定 00:00 —— 区间筛选必须用它。

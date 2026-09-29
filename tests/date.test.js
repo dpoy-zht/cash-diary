@@ -17,7 +17,10 @@ import {
   lastNWeekStarts,
   ymsOfYear,
   dayTrendLabel,
-  periodNameOf
+  periodNameOf,
+  ymLabelFull,
+  daysInMonth,
+  prevYmOf
 } from '../src/utils/date.js'
 
 /** 本地时间造时间戳（与工具函数的本地时区口径一致） */
@@ -236,5 +239,43 @@ describe('replaceDateKeepTime —— 只改日期不动时刻（T3.2 改期编�
     const out = replaceDateKeepTime(NaN, '2026-08-03')
     expect(Number.isFinite(out)).toBe(true)
     expect(toDateStr(out)).toBe('2026-08-03')
+  })
+})
+
+describe('月份工具（T4.4 月度报告用）', () => {
+  it('ymLabelFull：YYYY-MM → 2026年9月；非法输入返回空串', () => {
+    expect(ymLabelFull('2026-09')).toBe('2026年9月')
+    expect(ymLabelFull('2026-12')).toBe('2026年12月')
+    expect(ymLabelFull('')).toBe('')
+    expect(ymLabelFull(null)).toBe('')
+    expect(ymLabelFull('2026')).toBe('')
+  })
+
+  it('daysInMonth：大小月与闰年都按日历算', () => {
+    expect(daysInMonth('2026-09')).toBe(30)
+    expect(daysInMonth('2026-01')).toBe(31)
+    expect(daysInMonth('2026-02')).toBe(28)
+    expect(daysInMonth('2028-02')).toBe(29) // 闰年
+    expect(daysInMonth('2026-04')).toBe(30)
+  })
+
+  it('daysInMonth：非法月份返回 0（而不是 NaN，调用方据此跳过依赖天数的计算）', () => {
+    expect(daysInMonth('')).toBe(0)
+    expect(daysInMonth(null)).toBe(0)
+    expect(daysInMonth('2026-13')).toBe(0)
+    expect(daysInMonth('2026-00')).toBe(0)
+  })
+
+  it('prevYmOf：上一个月，跨年与跨世纪（2000 闰年）都对', () => {
+    expect(prevYmOf('2026-09')).toBe('2026-08')
+    expect(prevYmOf('2026-01')).toBe('2025-12')
+    expect(prevYmOf('2026-03')).toBe('2026-02')
+    expect(prevYmOf('2000-03')).toBe('2000-02')
+  })
+
+  it('prevYmOf：非法输入返回空串', () => {
+    expect(prevYmOf('')).toBe('')
+    expect(prevYmOf(null)).toBe('')
+    expect(prevYmOf('2026-13')).toBe('')
   })
 })

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import * as txService from '../services/tx.js'
 import { useAccountStore } from './account.js'
 import { useMetaStore } from './meta.js'
-import { lastNMonths, monthRange, toDateStr } from '../utils/date.js'
+import { lastNMonths, monthRange, toDateStr, prevYmOf } from '../utils/date.js'
 import { emptyFilters, normalizeFilters, hasAnyFilter } from '../utils/search.js'
 import { monthlySummaries, periodRange, trendSpecFor, sumByType, bucketSummaries } from '../utils/stats.js'
 
@@ -24,6 +24,10 @@ export const useTxStore = defineStore('tx', function () {
   const periodRecords = ref([])
   const periodSummary = ref({ expenseCents: 0, incomeCents: 0 })
   const periodTrend = ref([])
+
+  /** 月度报告（T4.4）：当月流水 + 上月流水（环比用）。总预算由页面从 budget store 取 */
+  const reportRecords = ref([])
+  const reportPrevRecords = ref([])
 
   /**
    * 首页搜索：跨月流水（备注/分类名命中）+ 组合筛选（T4.3）。
@@ -132,6 +136,22 @@ export const useTxStore = defineStore('tx', function () {
     periodTrend.value = bucketSummaries(rows, spec.keys, spec.keyOf)
   }
 
+  /**
+   * 月度报告（T4.4）：一次拿"当月 + 上月"两个月流水。
+   * 两个查询互不依赖，并行发（App 端每个 await 都是一次 SQLite 桥接往返）。
+   * 上月键由 prevYmOf 算（跨年交给 Date），非法月份直接不查上月。
+   */
+  async function loadReport(ym) {
+    const aid = currentAccount()
+    const prev = prevYmOf(ym)
+    const [cur, prevRows] = await Promise.all([
+      txService.listByMonth(ym, aid),
+      prev ? txService.listByMonth(prev, aid) : Promise.resolve([])
+    ])
+    reportRecords.value = cur
+    reportPrevRecords.value = prevRows
+  }
+
   async function add(ym, input) {
     await txService.addTx(Object.assign({}, input, { accountId: currentAccount() }))
     bumpData()
@@ -204,6 +224,8 @@ export const useTxStore = defineStore('tx', function () {
     periodRecords,
     periodSummary,
     periodTrend,
+    reportRecords,
+    reportPrevRecords,
     searchKeyword,
     searchFilters,
     searchResults,
@@ -216,6 +238,7 @@ export const useTxStore = defineStore('tx', function () {
     loadRecentTs,
     loadTrend,
     loadStatsPeriod,
+    loadReport,
     refresh,
     add,
     update,

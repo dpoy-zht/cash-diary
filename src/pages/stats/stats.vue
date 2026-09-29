@@ -100,6 +100,15 @@
       <text class="trend-foot">{{ trendFoot }}</text>
     </view>
 
+    <!-- 月度报告入口（T4.4）：把"这个月过得怎么样"整理成一页 -->
+    <view class="report-entry" @click="goReport">
+      <view class="re-main">
+        <text class="re-title">月度报告</text>
+        <text class="re-sub">{{ reportEntrySub }}</text>
+      </view>
+      <view class="re-arrow" :style="iconArrow" />
+    </view>
+
     <tab-bar current="stats" />
   </view>
 </template>
@@ -300,8 +309,16 @@ function catOf(name) {
 function goHome() {
   uni.reLaunch({ url: '/pages/home/home' })
 }
+/** 月度报告入口（T4.4）：报告页与其他页共用 metaStore.ym，进去看到的就是当前这个月 */
+function goReport() {
+  uni.reLaunch({ url: '/pages/report/report' })
+}
+const reportEntrySub = computed(function () {
+  return ymLabel(metaStore.ym) + '的收支、环比、花得最多的几类…一页看完'
+})
 
 const iconBack = svgMaskStyle('M15.4 7.4L14 6l-6 6 6 6 1.4-1.4L10.8 12z')
+const iconArrow = svgMaskStyle('M8.6 7.4L7.2 8.8 10.4 12 7.2 15.2l1.4 1.4L13.2 12z')
 
 onShow(function () {
   reload()
@@ -639,5 +656,39 @@ onShow(function () {
   font-size: 11px;
   color: var(--cd-ink-2);
   line-height: 1.6;
+}
+
+/* ---- 月度报告入口 ---- */
+.report-entry {
+  margin: 12px 16px;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-md);
+  padding: 16px;
+  box-shadow: var(--cd-sh-card);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.re-main {
+  flex: 1;
+  min-width: 0;
+}
+.re-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--cd-ink);
+}
+.re-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--cd-ink-2);
+}
+.re-arrow {
+  width: 18px;
+  height: 18px;
+  background: var(--cd-icon-3);
+  flex: none;
 }
 </style>
