@@ -16,13 +16,14 @@
     <view v-if="store.list.length" class="list-card">
       <view v-for="f in store.list" :key="f.id" class="row">
         <cat-icon :category="catOf(f.category_id)" :size="36" />
-        <view class="row-main">
+        <view class="row-main" @click="openEdit(f)">
           <view class="row-line">
             <text class="row-name">{{ catName(f.category_id) }}<text v-if="f.note" class="row-note"> · {{ f.note }}</text></text>
             <text class="row-amt">-¥{{ formatCents(f.amount_cents) }}</text>
           </view>
           <view class="row-line2">
             <text class="row-sub" :class="{ off: !f.enabled }">每月 {{ f.day_of_month }} 号 · {{ f.enabled ? '自动记账中' : '已停用' }}</text>
+            <view class="row-pen" :style="iconEdit" />
           </view>
         </view>
         <switch :checked="f.enabled" color="#FFD93D" class="row-switch" @change="onToggle(f, $event)" />
@@ -36,15 +37,15 @@
     </view>
 
     <!-- 添加按钮 -->
-    <view class="add-row" @click="formShow = true">
+    <view class="add-row" @click="openCreate">
       <text class="add-i">＋</text>
       <text class="add-t">添加固定支出</text>
     </view>
 
-    <!-- 添加表单（底部弹层） -->
+    <!-- 新增 / 编辑表单（底部弹层） -->
     <view v-if="formShow" class="mask" @click="formShow = false">
       <view class="form" @click.stop>
-        <text class="form-title">添加固定支出</text>
+        <text class="form-title">{{ isEditing ? '编辑固定支出' : '添加固定支出' }}</text>
 
         <!-- 分类 -->
         <text class="f-label">花在哪</text>
@@ -77,6 +78,12 @@
         <text class="f-label">备注（可选）</text>
         <input v-model="form.note" class="note-input" placeholder="比如 房租 / B站大会员" placeholder-class="amt-ph" />
 
+        <!-- 启停（编辑时可直接在这里改，不用退回列表拨开关） -->
+        <view class="f-row">
+          <text class="f-row-label">启用自动记账</text>
+          <switch :checked="form.enabled" color="#FFD93D" class="f-row-switch" @change="onEnabledChange" />
+        </view>
+
         <view class="form-row">
           <view class="btn-ghost" @click="formShow = false">取消</view>
           <view class="btn-y" @click="onSave">保存</view>
@@ -101,7 +108,10 @@ const categoryStore = useCategoryStore()
 const expenseCats = computed(function () { return categoryStore.expenseCats })
 
 const formShow = ref(false)
-const form = reactive({ categoryId: null, amountStr: '', dayOfMonth: 1, note: '' })
+/** 正在编辑的配置 id；null = 新增（同一个弹层复用两种模式，字段完全一致） */
+const editingId = ref(null)
+const isEditing = computed(function () { return editingId.value !== null })
+const form = reactive({ categoryId: null, amountStr: '', dayOfMonth: 1, note: '', enabled: true })
 const dayOptions = []
 for (let d = 1; d <= 28; d += 1) dayOptions.push(d + ' 号')
 const dayIndex = computed(function () { return form.dayOfMonth - 1 })
@@ -120,21 +130,50 @@ function catOf(id) {
 function onDayChange(e) {
   form.dayOfMonth = Number(dayOptions[Number(e.detail.value)].replace(' 号', '')) || 1
 }
+function onEnabledChange(e) {
+  form.enabled = !!e.detail.value
+}
+
+/** 新增：清空表单。分类不预选——避免用户没注意就存到"早餐"名下 */
+function openCreate() {
+  editingId.value = null
+  form.categoryId = null
+  form.amountStr = ''
+  form.dayOfMonth = 1
+  form.note = ''
+  form.enabled = true
+  formShow.value = true
+}
+
+/** 编辑：把当前配置回填进弹层（金额转成页面口径的字符串） */
+function openEdit(f) {
+  editingId.value = f.id
+  form.categoryId = f.category_id
+  form.amountStr = (f.amount_cents / 100).toFixed(2)
+  form.dayOfMonth = f.day_of_month
+  form.note = f.note || ''
+  form.enabled = !!f.enabled
+  formShow.value = true
+}
 
 async function onSave() {
+  const input = {
+    amountStr: form.amountStr,
+    categoryId: form.categoryId,
+    dayOfMonth: form.dayOfMonth,
+    note: form.note,
+    enabled: form.enabled
+  }
   try {
-    await store.add({
-      amountStr: form.amountStr,
-      categoryId: form.categoryId,
-      dayOfMonth: form.dayOfMonth,
-      note: form.note
-    })
+    if (isEditing.value) {
+      await store.update(editingId.value, input)
+      // 口径说明：本月已记的那笔不动（避免重复记），从下个月起按新配置执行
+      uni.showToast({ title: '已保存，下月起按新配置', icon: 'none' })
+    } else {
+      await store.add(input)
+      uni.showToast({ title: '已添加，下月开始自动记账', icon: 'none' })
+    }
     formShow.value = false
-    form.categoryId = null
-    form.amountStr = ''
-    form.dayOfMonth = 1
-    form.note = ''
-    uni.showToast({ title: '已添加，下月开始自动记账', icon: 'none' })
   } catch (err) {
     uni.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
   }
@@ -169,6 +208,8 @@ function goBack() {
 }
 
 const iconBack = svgMaskStyle('M15.4 7.4L14 6l-6 6 6 6 1.4-1.4L10.8 12z')
+/** 行内小铅笔：提示"这一条能点开改"（T3.5） */
+const iconEdit = svgMaskStyle('M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z')
 
 onShow(function () {
   categoryStore.init()
@@ -273,6 +314,9 @@ onShow(function () {
 }
 .row-line2 {
   margin-top: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .row-sub {
   font-size: 11px;
@@ -280,6 +324,14 @@ onShow(function () {
 }
 .row-sub.off {
   text-decoration: line-through;
+}
+/* 可编辑提示：整块 row-main 都能点开编辑弹层 */
+.row-pen {
+  width: 13px;
+  height: 13px;
+  background: #b89968;
+  flex: none;
+  margin-left: 6px;
 }
 .row-switch {
   transform: scale(0.8);
@@ -443,6 +495,21 @@ onShow(function () {
   padding: 10px 16px;
   font-size: 14px;
   color: var(--cd-ink);
+}
+/* 启停开关：编辑时不用退回列表拨开关 */
+.f-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+.f-row-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cd-ink-2);
+}
+.f-row-switch {
+  transform: scale(0.85);
 }
 .form-row {
   display: flex;

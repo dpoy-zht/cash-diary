@@ -3,6 +3,7 @@ import { getStorage, resetStorageForTest } from '../src/db/index.js'
 import { seedIfEmpty, listAll as listCats } from '../src/services/category.js'
 import { seedDefaultIfEmpty } from '../src/services/account.js'
 import * as fixedService from '../src/services/fixed.js'
+import * as txService from '../src/services/tx.js'
 import { ymOf } from '../src/utils/date.js'
 
 /** 固定支出（每月自动补记）业务测试，走内存存储全链路 */
@@ -179,5 +180,81 @@ describe('T2.3 —— 补记日期按配置日落位', () => {
     expect(again.posted).toBe(0)
     expect((await s.txListByRange(0, 99999999999999, 1)).length).toBe(3)
     void id
+  })
+})
+
+describe('T3.5 —— 固定支出编辑', () => {
+  const T = new Date(2026, 8, 28, 9, 0, 0).getTime() // 2026-09-28
+  const T2 = new Date(2026, 9, 20, 9, 0, 0).getTime() // 2026-10-20
+  let cats
+  let lunch
+  let home
+
+  beforeEach(async () => {
+    resetStorageForTest()
+    await getStorage().init()
+    await seedIfEmpty()
+    await seedDefaultIfEmpty()
+    cats = await listCats()
+    lunch = cats.find(function (c) { return c.name === '午餐' })
+    home = cats.find(function (c) { return c.name === '住房' })
+  })
+
+  it('金额 / 记账日 / 备注 / 分类 / 启停 都能改到', async () => {
+    const id = await fixedService.addFixed({ amountStr: '15', categoryId: lunch.id, dayOfMonth: 5 }, 1, T)
+
+    await fixedService.updateFixed(id, {
+      amountStr: '1234.56',
+      dayOfMonth: 20,
+      note: '涨租了',
+      categoryId: home.id,
+      enabled: false
+    })
+
+    const row = (await fixedService.listFixed(1))[0]
+    expect(row.amount_cents).toBe(123456)
+    expect(row.day_of_month).toBe(20)
+    expect(row.note).toBe('涨租了')
+    expect(row.category_id).toBe(home.id)
+    expect(row.enabled).toBe(false)
+  })
+
+  it('编辑不重置 last_posted_ym：本月已记的那笔不会被重复补记', async () => {
+    const id = await fixedService.addFixed({ amountStr: '15', categoryId: lunch.id, dayOfMonth: 5 }, 1, T)
+    await fixedService.updateFixed(id, { amountStr: '30', dayOfMonth: 8 })
+
+    expect((await fixedService.listFixed(1))[0].last_posted_ym).toBe(ymOf(T))
+    // 当月再跑补记：仍然 0 笔（编辑不该让本月重新记一遍）
+    expect((await fixedService.postDueFixed(1, T)).posted).toBe(0)
+    expect((await txService.listByMonth(ymOf(T), 1)).length).toBe(0)
+  })
+
+  it('改完之后，下个月的自动记账按新配置执行（金额与新记账日）', async () => {
+    const id = await fixedService.addFixed({ amountStr: '15', categoryId: lunch.id, dayOfMonth: 5 }, 1, T)
+    await fixedService.updateFixed(id, { amountStr: '30', dayOfMonth: 8, note: '改过了' })
+
+    const r = await fixedService.postDueFixed(1, T2)
+    expect(r.posted).toBe(1)
+
+    const oct = await txService.listByMonth('2026-10', 1)
+    expect(oct.length).toBe(1)
+    expect(oct[0].amount_cents).toBe(3000)
+    expect(oct[0].note).toBe('改过了')
+    expect(new Date(oct[0].occurred_at).getDate()).toBe(8)
+    expect(new Date(oct[0].occurred_at).getHours()).toBe(12)
+  })
+
+  it('校验失败时拒绝写入，原配置保持不变', async () => {
+    const id = await fixedService.addFixed({ amountStr: '15', categoryId: lunch.id, dayOfMonth: 5 }, 1, T)
+
+    await expect(fixedService.updateFixed(id, { amountStr: '0' })).rejects.toThrow('金额无效')
+    await expect(fixedService.updateFixed(id, { amountStr: 'abc' })).rejects.toThrow('金额无效')
+    await expect(fixedService.updateFixed(id, { dayOfMonth: 31 })).rejects.toThrow('记账日要选 1~28 号')
+    await expect(fixedService.updateFixed(id, { categoryId: null })).rejects.toThrow('分类不能为空')
+
+    const row = (await fixedService.listFixed(1))[0]
+    expect(row.amount_cents).toBe(1500)
+    expect(row.day_of_month).toBe(5)
+    expect(row.category_id).toBe(lunch.id)
   })
 })

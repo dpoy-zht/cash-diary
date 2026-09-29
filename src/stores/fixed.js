@@ -16,6 +16,15 @@ export const useFixedStore = defineStore('fixed', function () {
     await load()
   }
 
+  /**
+   * 修改配置（T3.5）。金额/记账日/分类/备注/启停都走 services/fixed.js 的 updateFixed 校验。
+   * 不动 last_posted_ym：本月已记的那笔不重复记，新配置从下个月开始生效。
+   */
+  async function update(id, input) {
+    await fixedService.updateFixed(id, input)
+    await load()
+  }
+
   async function toggle(id, enabled) {
     await fixedService.toggleFixed(id, enabled)
     await load()
@@ -26,5 +35,5 @@ export const useFixedStore = defineStore('fixed', function () {
     await load()
   }
 
-  return { list, load, add, toggle, remove }
+  return { list, load, add, update, toggle, remove }
 })
