@@ -5,6 +5,9 @@ import { useCategoryStore } from './stores/category.js'
 import { useAccountStore } from './stores/account.js'
 import { listenPushClick } from './utils/notify.js'
 import { checkForUpdate, updateNow } from './services/update.js'
+// #ifdef H5
+import { setPersistErrorHandler, flush as flushMemory } from './db/memory.js'
+// #endif
 
 onLaunch(() => {
   const categoryStore = useCategoryStore()
@@ -13,6 +16,25 @@ onLaunch(() => {
   initDB()
     .then(() => Promise.all([categoryStore.init(), accountStore.init()]))
     .catch((err) => console.error('[cash-diary] 初始化失败：', err))
+
+  // #ifdef H5
+  /**
+   * H5 的数据落在 localStorage，写入可能因配额（>5MB）或隐私模式失败。
+   * 落盘是防抖的（T3.9），一旦写不进去，内存里看着正常、刷新就全没了 —— 必须让人知道。
+   */
+  setPersistErrorHandler(function () {
+    uni.showToast({
+      title: '本地存储写入失败，请到「我的 → 数据备份与恢复」导出备份',
+      icon: 'none',
+      duration: 5000
+    })
+  })
+  // 关页 / 切后台前把防抖中的改动落盘，避免最后几笔账丢失
+  window.addEventListener('pagehide', flushMemory)
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) flushMemory()
+  })
+  // #endif
 
   // 点系统通知直达对应页面：超支通知 → 预算页（等路由就绪后再跳，冷启动直接跳会丢）
   listenPushClick(function (payload) {

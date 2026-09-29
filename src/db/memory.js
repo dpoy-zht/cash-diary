@@ -29,8 +29,60 @@ function backend() {
   return memBackend
 }
 
+/* ---------------- 落盘：防抖批量写 + 失败可感知（T3.9） ----------------
+ * 每次写操作都 JSON.stringify 整库并同步写 localStorage，在数据量大时会明显卡顿，
+ * 而且超过 5MB 会静默抛 QuotaExceededError —— 用户以为记上了，刷新后全没了。
+ * 这里改成"内存即时生效 + 磁盘合并延迟写"，并把写入失败暴露给上层去提示用户。
+ */
+
+/** 落盘延迟：把连续写合并成一次（恢复备份时几百次写只落一次盘） */
+const PERSIST_DELAY = 200
+
+let persistTimer = null
+let lastPersistError = null
+let onPersistError = null
+
+/** 立即写盘。失败不抛错：内存数据仍是正确的，不该让页面崩 */
+function writeNow() {
+  try {
+    backend().setItem(LS_KEY, JSON.stringify(data))
+    lastPersistError = null
+    return true
+  } catch (e) {
+    const wasFailing = lastPersistError !== null
+    lastPersistError = e
+    // 只在"从正常转入失败"时通知一次，避免每次写操作都弹提示
+    if (onPersistError && !wasFailing) {
+      try { onPersistError(e) } catch (e2) { /* 回调自身出错不影响写入路径 */ }
+    }
+    return false
+  }
+}
+
+/** 延迟落盘（内存已经是最新的，读数据不受影响） */
 function persist() {
-  backend().setItem(LS_KEY, JSON.stringify(data))
+  if (persistTimer) return
+  persistTimer = setTimeout(function () {
+    persistTimer = null
+    writeNow()
+  }, PERSIST_DELAY)
+}
+
+/**
+ * 立刻落盘、不等防抖。用于：事务收尾、页面卸载前、以及需要马上读磁盘的场景。
+ * @returns {boolean} 是否写入成功
+ */
+export function flush() {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  return writeNow()
+}
+
+/** 注册落盘失败处理器（App.vue 里注册：提示用户尽快导出备份） */
+export function setPersistErrorHandler(fn) {
+  onPersistError = typeof fn === 'function' ? fn : null
 }
 
 function nid() {
@@ -46,11 +98,11 @@ export async function transaction(fn) {
   const snapshot = JSON.stringify(data)
   try {
     const result = await fn()
-    persist()
+    flush()
     return result
   } catch (e) {
     data = JSON.parse(snapshot)
-    persist()
+    flush()
     throw e
   }
 }
@@ -73,13 +125,13 @@ export async function init() {
     } catch (e) { /* 损坏则重建 */ }
   }
   data = blank()
-  persist()
+  flush()
 }
 
 /** 仅供测试：清空并重建（浏览器预览下慎用） */
 export function reset() {
   data = blank()
-  persist()
+  flush()
 }
 
 /* ---------- 流水 CRUD ---------- */
@@ -382,7 +434,7 @@ export async function fixedExpenseRemove(id) {
 /** 清空全部业务数据（流水 + 分类 + 账本 + 预算），表结构保留 —— 供「重置数据」用 */
 export async function clearAll() {
   data = blank()
-  persist()
+  flush()
 }
 
 /* ---------- 备份：整库导出 / 整库恢复 ---------- */
