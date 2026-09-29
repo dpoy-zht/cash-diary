@@ -62,6 +62,16 @@ export function stripReleaseNotes(body, maxLen) {
 export const WGT_ASSET_PREFIX = 'nailong-ledger-v'
 
 /**
+ * 从 Release 说明里解析 wgt 的 SHA-256（发版约定行：`wgt-sha256: <64位hex>`）。
+ * 没有该行返回空串 —— 旧版 Release 没带哈希，灰度期沿用"不校验"的旧逻辑；
+ * 带了一定要验，验不过绝不安装。
+ */
+export function parseWgtSha256(body) {
+  const m = /wgt[-_]sha256[:：=\s]+([0-9a-fA-F]{64})/.exec(String(body || ''))
+  return m ? m[1].toLowerCase() : ''
+}
+
+/**
  * 从 wgt 文件名解析版本号：'nailong-ledger-v2.2.0.wgt' → 'v2.2.0'。
  * 不匹配返回空串。
  */

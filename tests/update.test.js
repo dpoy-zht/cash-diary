@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtVersionFromName } from '../src/utils/update.js'
+import { parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtVersionFromName, parseWgtSha256 } from '../src/utils/update.js'
 import { currentAppVersion } from '../src/services/update.js'
 
 describe('应用内更新检查 —— 版本比较（纯函数）', () => {
@@ -138,5 +138,29 @@ describe('currentAppVersion —— 版本读取优先级（wgt 热更后防循�
     globalThis.uni = { getAppBaseInfo: () => { throw new Error('boom') } }
     delete globalThis.plus
     expect(currentAppVersion()).toBe('')
+  })
+})
+
+describe('parseWgtSha256 —— 从 Release 说明解析 wgt 哈希（T2.5）', () => {
+  const HEX = 'f7eb127699b33db8a48bce7c61173b5f9a577bb9b0492169eabc3f2cd9cada15'
+
+  it('标准约定行（wgt-sha256: <hex>）', () => {
+    expect(parseWgtSha256('## 校验\n- wgt-sha256: ' + HEX + '\n')).toBe(HEX)
+  })
+
+  it('容忍全角冒号 / 无冒号空格等变体，大写转小写', () => {
+    expect(parseWgtSha256('wgt-sha256：' + HEX.toUpperCase())).toBe(HEX)
+    expect(parseWgtSha256('wgt_sha256=' + HEX)).toBe(HEX)
+  })
+
+  it('没有该行 / 空 body → 返回空串（灰度兼容旧 Release）', () => {
+    expect(parseWgtSha256('## 更新内容\n没有哈希行')).toBe('')
+    expect(parseWgtSha256('')).toBe('')
+    expect(parseWgtSha256(null)).toBe('')
+  })
+
+  it('非法 hex（长度/字符不符）不算命中', () => {
+    expect(parseWgtSha256('wgt-sha256: abc123')).toBe('')
+    expect(parseWgtSha256('wgt-sha256: ' + 'g'.repeat(64))).toBe('')
   })
 })

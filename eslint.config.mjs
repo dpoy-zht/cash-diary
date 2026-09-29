@@ -39,6 +39,7 @@ export default [
         URL: 'readonly',
         Blob: 'readonly',
         FileReader: 'readonly',
+        TextEncoder: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',

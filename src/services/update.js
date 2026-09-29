@@ -7,7 +7,8 @@
  * - 每 24h 最多自动检查一次（节流键存 uni storage）；也可从「关于」手动触发
  * - 无网络 / 超时 / H5 端全部静默失败——检查更新是锦上添花，绝不能打扰使用
  */
-import { isNewerVersion, stripReleaseNotes, pickUpdateAssets, WGT_ASSET_PREFIX } from '../utils/update.js'
+import { isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtSha256, WGT_ASSET_PREFIX } from '../utils/update.js'
+import { sha256Hex, base64ToBytes } from '../utils/sha256.js'
 
 const UPDATE_LAST_KEY = 'cashDiary.updateCheck.lastAt'
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000
@@ -94,6 +95,7 @@ export async function checkForUpdate(opts) {
       current: current,
       wgtUrl: picked.wgtUrl,
       wgtVersion: picked.wgtVersion,
+      wgtSha256: parseWgtSha256(res && res.body),
       apkUrl: picked.apkUrl
     }
   } catch (e) {
@@ -134,6 +136,45 @@ function downloadFile(url) {
   })
 }
 
+/** 读本地临时文件（App 端）：readAsDataURL 拿到 base64，交给纯函数解码与哈希 */
+function readTempFileDataUrl(path) {
+  return new Promise(function (resolve, reject) {
+    try {
+      plus.io.resolveLocalFileSystemURL(
+        path,
+        function (entry) {
+          entry.file(
+            function (file) {
+              const reader = new plus.io.FileReader()
+              reader.onload = function (e) { resolve(String(e.target.result || '')) }
+              reader.onerror = function () { reject(new Error('读取更新包失败')) }
+              reader.readAsDataURL(file)
+            },
+            function () { reject(new Error('读取更新包失败')) }
+          )
+        },
+        function () { reject(new Error('读取更新包失败')) }
+      )
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+/**
+ * 校验下载到的 wgt 文件哈希（T2.5）。
+ * 读不出来 / 算不出来一律视为校验失败（fail closed）：无法证明完整的东西绝不装。
+ */
+export async function verifyWgtFileHash(tempPath, expectedHex) {
+  try {
+    const dataUrl = await readTempFileDataUrl(tempPath)
+    const hex = sha256Hex(base64ToBytes(dataUrl))
+    return hex === String(expectedHex || '').toLowerCase()
+  } catch (e) {
+    return false
+  }
+}
+
 /** plus.runtime.install 包装：失败 resolve false，不抛错 */
 function installWgt(tempFilePath) {
   return new Promise(function (resolve) {
@@ -169,12 +210,21 @@ export async function applyUpdate(r) {
   if (typeof plus === 'undefined' || !plus.runtime) return { ok: false, reason: 'not-app' }
   if (!r || (!r.wgtUrl && !r.url)) return { ok: false, reason: 'no-target' }
 
-  // 1) 有 wgt：静默下载安装（安装失败回退整包）
+  // 1) 有 wgt：静默下载 → 哈希校验（Release 说明带 wgt-sha256 时）→ 安装；
+  //    下载/校验/安装失败 → 回退整包
   if (r.wgtUrl) {
     try {
       const temp = await downloadFile(r.wgtUrl)
-      const ok = await installWgt(temp)
-      if (ok) return { ok: true, type: 'wgt' }
+      if (r.wgtSha256) {
+        const hashOk = await verifyWgtFileHash(temp, r.wgtSha256)
+        if (!hashOk) {
+          // 校验失败：中止热更（坏包/被劫持），引导走整包
+          const opened = openReleasePage(r.url)
+          return { ok: opened, type: 'apk', reason: opened ? 'hash-mismatch' : 'open-failed' }
+        }
+      }
+      const installed = await installWgt(temp)
+      if (installed) return { ok: true, type: 'wgt' }
     } catch (e) {
       // 下载/安装失败，落到下面的整包回退
     }
@@ -209,7 +259,9 @@ export function updateNow(r) {
       }
       if (!u.ok) {
         uni.showToast({
-          title: u.reason === 'open-failed' ? '浏览器打开失败，请到项目主页手动下载' : '更新失败，稍后再试',
+          title: u.reason === 'open-failed' ? '浏览器打开失败，请到项目主页手动下载'
+            : u.reason === 'hash-mismatch' ? '更新包校验失败，请通过整包安装'
+            : '更新失败，稍后再试',
           icon: 'none'
         })
         return u
