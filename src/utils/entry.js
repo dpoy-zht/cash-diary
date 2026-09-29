@@ -4,6 +4,8 @@
  * 避免以后有人"顺手"把日期也重置了，破坏连续记账的预期。
  */
 
+import { toDateStr } from './date.js'
+
 /**
  * 保存成功后的表单收敛（用于连续记账 / 离开页面前收尾）。
  *
@@ -24,4 +26,37 @@ export function formAfterSaved(form) {
     amount: '',
     note: ''
   }
+}
+
+/**
+ * 把日期钳制到"今天"以内（T3.3）。
+ *
+ * 记账语义是"记录已经发生的收支"：未来日期既不会进当月预算，又会污染趋势图与统计口径，
+ * 所以入口处一律拦掉。picker 的 end 属性各端支持度不完全一致，这里再兜一层。
+ *
+ * @param {string} dateStr 'YYYY-MM-DD'
+ * @param {string} [today] 比较基准，缺省取本机今天
+ * @returns {string} 不超过 today 的日期字符串
+ */
+export function clampFutureDate(dateStr, today) {
+  const limit = today || toDateStr(Date.now())
+  if (typeof dateStr !== 'string' || !dateStr) return limit
+  // 'YYYY-MM-DD' 定长补零，字典序与时间序一致，直接比字符串即可
+  return dateStr > limit ? limit : dateStr
+}
+
+/**
+ * 日期选择器的下界（T3.3）：今天往前 years 年。
+ * 不设下界时 picker 的年份列能一路滑到 1970，补记账目时极难滑回来。
+ *
+ * @param {string} [today] 'YYYY-MM-DD'，缺省取本机今天
+ * @param {number} [years] 往前年数，默认 5
+ * @returns {string} 'YYYY-MM-DD'
+ */
+export function minSelectableDate(today, years) {
+  const n = Math.abs(Math.floor(Number(years) || 5))
+  // 用 12:00 构造，避免时区偏移把日期整体挪一天
+  const base = new Date((today || toDateStr(Date.now())) + 'T12:00:00')
+  base.setFullYear(base.getFullYear() - n)
+  return toDateStr(base.getTime())
 }

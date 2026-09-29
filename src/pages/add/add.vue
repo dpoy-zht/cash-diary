@@ -31,7 +31,7 @@
         placeholder="加点备注…"
         placeholder-class="ph"
       />
-      <picker mode="date" :value="dateStr" @change="onDateChange">
+      <picker mode="date" :value="dateStr" :start="minDateStr" :end="todayStr" @change="onDateChange">
         <view class="date-btn">{{ dateStr.slice(5) }}</view>
       </picker>
     </view>
@@ -58,13 +58,14 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { buildAddInput } from '../../services/tx.js'
 import { keypadInput, parseAmountToCents, displayAmount, formatCents } from '../../utils/money.js'
 import { toDateStr, tsFromDateStr } from '../../utils/date.js'
-import { formAfterSaved } from '../../utils/entry.js'
+import { formAfterSaved, clampFutureDate, minSelectableDate } from '../../utils/entry.js'
 import { haptic } from '../../utils/notify.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
@@ -86,6 +87,10 @@ const current = ref('')
 const categoryId = ref(null)
 const note = ref('')
 const dateStr = ref(toDateStr(Date.now()))
+/** 可选日期上界 = 今天；记账记的是"已经发生"的收支，未来日期一律拦掉（T3.3） */
+const todayStr = ref(toDateStr(Date.now()))
+/** 可选日期下界：今天往前 5 年，避免 picker 年份列滑到 1970 后回不来 */
+const minDateStr = ref(minSelectableDate(todayStr.value))
 const successShow = ref(false)
 const lastSaved = ref(null)
 const saving = ref(false)
@@ -115,8 +120,21 @@ function onKey(k) {
   current.value = keypadInput(current.value, k)
 }
 function onDateChange(e) {
-  dateStr.value = e.detail.value
+  // picker 的 start/end 各端支持度不完全一致，返回值再钳一次兜底
+  dateStr.value = clampFutureDate(e.detail.value, todayStr.value)
 }
+
+/**
+ * 页面可能长时间挂在后台（晚上打开、第二天早上接着记），"今天"要跟着现实走。
+ * 只把"一直没动过日期"的用户带着前进；自己选过日期的（补记）保持不动。
+ */
+onShow(function () {
+  const t = toDateStr(Date.now())
+  if (t === todayStr.value) return
+  if (dateStr.value === todayStr.value) dateStr.value = t
+  todayStr.value = t
+  minDateStr.value = minSelectableDate(t)
+})
 
 async function save() {
   if (saving.value) return // 防连点：写库期间再点不重复提交
