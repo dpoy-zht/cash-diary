@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtVersionFromName, WGT_ASSET_PREFIX } from '../src/utils/update.js'
+import { currentAppVersion } from '../src/services/update.js'
 
 describe('应用内更新检查 —— 版本比较（纯函数）', () => {
   it('parseTagVersion：带 v 前缀 / 不带 / 位数不齐都能解析', () => {
@@ -95,5 +96,47 @@ describe('wgt 资产解析（pickUpdateAssets / parseWgtVersionFromName）', () 
   it('非法 assets 不抛错', () => {
     expect(pickUpdateAssets(null, P)).toEqual({ wgtUrl: '', wgtVersion: '', apkUrl: '' })
     expect(pickUpdateAssets([1, 'x'], P)).toEqual({ wgtUrl: '', wgtVersion: '', apkUrl: '' })
+  })
+})
+
+describe('currentAppVersion —— 版本读取优先级（wgt 热更后防循环的关键）', () => {
+  const originalUni = globalThis.uni
+  const originalPlus = globalThis.plus
+
+  afterEach(() => {
+    if (originalUni === undefined) delete globalThis.uni
+    else globalThis.uni = originalUni
+    if (originalPlus === undefined) delete globalThis.plus
+    else globalThis.plus = originalPlus
+  })
+
+  it('优先 appWgtVersion（资源包版本，热更后立即变新）', () => {
+    globalThis.uni = { getAppBaseInfo: () => ({ appVersion: '2.2.0', appWgtVersion: '2.2.1' }) }
+    delete globalThis.plus
+    expect(currentAppVersion()).toBe('2.2.1')
+  })
+
+  it('appWgtVersion 为空时回落 appVersion（未热更过的纯 APK 安装）', () => {
+    globalThis.uni = { getAppBaseInfo: () => ({ appVersion: '2.2.0' }) }
+    delete globalThis.plus
+    expect(currentAppVersion()).toBe('2.2.0')
+  })
+
+  it('无 getAppBaseInfo 时回落 plus.runtime.version（旧运行时兜底）', () => {
+    delete globalThis.uni
+    globalThis.plus = { runtime: { version: '2.2.0' } }
+    expect(currentAppVersion()).toBe('2.2.0')
+  })
+
+  it('H5 / 测试环境（uni、plus 均无版本能力）返回空串，不抛错', () => {
+    delete globalThis.uni
+    delete globalThis.plus
+    expect(currentAppVersion()).toBe('')
+  })
+
+  it('getAppBaseInfo 抛异常时安全降级不崩溃', () => {
+    globalThis.uni = { getAppBaseInfo: () => { throw new Error('boom') } }
+    delete globalThis.plus
+    expect(currentAppVersion()).toBe('')
   })
 })

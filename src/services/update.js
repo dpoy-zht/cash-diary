@@ -14,8 +14,21 @@ const CHECK_INTERVAL = 24 * 60 * 60 * 1000
 const RELEASE_API = 'https://api.github.com/repos/dpoy-zht/cash-diary/releases/latest'
 const RELEASE_PAGE = 'https://github.com/dpoy-zht/cash-diary/releases/latest'
 
-/** 当前 App 版本名（App 端读 plus.runtime.version；H5 无此能力返回空串） */
+/**
+ * 当前 App 版本名。
+ * 优先级：appWgtVersion（当前资源包版本，wgt 热更后立即变新）→ appVersion（APK 版本）
+ * → plus.runtime.version（兜底，热更后不会变，只作最后回退）。
+ * 用 appWgtVersion 对比版本是为了防循环：热更后 plus.runtime.version 还是旧值，
+ * 会一直提示「发现新版本 v2.2.1」反复下载同一个 wgt。
+ */
 export function currentAppVersion() {
+  try {
+    if (typeof uni !== 'undefined' && uni.getAppBaseInfo) {
+      const info = uni.getAppBaseInfo() || {}
+      const v = String(info.appWgtVersion || info.appVersion || '').trim()
+      if (v) return v
+    }
+  } catch (e) { /* 降级到 plus */ }
   try {
     if (typeof plus !== 'undefined' && plus.runtime && plus.runtime.version) {
       return String(plus.runtime.version)
