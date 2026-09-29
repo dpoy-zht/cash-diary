@@ -187,7 +187,8 @@ export function maxIndex(values) {
   return best > 0 ? idx : -1
 }
 
-/** 等级称号表：按累计记录笔数升级，每 10 笔一级 */const LEVEL_TITLES = [
+/** 等级称号表：按累计记录笔数升级，每 10 笔一级 */
+const LEVEL_TITLES = [
   '记账萌新',
   '攒钱新手',
   '攒钱小能手',

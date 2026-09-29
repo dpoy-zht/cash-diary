@@ -115,8 +115,9 @@ const iconKeys = categoryService.iconOptions()
 
 async function reload() {
   all.value = await categoryService.listWithStats()
-  // 同时刷新全局分类（记账宫格、编辑弹层用的是 store 那份）
-  await categoryStore.init()
+  // 同时刷新全局分类（记账宫格、编辑弹层用的是 store 那份）；
+  // 这里是写操作后的强制刷新，必须走 reload（init 有 ready 守卫不生效）
+  await categoryStore.reload()
 }
 
 /* ---- 面板 ---- */

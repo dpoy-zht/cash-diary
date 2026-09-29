@@ -188,7 +188,10 @@ const pickerLabel = computed(function () {
 /** 期间或锚点变化后统一走这里；月期间的锚点从 metaStore.ym 派生 */
 function reload() {
   const anchor = period.value === 'month' ? ymToAnchor(metaStore.ym) : anchorTs.value
-  txStore.loadStatsPeriod(period.value, anchor)
+  txStore.loadStatsPeriod(period.value, anchor).catch(function () {
+    // 查询失败（如桥接异常）时保留旧数据继续展示，别把页面刷成空白
+    uni.showToast({ title: '统计加载失败，已保留上次数据', icon: 'none' })
+  })
 }
 function ymToAnchor(ym) {
   const p = String(ym || '').split('-').map(Number)

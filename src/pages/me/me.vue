@@ -380,8 +380,8 @@ async function doRestoreApply(obj) {
   uni.showLoading({ title: '恢复中…', mask: true })
   try {
     const counts = await backupService.restoreBackup(obj)
-    // 四张表都换了，store 必须整体重读（account 的 init 有 ready 守卫，要用 reload）
-    await categoryStore.init()
+    // 四张表都换了，store 必须整体重读（init 有 ready 守卫，强制刷新走 reload）
+    await categoryStore.reload()
     await accountStore.reload()
     await budgetStore.load()
     await txStore.refresh(metaStore.ym)
@@ -425,7 +425,8 @@ async function doReset() {
   uni.showLoading({ title: '重置中…', mask: true })
   try {
     await resetAll()
-    await categoryStore.init()
+    // 整库重建后强制重读分类（init 有 ready 守卫，要走 reload）
+    await categoryStore.reload()
     // resetAll 重建了默认账本与预算相关数据，两个 store 必须重读，
     // 否则继续引用已不存在的账本 id（account 的 init 有 ready 守卫，要用 reload）
     await Promise.all([accountStore.reload(), budgetStore.load()])
