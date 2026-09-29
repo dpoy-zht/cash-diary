@@ -31,6 +31,26 @@ function splitSql(sqlText) {
   return sqlText.split(';').map(function (s) { return s.trim() }).filter(Boolean)
 }
 
+/**
+ * 事务：BEGIN → fn 内全部语句 → COMMIT；fn 抛错则 ROLLBACK 并把原错误上抛。
+ * 恢复/迁移这类"多步写、绝不能做一半"的操作必须包在这里。
+ * 依赖 plus.sqlite 支持 BEGIN/COMMIT/ROLLBACK（同一命名连接内顺序执行）；
+ * 若真机不支持，BEGIN 会显式失败 —— 宁可恢复失败报错，也不留下半库。
+ */
+export async function transaction(fn) {
+  await executeBatch(['BEGIN'])
+  try {
+    const result = await fn()
+    await executeBatch(['COMMIT'])
+    return result
+  } catch (e) {
+    try {
+      await executeBatch(['ROLLBACK'])
+    } catch (e2) { /* 回滚失败时以上抛的原错误为准 */ }
+    throw e
+  }
+}
+
 async function appliedVersions() {
   const rows = await select('SELECT version FROM schema_migrations')
   return rows.map(function (r) { return Number(r.version) })
@@ -342,13 +362,19 @@ export async function dumpAll() {
   return out
 }
 
-/** 恢复用：整库替换（先清空，再按原 id 写回，保证表间关系不变）。调用方必须已校验过数据。 */
+/**
+ * 恢复用：整库替换（先清空，再按原 id 写回，保证表间关系不变）。调用方必须已校验过数据。
+ * 清库 + 全部插入包在**同一个事务**里：中途任何一步失败（磁盘满/App 被杀/坏行）
+ * 都整体回滚，库内数据与恢复前完全一致 —— 绝不允许"旧数据已清、新数据残缺"。
+ */
 export async function restoreAll(tables) {
   const t = tables || {}
-  await clearAll()
-  for (const table of Object.keys(TABLE_COLS)) {
-    const rows = Array.isArray(t[table]) ? t[table] : []
-    if (!rows.length) continue
-    await executeBatch(rows.map(function (row) { return insertRow(table, row) }))
-  }
+  return transaction(async function () {
+    await clearAll()
+    for (const table of Object.keys(TABLE_COLS)) {
+      const rows = Array.isArray(t[table]) ? t[table] : []
+      if (!rows.length) continue
+      await executeBatch(rows.map(function (row) { return insertRow(table, row) }))
+    }
+  })
 }

@@ -37,6 +37,24 @@ function nid() {
   return data.nextId++
 }
 
+/**
+ * 事务：与 sqlite.js 的 transaction 同签名。
+ * memory 侧用「整库快照」实现回滚——fn 抛错时数据恢复到事务前，
+ * 与 SQLite 端"要么全做、要么全不做"的语义保持一致（契约测试依赖这一点）。
+ */
+export async function transaction(fn) {
+  const snapshot = JSON.stringify(data)
+  try {
+    const result = await fn()
+    persist()
+    return result
+  } catch (e) {
+    data = JSON.parse(snapshot)
+    persist()
+    throw e
+  }
+}
+
 export async function init() {
   const raw = backend().getItem(LS_KEY)
   if (raw) {
@@ -371,20 +389,22 @@ export async function dumpAll() {
   return out
 }
 
-/** 恢复用：整库替换（按原样写回，保留 id 关系）。调用方必须已校验过数据。 */
+/** 恢复用：整库替换（按原样写回，保留 id 关系）。调用方必须已校验过数据。
+    与 sqlite.js 一致包在事务里：中途失败整体回滚，绝不留下半库。 */
 export async function restoreAll(tables) {
   const t = tables || {}
-  data = blank()
-  let maxId = 0
-  TABLES.forEach(function (k) {
-    const rows = Array.isArray(t[k]) ? t[k] : []
-    rows.forEach(function (row) {
-      data[k].push(Object.assign({}, row))
-      const id = Number(row.id)
-      if (Number.isFinite(id) && id > maxId) maxId = id
+  return transaction(async function () {
+    data = blank()
+    let maxId = 0
+    TABLES.forEach(function (k) {
+      const rows = Array.isArray(t[k]) ? t[k] : []
+      rows.forEach(function (row) {
+        data[k].push(Object.assign({}, row))
+        const id = Number(row.id)
+        if (Number.isFinite(id) && id > maxId) maxId = id
+      })
     })
+    // 自增起点必须大于已用的最大 id，否则之后新增记录会撞 id
+    data.nextId = maxId + 1
   })
-  // 自增起点必须大于已用的最大 id，否则之后新增记录会撞 id
-  data.nextId = maxId + 1
-  persist()
 }
