@@ -49,7 +49,8 @@
         <text class="modal-title">记好啦！</text>
         <text class="modal-sub">{{ lastSavedText }}</text>
         <text class="modal-tip">这笔账已经帮你存好啦~</text>
-        <view class="btn-y" @click="successOK">开心回家</view>
+        <view class="btn-y" @click="continueAdd">再记一笔</view>
+        <view class="btn-ghost" @click="successOK">开心回家</view>
       </view>
     </view>
   </view>
@@ -63,6 +64,7 @@ import { useMetaStore } from '../../stores/meta.js'
 import { buildAddInput } from '../../services/tx.js'
 import { keypadInput, parseAmountToCents, displayAmount, formatCents } from '../../utils/money.js'
 import { toDateStr, tsFromDateStr } from '../../utils/date.js'
+import { formAfterSaved } from '../../utils/entry.js'
 import { haptic } from '../../utils/notify.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
@@ -143,8 +145,7 @@ async function save() {
       })
     )
     lastSaved.value = { cents: cents, type: type.value, name: cat ? cat.name : '' }
-    current.value = ''
-    note.value = ''
+    resetFormAfterSaved()
     successShow.value = true
     haptic(30) // 保存成功长振一下，跟按键的轻振区分开
   } catch (err) {
@@ -155,6 +156,28 @@ async function save() {
   }
 }
 
+/**
+ * 表单收敛：清空金额与备注，保留类型/分类/日期（契约见 utils/entry.js）。
+ * save() 与"再记一笔"共用，保证两条路径的收尾行为不会漂移。
+ */
+function resetFormAfterSaved() {
+  const next = formAfterSaved({
+    type: type.value,
+    categoryId: categoryId.value,
+    dateStr: dateStr.value
+  })
+  type.value = next.type
+  categoryId.value = next.categoryId
+  dateStr.value = next.dateStr
+  current.value = next.amount
+  note.value = next.note
+}
+
+/** 再记一笔：只关弹窗，类型/分类/日期原样保留，接着输入金额即可 */
+function continueAdd() {
+  successShow.value = false
+  haptic(10)
+}
 function successOK() {
   successShow.value = false
   goHome()
@@ -351,5 +374,16 @@ watch(
   font-weight: 700;
   text-align: center;
   box-shadow: var(--cd-sh-btn);
+}
+/* 次要动作：不加底色，避免和主按钮抢注意力 */
+.btn-ghost {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 0;
+  border-radius: var(--cd-r-pill);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cd-ink-2);
+  text-align: center;
 }
 </style>
