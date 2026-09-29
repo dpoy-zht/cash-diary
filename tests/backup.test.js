@@ -3,6 +3,7 @@ import { getStorage, resetStorageForTest } from '../src/db/index.js'
 import { seedIfEmpty, listAll as listCats } from '../src/services/category.js'
 import * as accountService from '../src/services/account.js'
 import * as budgetService from '../src/services/budget.js'
+import { sortedBackupNames } from '../src/utils/backup-file.js'
 import * as txService from '../src/services/tx.js'
 import * as backupService from '../src/services/backup.js'
 import { resetAll } from '../src/services/maintenance.js'
@@ -379,5 +380,41 @@ describe('备份 v2 —— fixed_expense 表', () => {
     const bad = buildBackup({ account: base.account, category: base.category,
       fixed_expense: [{ id: 1, account_id: 1, category_id: 1, amount_cents: 100, note: '', day_of_month: 31, last_posted_ym: '', enabled: 1, created_at: 1, updated_at: 1 }] })
     expect(validateBackup(bad).ok).toBe(false) // 31 号不合法
+  })
+})
+
+describe('sortedBackupNames —— 备份文件名筛选与时间倒序（T1.2）', () => {
+  it('按文件名倒序排列（文件名定长时间戳，字典序=时间序，最新在最前）', () => {
+    const names = [
+      '奶龙记账-自动备份-2026-09-28-0012.json',
+      '奶龙记账-自动备份-2026-09-29-0800.json',
+      '奶龙记账-自动备份-2026-09-27-2359.json'
+    ]
+    expect(sortedBackupNames(names)[0]).toBe('奶龙记账-自动备份-2026-09-29-0800.json')
+    expect(sortedBackupNames(names)[2]).toBe('奶龙记账-自动备份-2026-09-27-2359.json')
+  })
+
+  it('只保留 .json 结尾的文件，非字符串项被丢弃', () => {
+    const names = ['a.json', 'b.txt', 'c.json', 42, null, undefined, 'd.JSON.bak']
+    expect(sortedBackupNames(names)).toEqual(['c.json', 'a.json'])
+  })
+
+  it('月份/日期跨位仍正确（补零格式保证字典序与时间序一致）', () => {
+    const names = [
+      '奶龙记账-自动备份-2026-10-01-0000.json',
+      '奶龙记账-自动备份-2026-09-30-2359.json',
+      '奶龙记账-自动备份-2025-12-31-1200.json'
+    ]
+    expect(sortedBackupNames(names)).toEqual([
+      '奶龙记账-自动备份-2026-10-01-0000.json',
+      '奶龙记账-自动备份-2026-09-30-2359.json',
+      '奶龙记账-自动备份-2025-12-31-1200.json'
+    ])
+  })
+
+  it('空输入 / 全非法输入返回空数组，不抛错', () => {
+    expect(sortedBackupNames([])).toEqual([])
+    expect(sortedBackupNames([1, null, {}])).toEqual([])
+    expect(sortedBackupNames(null)).toEqual([])
   })
 })

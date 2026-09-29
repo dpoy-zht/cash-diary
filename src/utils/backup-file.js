@@ -11,6 +11,21 @@
 /** App 文档目录下备份文件的扩展名 */
 const EXT = '.json'
 
+/**
+ * 从一批文件名里筛出备份文件并倒序排列（纯函数，可单测）。
+ *
+ * App 端 FileEntry.file 是方法不是属性，`entry.file.lastModified` 恒为 undefined，
+ * 拿不到真实修改时间；而备份文件名里带定长数字时间戳（如 奶龙记账-自动备份-2026-09-28-0012.json），
+ * **字典序即时间序**——所以时间序靠文件名保证，这也是导出命名用定长格式的原因。
+ */
+export function sortedBackupNames(names, ext) {
+  const suffix = String(ext || EXT)
+  if (!Array.isArray(names)) return []
+  return names
+    .filter(function (n) { return typeof n === 'string' && n.slice(-suffix.length) === suffix })
+    .sort(function (a, b) { return a < b ? 1 : a > b ? -1 : 0 })
+}
+
 /* ---------------- 导出：写文件 ---------------- */
 
 export async function saveTextFile(fileName, text) {
@@ -98,7 +113,7 @@ export async function pickBackupText() {
 }
 
 // #ifndef H5
-/** 列出应用文档目录里的备份文件（按修改时间倒序） */
+/** 列出应用文档目录里的备份文件（按文件名倒序 = 时间倒序，见 sortedBackupNames） */
 function listBackupFiles() {
   return new Promise(function (resolve, reject) {
     plus.io.requestFileSystem(
@@ -106,10 +121,11 @@ function listBackupFiles() {
       function (fs) {
         fs.root.createReader().readEntries(
           function (entries) {
-            const files = entries
-              .filter(function (e) { return e.isFile && e.name.slice(-EXT.length) === EXT })
-              .map(function (e) { return { name: e.name, mtime: (e.file && e.file.lastModified) || 0 } })
-              .sort(function (a, b) { return b.mtime - a.mtime })
+            const files = sortedBackupNames(
+              entries
+                .filter(function (e) { return e.isFile })
+                .map(function (e) { return e.name })
+            ).map(function (n) { return { name: n } })
             resolve(files)
           },
           function () { reject(new Error('读取目录失败')) }
