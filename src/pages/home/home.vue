@@ -337,6 +337,8 @@ onShow(async function () {
   try {
     const r = await fixedService.postDueFixed(accountStore.currentId)
     autoPosted = r.posted
+    // 补记真的写了新流水：让查询缓存失效（T3.10），否则这几笔要等下一次写操作才出现
+    if (autoPosted > 0) metaStore.bumpData()
   } catch (e) { /* 补记失败不阻塞页面，下次打开会再试 */ }
 
   // 预算与流水一起加载完再判断超支，否则会拿旧数据算

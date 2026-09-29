@@ -401,6 +401,8 @@ async function doRestoreApply(obj) {
     await categoryStore.reload()
     await accountStore.reload()
     await budgetStore.load()
+    // 整库被替换：查询缓存必须失效，否则 refresh 会命中旧缓存读到恢复前的数据
+    metaStore.bumpData()
     await txStore.refresh(metaStore.ym)
     uni.hideLoading()
     uni.showToast({ title: '已恢复 ' + counts.transaction_record + ' 笔流水', icon: 'none' })
@@ -447,6 +449,8 @@ async function doReset() {
     // resetAll 重建了默认账本与预算相关数据，两个 store 必须重读，
     // 否则继续引用已不存在的账本 id（account 的 init 有 ready 守卫，要用 reload）
     await Promise.all([accountStore.reload(), budgetStore.load()])
+    // 整库重建：查询缓存必须失效（T3.10），否则首页/账本页会拿缓存的旧数据
+    metaStore.bumpData()
     await txStore.refresh(metaStore.ym)
     uni.hideLoading()
     uni.showToast({ title: '已重置', icon: 'none' })

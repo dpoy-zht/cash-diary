@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as txService from '../services/tx.js'
 import { useAccountStore } from './account.js'
-import { lastNMonths, monthRange } from '../utils/date.js'
+import { useMetaStore } from './meta.js'
+import { lastNMonths, monthRange, toDateStr } from '../utils/date.js'
 import { monthlySummaries, periodRange, trendSpecFor, sumByType, bucketSummaries } from '../utils/stats.js'
 
 /** 趋势图统计的月份数 */
@@ -57,8 +58,13 @@ export const useTxStore = defineStore('tx', function () {
 
   async function loadMonth(ym) {
     const aid = currentAccount()
-    records.value = await txService.listByMonth(ym, aid)
-    summary.value = await txService.monthSummary(ym, aid)
+    // 两个查询互不依赖，并行发（App 端每个 await 都是一次 SQLite 桥接往返）
+    const [rows, sum] = await Promise.all([
+      txService.listByMonth(ym, aid),
+      txService.monthSummary(ym, aid)
+    ])
+    records.value = rows
+    summary.value = sum
   }
 
   async function loadOverview() {
@@ -109,31 +115,65 @@ export const useTxStore = defineStore('tx', function () {
 
   async function add(ym, input) {
     await txService.addTx(Object.assign({}, input, { accountId: currentAccount() }))
+    bumpData()
     await refresh(ym)
   }
 
   async function update(ym, id, input) {
     await txService.updateTx(id, input)
+    bumpData()
     await refresh(ym)
   }
 
   async function remove(ym, id) {
     await txService.removeTx(id)
+    bumpData()
     await refresh(ym)
+  }
+
+  function bumpData() {
+    useMetaStore().bumpData()
+  }
+
+  /**
+   * 上一次 refresh 的缓存键（T3.10）。
+   *
+   * 键 = 月份 | 账本 | 数据版本 | 本地日期：
+   * - 月份 / 账本：查询本身的口径
+   * - 数据版本：任何写操作后递增（见 meta.js），保证读到的不是旧数据
+   * - 本地日期：跨天后「近两年流水时间戳」的窗口在移动，也必须重算
+   * 命中就直接返回 —— 首页/账本/预算/我的 四处 onShow 不再重复打同样的四次查询。
+   */
+  let lastRefreshKey = ''
+
+  function refreshKey(ym) {
+    return [ym, currentAccount(), useMetaStore().dataVersion, toDateStr(Date.now())].join('|')
   }
 
   /**
    * 月份数据 + 全量概览 + 连续天数样本 + 六月趋势一起刷新，避免几处数字对不上。
    * 四个查询互不依赖，并行执行（App 端每个 await 都是一次 plus.sqlite 桥接往返，
    * 串行要付 4 倍往返延迟）；任一失败整体抛出，由调用方按原有错误语义处理。
+   *
+   * @param {string} ym 月份键
+   * @param {{ force?: boolean }} [opts] force=true 时无视缓存强制重查
    */
-  async function refresh(ym) {
-    await Promise.all([
-      loadMonth(ym),
-      loadOverview(),
-      loadRecentTs(),
-      loadTrend()
-    ])
+  async function refresh(ym, opts) {
+    const key = refreshKey(ym)
+    if (!(opts && opts.force) && key === lastRefreshKey) return
+    lastRefreshKey = key
+    try {
+      await Promise.all([
+        loadMonth(ym),
+        loadOverview(),
+        loadRecentTs(),
+        loadTrend()
+      ])
+    } catch (e) {
+      // 失败不留下"已刷新"的假象：下次调用必须真的重试
+      lastRefreshKey = ''
+      throw e
+    }
   }
 
   return {
