@@ -3,8 +3,8 @@ import { getStorage, resetStorageForTest } from '../src/db/index.js'
 import { seedIfEmpty, listAll as listCats, DEFAULT_CATEGORIES } from '../src/services/category.js'
 import { resetAll } from '../src/services/maintenance.js'
 import * as txService from '../src/services/tx.js'
-import { buildAddInput, buildTx } from '../src/services/tx.js'
-import { ymOf, monthRange } from '../src/utils/date.js'
+import { buildAddInput, buildTx, buildEditInput } from '../src/services/tx.js'
+import { ymOf, monthRange, toDateStr } from '../src/utils/date.js'
 
 /**
  * 记账闭环集成测试（内存存储路径）。
@@ -105,6 +105,37 @@ describe('记账闭环（内存存储）', () => {
     const lastList = await txService.listByMonth(lastYm)
     expect(lastList.length).toBe(1)
     expect(lastList[0].amount_cents).toBe(10000)
+  })
+
+  it('编辑改期：落到目标月份与日期，时刻沿用原记录（T3.2）', async () => {
+    const cat = (await listCats()).find(function (c) { return c.type === 'expense' })
+    const parts = ym.split('-').map(Number)
+    // 原记录：本月 15 日 15:30
+    const originalTs = new Date(parts[0], parts[1] - 1, 15, 15, 30, 0).getTime()
+    await txService.addTx({ amountStr: '50', categoryId: cat.id, type: 'expense', note: '打车', ts: originalTs })
+    const before = (await txService.listByMonth(ym))[0]
+    expect(before.occurred_at).toBe(originalTs)
+
+    // 改到上个月 3 日 —— 页面走的就是 buildEditInput 这条映射
+    const lastTs = new Date(parts[0], parts[1] - 2, 3, 15, 30, 0).getTime()
+    const targetDate = toDateStr(lastTs)
+    const dto = buildEditInput(
+      { amountStr: '60', categoryId: cat.id, note: '打车', type: 'expense', dateStr: targetDate },
+      originalTs
+    )
+    await txService.updateTx(before.id, dto)
+
+    // 本月列表清空、上月出现这条记录，金额同步更新
+    expect((await txService.listByMonth(ym)).length).toBe(0)
+    const moved = await txService.listByMonth(ymOf(lastTs))
+    expect(moved.length).toBe(1)
+    expect(moved[0].amount_cents).toBe(6000)
+
+    // 时/分仍是 15:30：改日期不该把时刻顶成"现在"
+    expect(toDateStr(moved[0].occurred_at)).toBe(targetDate)
+    const d = new Date(moved[0].occurred_at)
+    expect(d.getHours()).toBe(15)
+    expect(d.getMinutes()).toBe(30)
   })
 })
 

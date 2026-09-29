@@ -130,7 +130,8 @@ import { useBudgetStore } from '../../stores/budget.js'
 import { useAccountStore } from '../../stores/account.js'
 import * as backupService from '../../services/backup.js'
 import * as fixedService from '../../services/fixed.js'
-import { groupByDay, dayLabel } from '../../utils/date.js'
+import { buildEditInput } from '../../services/tx.js'
+import { groupByDay, dayLabel, ymOf } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
 import { requestNotifyPermission, notifyLocal, REMIND_PREF_KEY, normalizeRemindEnabled } from '../../utils/notify.js'
@@ -293,10 +294,16 @@ function closeEdit() {
   editing.value = null
 }
 async function onSave(payload) {
+  const rec = editing.value
+  if (!rec) return
   try {
-    await txStore.update(metaStore.ym, editing.value.id, payload)
+    // 字段映射统一走 service 层：dateStr → occurred_at 会保留原记录的时/分（buildEditInput）
+    const dto = buildEditInput(payload, rec.occurred_at)
+    await txStore.update(metaStore.ym, rec.id, dto)
     editing.value = null
-    uni.showToast({ title: '已保存', icon: 'none' })
+    // 改到别的月份后这条记录会从当前列表消失，必须说一句，否则用户以为"保存把账弄丢了"
+    const movedTo = dto.ts && ymOf(dto.ts) !== metaStore.ym ? ymOf(dto.ts) : ''
+    uni.showToast({ title: movedTo ? '已记到 ' + movedTo : '已保存', icon: 'none' })
   } catch (err) {
     uni.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
   }

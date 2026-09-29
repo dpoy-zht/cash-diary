@@ -23,7 +23,12 @@
         </view>
       </scroll-view>
 
-      <input v-model="note" class="sheet-input" type="text" placeholder="备注（可选）" maxlength="30" />
+      <view class="sheet-meta">
+        <input v-model="note" class="sheet-input sheet-note" type="text" placeholder="备注（可选）" maxlength="30" />
+        <picker mode="date" :value="dateStr" :start="minDateStr" :end="todayStr" @change="onDateChange">
+          <view class="sheet-date">{{ dateStr.slice(5) }}</view>
+        </picker>
+      </view>
 
       <view class="sheet-actions">
         <button class="btn-del" hover-class="btn-hover" @click="$emit('remove')">删除</button>
@@ -36,6 +41,8 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { colorOf } from '../../utils/palette.js'
+import { toDateStr } from '../../utils/date.js'
+import { clampFutureDate, minSelectableDate } from '../../utils/entry.js'
 
 const props = defineProps({
   record: { type: Object, default: null },
@@ -46,6 +53,14 @@ const emit = defineEmits(['close', 'save', 'remove'])
 const amountStr = ref('')
 const catId = ref(null)
 const note = ref('')
+const dateStr = ref(toDateStr(Date.now()))
+/** 日期可选范围与记账页一致：不早于 5 年前、不晚于今天（T3.3 的同一套约束） */
+const todayStr = ref(toDateStr(Date.now()))
+const minDateStr = ref(minSelectableDate(todayStr.value))
+
+function onDateChange(e) {
+  dateStr.value = clampFutureDate(e.detail.value, todayStr.value)
+}
 
 watch(
   function () { return props.record },
@@ -54,6 +69,7 @@ watch(
     amountStr.value = (r.amount_cents / 100).toFixed(2)
     catId.value = r.category_id
     note.value = r.note || ''
+    dateStr.value = toDateStr(r.occurred_at)
   },
   { immediate: true }
 )
@@ -63,7 +79,8 @@ function onSave() {
     amountStr: amountStr.value,
     categoryId: catId.value,
     note: note.value,
-    type: props.record.type
+    type: props.record.type,
+    dateStr: dateStr.value
   })
 }
 </script>
@@ -136,6 +153,29 @@ function onSave() {
 .sheet-cats {
   white-space: nowrap;
   padding: 2px 0 10px;
+}
+/* 备注 + 日期同一行：备注自适应宽度，日期按钮不换行 */
+.sheet-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sheet-note {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.sheet-date {
+  border: 1px solid var(--cd-line);
+  border-radius: var(--cd-r-sm);
+  background: var(--cd-bg);
+  padding: 13px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cd-ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .chip {
   display: inline-flex;

@@ -8,6 +8,7 @@ import {
   groupByDay,
   toDateStr,
   tsFromDateStr,
+  replaceDateKeepTime,
   weekStart,
   dayRange,
   weekRange,
@@ -199,5 +200,41 @@ describe('ymsOfYear / dayTrendLabel / periodNameOf', () => {
     expect(periodNameOf('month')).toBe('本月')
     expect(periodNameOf('year')).toBe('本年')
     expect(periodNameOf('xxx')).toBe('本月')
+  })
+})
+
+describe('replaceDateKeepTime —— 只改日期不动时刻（T3.2 改期编辑）', () => {
+  it('年月日替换为目标日期，时/分/秒沿用原值', () => {
+    const src = new Date(2026, 8, 15, 15, 30, 20).getTime()
+    const out = new Date(replaceDateKeepTime(src, '2026-08-03'))
+    expect(out.getFullYear()).toBe(2026)
+    expect(out.getMonth() + 1).toBe(8)
+    expect(out.getDate()).toBe(3)
+    expect(out.getHours()).toBe(15)
+    expect(out.getMinutes()).toBe(30)
+    expect(out.getSeconds()).toBe(20)
+  })
+
+  it('跨年改期正确', () => {
+    const src = new Date(2026, 0, 5, 9, 0, 0).getTime()
+    expect(toDateStr(replaceDateKeepTime(src, '2025-12-31'))).toBe('2025-12-31')
+  })
+
+  it('同一天的日期字符串不改动时间戳', () => {
+    const src = new Date(2026, 8, 15, 15, 30, 0).getTime()
+    expect(replaceDateKeepTime(src, toDateStr(src))).toBe(src)
+  })
+
+  it('日期非法时原样返回原时间戳，不产生 NaN', () => {
+    const src = new Date(2026, 8, 15, 15, 30, 0).getTime()
+    expect(replaceDateKeepTime(src, '')).toBe(src)
+    expect(replaceDateKeepTime(src, null)).toBe(src)
+    expect(replaceDateKeepTime(src, '2026-13')).toBe(src)
+  })
+
+  it('原时间戳非法时兜底为"现在"，返回值仍是有限数字', () => {
+    const out = replaceDateKeepTime(NaN, '2026-08-03')
+    expect(Number.isFinite(out)).toBe(true)
+    expect(toDateStr(out)).toBe('2026-08-03')
   })
 })

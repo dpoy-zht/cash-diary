@@ -89,6 +89,28 @@ export function tsFromDateStr(dstr) {
   return new Date(dstr + 'T' + pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':00').getTime()
 }
 
+/**
+ * 只换日期、不动时刻：把 originalTs 的年月日替换成 dstr，时/分/秒/毫秒沿用原值。
+ *
+ * 改期编辑（T3.2）必须用它而不是 tsFromDateStr ——
+ * 后者会把时刻顶成"现在"，同一天内的排序会莫名改变（原来 15:30 记的，改个日期就跑到 21:50）。
+ *
+ * @param {number} originalTs 原记录的毫秒时间戳
+ * @param {string} dstr 'YYYY-MM-DD'
+ * @returns {number} 毫秒时间戳；dstr 非法时原样返回 originalTs
+ */
+export function replaceDateKeepTime(originalTs, dstr) {
+  const ts = Number(originalTs)
+  const base = new Date(isFinite(ts) && ts > 0 ? ts : Date.now())
+  const parts = String(dstr == null ? '' : dstr).split('-')
+  const y = Number(parts[0])
+  const m = Number(parts[1])
+  const d = Number(parts[2])
+  if (!y || !m || !d) return base.getTime()
+  base.setFullYear(y, m - 1, d)
+  return base.getTime()
+}
+
 /* ================= 周期区间（统计页 日 / 周 / 月 / 年 用） ================= */
 
 const DAY_MS = 86400000

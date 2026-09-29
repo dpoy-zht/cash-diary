@@ -5,6 +5,7 @@
 import * as txRepo from '../db/repository/tx.js'
 import * as categoryRepo from '../db/repository/category.js'
 import { parseAmountToCents } from '../utils/money.js'
+import { replaceDateKeepTime } from '../utils/date.js'
 
 /**
  * 构造一条待入库流水。校验失败抛错：
@@ -68,8 +69,32 @@ export function buildPatch(input) {
   }
   if (input.note !== undefined) patch.note = (input.note || '').trim()
   if (input.type !== undefined) patch.type = input.type
+  if (input.ts !== undefined) patch.occurred_at = Number(input.ts)
   if (Object.keys(patch).length) patch.updated_at = Date.now()
   return patch
+}
+
+/**
+ * 编辑弹层的输入（页面字段）→ buildPatch 需要的 DTO。
+ *
+ * 与 buildAddInput 同思路：字段映射只存在一处，页面不自己拼时间戳。
+ * 差别在日期：编辑是"改已有记录的日期"，必须保留原记录的时/分/秒（见 replaceDateKeepTime），
+ * 不传 dateStr 时不改发生时间。
+ *
+ * @param {{ amountStr:*, categoryId:*, note?:string, type?:string, dateStr?:string }} input
+ * @param {number} originalTs 被编辑记录的原始 occurred_at
+ * @returns {{ amountStr:*, categoryId:*, note:*, type:*, ts?:number }}
+ */
+export function buildEditInput(input, originalTs) {
+  const src = input || {}
+  const out = {
+    amountStr: src.amountStr,
+    categoryId: src.categoryId,
+    note: src.note,
+    type: src.type
+  }
+  if (src.dateStr) out.ts = replaceDateKeepTime(originalTs, src.dateStr)
+  return out
 }
 
 export async function addTx(input) {
