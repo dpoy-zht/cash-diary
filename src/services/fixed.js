@@ -83,13 +83,63 @@ export async function toggleFixed(id, enabled) {
   await fixedRepo.update(id, { enabled: !!enabled })
 }
 
+/* ---------------- 补记日期计算（纯函数，可单测） ---------------- */
+
+/** 'YYYY-MM' → [year, month]；非法返回 null */
+function parseYm(ym) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''))
+  if (!m) return null
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  return (mo >= 1 && mo <= 12) ? [y, mo] : null
+}
+
+/** 某月的下一个月，'YYYY-MM' → 'YYYY-MM'（非法输入返回空串） */
+export function nextYm(ym) {
+  const p = parseYm(ym)
+  if (!p) return ''
+  return p[1] === 12 ? (p[0] + 1) + '-01' : p[0] + '-' + String(p[1] + 1).padStart(2, '0')
+}
+
 /**
- * 补记当月到期的固定支出（**核心入口**，首页 onShow 调用）。
- * 每个到期配置补一笔支出（occurred_at = 当前时刻），并把 last_posted_ym 更新为当月。
+ * 目标月应记的时间戳：该月 day 号的**本地 12:00**（中性时刻，避免蹭到月首月末边界）。
+ * day 超出该月天数时钳制到月末（配置限 1~28，但备份恢复可能带进 29~31，兜底处理）。
+ */
+export function postTsFor(ym, day) {
+  const p = parseYm(ym)
+  if (!p) return null
+  const lastDay = new Date(p[0], p[1], 0).getDate()
+  const d = Math.min(Math.max(1, Math.floor(Number(day) || 1)), lastDay)
+  return new Date(p[0], p[1] - 1, d, 12, 0, 0, 0).getTime()
+}
+
+/**
+ * 应补记的月份列表（'YYYY-MM' 数组）：从 last_posted_ym 的**下一个月**起逐月补到当前月。
+ * - last_posted 为空 / 非法 → 只补当前月（首次启用不倒灌无限历史）
+ * - last_posted ≥ 当前月 → 空数组（设备时钟回拨时随 last_posted_ym 更新自我修复）
+ * - 最多回看 60 个月，防御异常 last_posted_ym 把账目灌爆
+ */
+export function missedMonths(lastPostedYm, currentYm) {
+  const cur = parseYm(currentYm)
+  if (!cur) return []
+  const curKey = cur[0] + '-' + String(cur[1]).padStart(2, '0')
+  if (!parseYm(lastPostedYm)) return [curKey]
+  const out = []
+  let cursor = nextYm(lastPostedYm)
+  while (cursor && cursor <= curKey && out.length < 60) {
+    out.push(cursor)
+    cursor = nextYm(cursor)
+  }
+  return out
+}
+
+/**
+ * 补记到期的固定支出（**核心入口**，首页 onShow 调用）。
  *
- * @param {number} accountId 当前账本
- * @param {number} [nowTs] 当前时间（测试注入用）
- * @returns {Promise<{posted:number, items:Array<{id:number, category_id:number, amount_cents:number, note:string}>}>}
+ * 日期口径（T2.3）：每笔补记的 occurred_at = **应记月份的 day_of_month 号本地 12:00**，
+ * 不是"打开 App 的此刻"——月中/跨月未打开时，账必须落在它应属的月份；
+ * 跨了 N 个月就补 N 笔（从 last_posted_ym 的下一个月起逐月补），不让任何月份永久缺失。
+ * 全部补完后 last_posted_ym 一次性更新为当前月。
  */
 export async function postDueFixed(accountId, nowTs) {
   const now = nowTs == null ? Date.now() : nowTs
@@ -98,24 +148,28 @@ export async function postDueFixed(accountId, nowTs) {
   const due = dueFixedExpenses(list, ym)
   const items = []
   for (const f of due) {
-    await txRepo.insert({
-      account_id: accountId,
-      category_id: f.category_id,
-      type: 'expense',
-      amount_cents: f.amount_cents,
-      note: f.note || '',
-      occurred_at: now,
-      created_at: now,
-      updated_at: now,
-      deleted_at: null
-    })
+    const months = missedMonths(f.last_posted_ym, ym)
+    for (const m of months) {
+      await txRepo.insert({
+        account_id: accountId,
+        category_id: f.category_id,
+        type: 'expense',
+        amount_cents: f.amount_cents,
+        note: f.note || '',
+        occurred_at: postTsFor(m, f.day_of_month),
+        created_at: now,
+        updated_at: now,
+        deleted_at: null
+      })
+      items.push({
+        id: f.id,
+        category_id: f.category_id,
+        amount_cents: f.amount_cents,
+        note: f.note || '',
+        ym: m
+      })
+    }
     await fixedRepo.update(f.id, { last_posted_ym: ym })
-    items.push({
-      id: f.id,
-      category_id: f.category_id,
-      amount_cents: f.amount_cents,
-      note: f.note || ''
-    })
   }
   return { posted: items.length, items: items }
 }
