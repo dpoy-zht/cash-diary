@@ -3,7 +3,7 @@ import { getStorage, resetStorageForTest } from '../src/db/index.js'
 import { seedIfEmpty, listAll as listCats } from '../src/services/category.js'
 import * as accountService from '../src/services/account.js'
 import * as budgetService from '../src/services/budget.js'
-import { sortedBackupNames } from '../src/utils/backup-file.js'
+import { sortedBackupNames, exportResultMessage } from '../src/utils/backup-file.js'
 import * as txService from '../src/services/tx.js'
 import * as backupService from '../src/services/backup.js'
 import { resetAll } from '../src/services/maintenance.js'
@@ -416,5 +416,33 @@ describe('sortedBackupNames —— 备份文件名筛选与时间倒序（T1.2�
     expect(sortedBackupNames([])).toEqual([])
     expect(sortedBackupNames([1, null, {}])).toEqual([])
     expect(sortedBackupNames(null)).toEqual([])
+  })
+})
+
+describe('exportResultMessage —— 导出去向的提示（T3.6）', () => {
+  it('H5：浏览器下载，不需要剪贴板兜底', () => {
+    const m = exportResultMessage({ mode: 'browser-download' })
+    expect(m.title).toContain('导出成功')
+    expect(m.content).toContain('浏览器')
+    expect(m.fallbackClipboard).toBe(false)
+  })
+
+  it('App 复制成功：把真实路径原样回显，方便用户去取', () => {
+    const m = exportResultMessage({ outPath: '/storage/emulated/0/Download/奶龙记账-2026-09-29-0912.json' })
+    expect(m.title).toContain('导出成功')
+    expect(m.content).toContain('/storage/emulated/0/Download/奶龙记账-2026-09-29-0912.json')
+    expect(m.fallbackClipboard).toBe(false)
+  })
+
+  it('App 复制失败：必须给出剪贴板兜底，不能让用户两手空空', () => {
+    const m = exportResultMessage({ outPath: '' })
+    expect(m.fallbackClipboard).toBe(true)
+    expect(m.content).toContain('复制到剪贴板')
+  })
+
+  it('缺省入参按"失败"处理（保守：宁可给兜底）', () => {
+    expect(exportResultMessage().fallbackClipboard).toBe(true)
+    expect(exportResultMessage(null).fallbackClipboard).toBe(true)
+    expect(exportResultMessage({}).fallbackClipboard).toBe(true)
   })
 })

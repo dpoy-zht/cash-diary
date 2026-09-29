@@ -69,6 +69,114 @@ export async function saveTextFile(fileName, text) {
   // #endif
 }
 
+/* ---------------- 导出：把文件送到用户拿得到的地方（T3.6） ---------------- */
+
+/**
+ * 把应用私有目录里的备份文件复制到**用户能取到的公共目录**（下载 / 文档）。
+ *
+ * 为什么不能只写私有目录：`_doc/` 是应用私有空间，用户既看不见也发不出去，
+ * 备份等于锁死在手机里 —— 换手机或重装就白备份了。
+ *
+ * 落点不猜测：Android 各版本/ROM 对公共目录的映射不同（分区存储会把 PUBLIC_DOWNLOADS
+ * 映射到应用专属目录），所以复制成功后把 plus.io 给出的**真实路径**回显给用户，
+ * 让他知道去哪儿取，插电脑时也能按路径找到。
+ *
+ * @param {string} name 应用目录里的备份文件名
+ * @returns {Promise<string|null>} 真实路径；null = H5（浏览器已自行下载，无需再复制）；空串 = App 端复制失败
+ */
+export async function exportDocFileToUser(name) {
+  // #ifdef H5
+  return null
+  // #endif
+
+  // #ifndef H5
+  try {
+    if (typeof plus === 'undefined' || !name) return ''
+    const targets = [plus.io.PUBLIC_DOWNLOADS, plus.io.PUBLIC_DOCUMENTS]
+    for (const fsType of targets) {
+      const path = await copyDocTo(name, fsType)
+      if (path) return path
+    }
+    return ''
+  } catch (e) {
+    return ''
+  }
+  // #endif
+}
+
+// #ifndef H5
+/** 私有目录 → 目标公共目录 的整文件复制；失败 resolve('')，不抛错（换下一个候选目录） */
+function copyDocTo(name, fsType) {
+  return new Promise(function (resolve) {
+    plus.io.requestFileSystem(
+      fsType,
+      function (destFs) {
+        plus.io.requestFileSystem(
+          plus.io.PRIVATE_DOC,
+          function (srcFs) {
+            srcFs.root.getFile(
+              name,
+              { create: false },
+              function (entry) {
+                entry.copyTo(
+                  destFs.root,
+                  name,
+                  function (copied) {
+                    // fullPath 是 _downloads/xxx 这类虚拟路径，用户看不懂 → 换成真实路径
+                    try {
+                      resolve(plus.io.convertLocalFileSystemURL(copied.fullPath) || copied.fullPath || '')
+                    } catch (e) {
+                      resolve(copied.fullPath || '')
+                    }
+                  },
+                  function () { resolve('') }
+                )
+              },
+              function () { resolve('') }
+            )
+          },
+          function () { resolve('') }
+        )
+      },
+      function () { resolve('') }
+    )
+  })
+}
+// #endif
+
+/**
+ * 导出结果 → 给用户看的提示（纯函数，可单测）。
+ *
+ * 契约（T3.6）：任何一条路径都不能让用户"什么都没有"——
+ * 拿不到文件时必须提供剪贴板兜底，否则备份形同虚设。
+ *
+ * @param {{ mode?: 'browser-download', outPath?: string }} result
+ *        mode='browser-download' 表示 H5（浏览器已下载）；outPath 为 App 端复制到的真实路径
+ * @returns {{ title: string, content: string, fallbackClipboard: boolean }}
+ */
+export function exportResultMessage(result) {
+  const r = result || {}
+  if (r.mode === 'browser-download') {
+    return {
+      title: '导出成功',
+      content: '备份文件已保存到浏览器的下载目录。',
+      fallbackClipboard: false
+    }
+  }
+  if (r.outPath) {
+    return {
+      title: '导出成功',
+      content: '备份文件已复制到：\n' + r.outPath + '\n\n用手机的文件管理器，或者连电脑按这个路径就能取到。',
+      fallbackClipboard: false
+    }
+  }
+  return {
+    title: '没有找到能放文件的公共目录',
+    content: '备份已经存在应用里（随时可以恢复）。要不要把备份内容复制到剪贴板？粘贴到微信、备忘录就能长久保存。',
+    fallbackClipboard: true
+  }
+}
+
 /* ---------------- 恢复：读文件 ---------------- */
 
 /**

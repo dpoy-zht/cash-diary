@@ -95,7 +95,7 @@ import { useBudgetStore } from '../../stores/budget.js'
 import { resetAll } from '../../services/maintenance.js'
 import * as backupService from '../../services/backup.js'
 import { backupFileName, validateBackup } from '../../utils/backup.js'
-import { saveTextFile, pickBackupText } from '../../utils/backup-file.js'
+import { saveTextFile, pickBackupText, exportDocFileToUser, exportResultMessage } from '../../utils/backup-file.js'
 import { formatCents, parseAmountToCents } from '../../utils/money.js'
 import { streakDays, levelOf } from '../../utils/stats.js'
 import {
@@ -314,17 +314,34 @@ function openBackupMenu() {
 async function doExport() {
   uni.showLoading({ title: '正在打包…', mask: true })
   try {
+    const name = backupFileName(Date.now())
     const text = await backupService.exportJson()
-    const where = await saveTextFile(backupFileName(Date.now()), text)
+    // ① 先落在应用自己的目录（App）/ 触发浏览器下载（H5），保证任何时候都有一份
+    await saveTextFile(name, text)
+    // ② App 端再复制一份到公共目录，否则用户根本拿不到（私有目录用户看不见）
+    const exported = await exportDocFileToUser(name)
     const b = backupService.parseBackupText(text)
+    const msg = exported === null
+      ? exportResultMessage({ mode: 'browser-download' })
+      : exportResultMessage({ outPath: exported })
+
     uni.hideLoading()
     uni.showModal({
-      title: '导出成功',
+      title: msg.title,
       content:
         '包含 ' + b.account.length + ' 个账本、' + b.category.length + ' 个分类、' +
-        b.transaction_record.length + ' 笔流水、' + b.budget.length + ' 条预算。\n' + where,
-      showCancel: false,
-      confirmText: '好'
+        b.transaction_record.length + ' 笔流水、' + b.budget.length + ' 条预算。\n\n' + msg.content,
+      showCancel: msg.fallbackClipboard,
+      cancelText: '不用了',
+      confirmText: msg.fallbackClipboard ? '复制备份内容' : '好',
+      success: function (res) {
+        if (!msg.fallbackClipboard || !res.confirm) return
+        // 兜底：拿不到文件时至少让用户能把备份带走
+        uni.setClipboardData({
+          data: text,
+          success: function () { uni.showToast({ title: '已复制，去微信/备忘录粘贴保存吧', icon: 'none' }) }
+        })
+      }
     })
   } catch (err) {
     uni.hideLoading()
