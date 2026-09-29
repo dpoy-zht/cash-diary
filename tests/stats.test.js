@@ -14,7 +14,7 @@ import {
   bucketSummaries,
   trendSpecFor
 } from '../src/utils/stats.js'
-import { lastNMonths, ymLabel, dayStart, weekStart, yearRange } from '../src/utils/date.js'
+import { lastNMonths, ymLabel, weekStart, yearRange } from '../src/utils/date.js'
 
 const CATS = [
   { id: 1, name: '午饭', icon: '🍜' },

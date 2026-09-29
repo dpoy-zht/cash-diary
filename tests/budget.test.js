@@ -63,7 +63,6 @@ describe('progressPercent / overText', () => {
 })
 
 describe('预算存取（服务层）', () => {
-  let ym
   let cats
   let exp1
   let exp2
@@ -73,7 +72,6 @@ describe('预算存取（服务层）', () => {
     await getStorage().init()
     await seedIfEmpty()
     await accountService.seedDefaultIfEmpty()
-    ym = ymOf(Date.now())
     cats = await listCats()
     const expense = cats.filter(function (c) { return c.type === 'expense' })
     exp1 = expense[0]

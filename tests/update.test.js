@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtVersionFromName, WGT_ASSET_PREFIX } from '../src/utils/update.js'
+import { parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtVersionFromName } from '../src/utils/update.js'
 import { currentAppVersion } from '../src/services/update.js'
 
 describe('应用内更新检查 —— 版本比较（纯函数）', () => {

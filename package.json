@@ -9,7 +9,8 @@
     "build:h5": "uni build",
     "build:app": "uni build -p app",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint src tests"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-5020620260917001",
@@ -26,6 +27,9 @@
     "@dcloudio/uni-cli-shared": "3.0.0-5020620260917001",
     "@dcloudio/uni-stacktracey": "3.0.0-5020620260917001",
     "@dcloudio/vite-plugin-uni": "3.0.0-5020620260917001",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "eslint-plugin-vue": "^10.11.1",
     "vite": "5.2.8",
     "vitest": "^1.5.0"
   }

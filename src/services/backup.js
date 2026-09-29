@@ -37,7 +37,7 @@ export function parseBackupText(text) {
   try {
     return JSON.parse(String(text == null ? '' : text))
   } catch (e) {
-    throw new Error('文件内容不是有效的 JSON')
+    throw new Error('文件内容不是有效的 JSON', { cause: e })
   }
 }
 
