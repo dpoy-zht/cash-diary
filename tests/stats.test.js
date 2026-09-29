@@ -3,6 +3,7 @@ import {
   expenseByCategory,
   donutSegments,
   conicGradient,
+  supportsConicGradient,
   balanceCents,
   streakDays,
   levelOf,
@@ -413,5 +414,41 @@ describe('trendSpecFor —— 各期间趋势分桶规格', () => {
     const pr = periodRange('day', anchor)
     const spec = trendSpecFor('day', anchor)
     expect(spec.start <= pr[0] && pr[1] <= spec.end).toBe(true)
+  })
+})
+
+describe('supportsConicGradient —— 环形图降级检测（T3.7）', () => {
+  function withCSS(fake, fn) {
+    globalThis.CSS = fake
+    try {
+      fn()
+    } finally {
+      delete globalThis.CSS
+    }
+  }
+
+  it('取不到 CSS.supports（非浏览器环境）时保守返回 false', () => {
+    expect(typeof CSS).toBe('undefined')
+    expect(supportsConicGradient()).toBe(false)
+  })
+
+  it('渲染引擎认 conic-gradient 时返回 true', () => {
+    withCSS({ supports: function () { return true } }, function () {
+      expect(supportsConicGradient()).toBe(true)
+    })
+  })
+
+  it('渲染引擎不认 conic-gradient（老 WebView）时返回 false', () => {
+    withCSS({
+      supports: function (prop, val) { return String(val).indexOf('conic-gradient') === -1 }
+    }, function () {
+      expect(supportsConicGradient()).toBe(false)
+    })
+  })
+
+  it('CSS.supports 抛错时不影响页面渲染，仍返回 false', () => {
+    withCSS({ supports: function () { throw new Error('boom') } }, function () {
+      expect(supportsConicGradient()).toBe(false)
+    })
   })
 })

@@ -40,6 +40,7 @@ export default [
         Blob: 'readonly',
         FileReader: 'readonly',
         TextEncoder: 'readonly',
+        CSS: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',

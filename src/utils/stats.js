@@ -82,6 +82,27 @@ export function conicGradient(segments) {
 }
 
 /**
+ * 当前环境能不能画 conic-gradient（T3.7）。
+ *
+ * Chrome 69 以下（Android 8 及更早的 WebView）不支持，环形图会整块空白；
+ * 统计页据此降级为纯色环 + 文字指引，保证"结构和数字仍可读"。
+ * 取不到 CSS.supports（非浏览器环境）时保守返回 false。
+ *
+ * @returns {boolean}
+ */
+export function supportsConicGradient() {
+  try {
+    if (typeof CSS === 'undefined' || typeof CSS.supports !== 'function') return false
+    return (
+      CSS.supports('background', 'conic-gradient(#fff, #000)') ||
+      CSS.supports('background-image', 'conic-gradient(#fff, #000)')
+    )
+  } catch (e) {
+    return false
+  }
+}
+
+/**
  * 首页余额卡数字：结余 = 收入 − 支出（分）。
  */
 export function balanceCents(summary) {

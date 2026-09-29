@@ -36,6 +36,7 @@
             <image class="donut-milo" src="/static/milo/milo.webp" mode="aspectFit" />
           </view>
         </view>
+        <text v-if="!conicOk" class="donut-tip">这台设备画不出圆环图，往下看「花得最多的是…」里的占比条，一样准</text>
         <view class="legend">
           <view v-for="s in segments" :key="s.name" class="li">
             <view class="dot" :style="{ background: s.color }" />
@@ -109,7 +110,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
-import { expenseByCategory, donutSegments, conicGradient, barPercents, maxIndex } from '../../utils/stats.js'
+import { expenseByCategory, donutSegments, conicGradient, supportsConicGradient, barPercents, maxIndex } from '../../utils/stats.js'
 import {
   ymLabel,
   toDateStr,
@@ -223,8 +224,14 @@ function pickPeriod(s) {
 const segments = computed(function () {
   return donutSegments(rows.value)
 })
+/**
+ * 老 WebView（Chrome < 69）不支持 conic-gradient，行内样式会被忽略、环形图整块空白（T3.7）。
+ * 检测一次即可（同一台设备的渲染引擎不会中途变），不支持时返回空背景，
+ * 让 CSS 里那层纯色环兜底，并在环下方给出"看占比条"的指引。
+ */
+const conicOk = ref(supportsConicGradient())
 const donutBg = computed(function () {
-  return conicGradient(segments.value)
+  return conicOk.value ? conicGradient(segments.value) : ''
 })
 
 /* ---- 空状态文案随期间变化 ---- */
@@ -381,7 +388,17 @@ onShow(function () {
   border-radius: 50%;
   margin: 0 auto;
   position: relative;
+  /* 兜底底色：设备画不了 conic-gradient 时，这里就是那圈"素色环"（T3.7） */
   background: var(--cd-primary-lt);
+}
+/* 降级提示：环画不出来时，把用户引到排行卡的占比条 */
+.donut-tip {
+  display: block;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--cd-ink-2);
 }
 .donut-center {
   position: absolute;
