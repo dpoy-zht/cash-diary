@@ -58,7 +58,7 @@
           <view class="rank-main">
             <view class="rank-line">
               <text class="rank-name">{{ c.name }}</text>
-              <text class="rank-amt">¥{{ fmt(c.cents) }}<text class="rank-pct"> {{ Math.round(c.pct * 100) }}%</text></text>
+              <text class="rank-amt">¥{{ fmt(c.cents) }}<text class="rank-pct">{{ Math.round(c.pct * 100) }}%</text></text>
             </view>
             <view class="bar"><view class="bar-i" :style="{ width: Math.round(c.pct * 100) + '%', background: c.color }" /></view>
           </view>
@@ -404,7 +404,11 @@ onShow(function () {
   color: var(--cd-ink);
   font-variant-numeric: tabular-nums;
 }
+/* 注意：金额与百分比之间靠这里的 margin 拉开，不要依赖模板里的空格 ——
+   uni-app 编译模板时会把嵌套 <text> 前的空白吃掉，写成 "> {{ }}" 会贴成
+   "¥1,800.0064%" 这种读不出金额的样式（H5 DOM 实测确认）。 */
 .rank-pct {
+  margin-left: 4px;
   font-size: 11px;
   font-weight: 600;
   color: var(--cd-ink-2);
