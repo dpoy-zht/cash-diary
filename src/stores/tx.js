@@ -122,12 +122,18 @@ export const useTxStore = defineStore('tx', function () {
     await refresh(ym)
   }
 
-  /** 月份数据 + 全量概览 + 连续天数样本 + 六月趋势一起刷新，避免几处数字对不上 */
+  /**
+   * 月份数据 + 全量概览 + 连续天数样本 + 六月趋势一起刷新，避免几处数字对不上。
+   * 四个查询互不依赖，并行执行（App 端每个 await 都是一次 plus.sqlite 桥接往返，
+   * 串行要付 4 倍往返延迟）；任一失败整体抛出，由调用方按原有错误语义处理。
+   */
   async function refresh(ym) {
-    await loadMonth(ym)
-    await loadOverview()
-    await loadRecentTs()
-    await loadTrend()
+    await Promise.all([
+      loadMonth(ym),
+      loadOverview(),
+      loadRecentTs(),
+      loadTrend()
+    ])
   }
 
   return {
