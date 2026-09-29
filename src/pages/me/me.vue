@@ -362,10 +362,11 @@ function onDailyTimeChange(e) {
 /* ---- 数据备份与恢复 ---- */
 function openBackupMenu() {
   uni.showActionSheet({
-    itemList: ['导出备份（JSON 文件）', '从备份恢复'],
+    itemList: ['导出备份（JSON 文件）', '导出账单（CSV 表格）', '从备份恢复'],
     success: function (res) {
       if (res.tapIndex === 0) doExport()
-      else if (res.tapIndex === 1) doRestore()
+      else if (res.tapIndex === 1) doExportCsv()
+      else if (res.tapIndex === 2) doRestore()
     }
   })
 }
@@ -399,6 +400,51 @@ async function doExport() {
         uni.setClipboardData({
           data: text,
           success: function () { uni.showToast({ title: '已复制，去微信/备忘录粘贴保存吧', icon: 'none' }) }
+        })
+      }
+    })
+  } catch (err) {
+    uni.hideLoading()
+    uni.showToast({ title: (err && err.message) || '导出失败', icon: 'none' })
+  }
+}
+
+/**
+ * 导出账单 CSV（T4.2）：给 Excel / WPS、报销、年度复盘用。
+ * 与 JSON 备份的区别：只导流水、不含已删记录、金额带正负号（Excel 里可直接求和）。
+ */
+async function doExportCsv() {
+  uni.showLoading({ title: '正在整理…', mask: true })
+  try {
+    const csv = await backupService.exportCsv()
+    if (!csv.rows) {
+      uni.hideLoading()
+      uni.showToast({ title: '还没有流水可以导出', icon: 'none' })
+      return
+    }
+    // ① 先落在应用自己的目录（App）/ 触发浏览器下载（H5），保证任何时候都有一份
+    await saveTextFile(csv.name, csv.text, 'text/csv;charset=utf-8')
+    // ② App 端再复制一份到公共目录，否则用户根本拿不到
+    const exported = await exportDocFileToUser(csv.name)
+    const msg = exported === null
+      ? exportResultMessage({ mode: 'browser-download' }, '账单文件')
+      : exportResultMessage({ outPath: exported }, '账单文件')
+
+    uni.hideLoading()
+    uni.showModal({
+      title: msg.title,
+      content:
+        '共 ' + csv.rows + ' 笔流水。\n\n' + msg.content +
+        '\n\n用 Excel / WPS 直接打开即可（已带 UTF-8 BOM，中文不会乱码）。',
+      showCancel: msg.fallbackClipboard,
+      cancelText: '不用了',
+      confirmText: msg.fallbackClipboard ? '复制账单内容' : '好',
+      success: function (res) {
+        if (!msg.fallbackClipboard || !res.confirm) return
+        // 兜底：拿不到文件时至少让用户能把表带走（粘进 Excel 就是一张表）
+        uni.setClipboardData({
+          data: csv.text,
+          success: function () { uni.showToast({ title: '已复制，粘进 Excel 或备忘录就能保存', icon: 'none' }) }
         })
       }
     })

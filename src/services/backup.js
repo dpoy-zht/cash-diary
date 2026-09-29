@@ -18,6 +18,7 @@ import {
   AUTO_KEEP_COUNT
 } from '../utils/backup.js'
 import { saveTextFile, listAutoBackupNames, removeDocFile } from '../utils/backup-file.js'
+import { buildTxCsvRows, toCsv, withBom, csvFileName } from '../utils/csv.js'
 import { seedIfEmpty } from './category.js'
 import { seedDefaultIfEmpty } from './account.js'
 
@@ -30,6 +31,24 @@ export async function exportBackup() {
 /** 导出成 JSON 文本（带缩进，方便用户自己查看/编辑） */
 export async function exportJson() {
   return JSON.stringify(await exportBackup(), null, 2)
+}
+
+/**
+ * 导出成账单 CSV（T4.2）——给报销、年度复盘、Excel 透视用。
+ *
+ * 与 JSON 备份的区别：**只导出流水，且不含软删除记录**。
+ * 备份是"把整个库搬走"（必须保留已删除记录，否则恢复后数据对不上），
+ * 账单是"给人看的表"，已删的账不该出现在里面。
+ *
+ * @returns {Promise<{name:string, text:string, rows:number}>} rows = 流水条数（不含表头）
+ */
+export async function exportCsv() {
+  const rows = buildTxCsvRows(await maintenanceRepo.dumpAll())
+  return {
+    name: csvFileName(Date.now()),
+    text: withBom(toCsv(rows)),
+    rows: Math.max(0, rows.length - 1)
+  }
 }
 
 /** 解析备份文本；不是合法 JSON 时给出人话错误 */

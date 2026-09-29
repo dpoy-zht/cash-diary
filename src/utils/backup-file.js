@@ -28,9 +28,15 @@ export function sortedBackupNames(names, ext) {
 
 /* ---------------- 导出：写文件 ---------------- */
 
-export async function saveTextFile(fileName, text) {
+/**
+ * 把文本写成文件。
+ * @param {string} fileName 目标文件名（扩展名决定浏览器的下载类型）
+ * @param {string} text 文件内容
+ * @param {string} [mime] MIME 类型，默认 application/json（备份）；导出 CSV 时传 text/csv
+ */
+export async function saveTextFile(fileName, text, mime) {
   // #ifdef H5
-  const blob = new Blob([text], { type: 'application/json;charset=utf-8' })
+  const blob = new Blob([text], { type: mime || 'application/json;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -152,27 +158,29 @@ function copyDocTo(name, fsType) {
  *
  * @param {{ mode?: 'browser-download', outPath?: string }} result
  *        mode='browser-download' 表示 H5（浏览器已下载）；outPath 为 App 端复制到的真实路径
+ * @param {string} [what] 导出的东西叫什么，默认「备份文件」（导出 CSV 时传「账单文件」）
  * @returns {{ title: string, content: string, fallbackClipboard: boolean }}
  */
-export function exportResultMessage(result) {
+export function exportResultMessage(result, what) {
   const r = result || {}
+  const label = what || '备份文件'
   if (r.mode === 'browser-download') {
     return {
       title: '导出成功',
-      content: '备份文件已保存到浏览器的下载目录。',
+      content: label + '已保存到浏览器的下载目录。',
       fallbackClipboard: false
     }
   }
   if (r.outPath) {
     return {
       title: '导出成功',
-      content: '备份文件已复制到：\n' + r.outPath + '\n\n用手机的文件管理器，或者连电脑按这个路径就能取到。',
+      content: label + '已复制到：\n' + r.outPath + '\n\n用手机的文件管理器，或者连电脑按这个路径就能取到。',
       fallbackClipboard: false
     }
   }
   return {
     title: '没有找到能放文件的公共目录',
-    content: '备份已经存在应用里（随时可以恢复）。要不要把备份内容复制到剪贴板？粘贴到微信、备忘录就能长久保存。',
+    content: label + '已经存在应用自己目录里。要不要把内容复制到剪贴板？粘贴到微信、备忘录就能长久保存。',
     fallbackClipboard: true
   }
 }

@@ -445,4 +445,16 @@ describe('exportResultMessage —— 导出去向的提示（T3.6）', () => {
     expect(exportResultMessage(null).fallbackClipboard).toBe(true)
     expect(exportResultMessage({}).fallbackClipboard).toBe(true)
   })
+
+  it('可以自定义名称：导出 CSV 时说「账单文件」，不说「备份文件」（T4.2）', () => {
+    const cases = [
+      exportResultMessage({ mode: 'browser-download' }, '账单文件'),
+      exportResultMessage({ outPath: '/storage/emulated/0/Download/奶龙记账-账单-2026-09-30-2210.csv' }, '账单文件'),
+      exportResultMessage({ outPath: '' }, '账单文件')
+    ]
+    cases.forEach(function (m) {
+      expect(m.content).toContain('账单文件')
+      expect(m.content).not.toContain('备份')
+    })
+  })
 })
