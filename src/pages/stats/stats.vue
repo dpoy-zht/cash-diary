@@ -128,7 +128,7 @@ import {
   dayTrendLabel,
   periodNameOf
 } from '../../utils/date.js'
-import { formatCents } from '../../utils/money.js'
+import { formatCents, groupThousands } from '../../utils/money.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -299,7 +299,7 @@ function compactYuan(cents) {
   const c = Math.max(0, Number(cents) || 0)
   if (!c) return '¥0'
   const yuan = c / 100
-  if (yuan < 10000) return '¥' + Math.round(yuan).toLocaleString('en-US')
+  if (yuan < 10000) return '¥' + groupThousands(Math.round(yuan))
   return '¥' + (yuan / 10000).toFixed(1) + '万'
 }
 

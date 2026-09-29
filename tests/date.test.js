@@ -7,6 +7,7 @@ import {
   dayLabel,
   groupByDay,
   toDateStr,
+  dateTimeLabel,
   tsFromDateStr,
   replaceDateKeepTime,
   weekStart,
@@ -277,5 +278,21 @@ describe('月份工具（T4.4 月度报告用）', () => {
     expect(prevYmOf('')).toBe('')
     expect(prevYmOf(null)).toBe('')
     expect(prevYmOf('2026-13')).toBe('')
+  })
+})
+
+describe('dateTimeLabel —— 手工拼「日期 + 时分」，不依赖 toLocaleString', () => {
+  it('本地时区补零正确', () => {
+    expect(dateTimeLabel(new Date(2026, 8, 30, 1, 20).getTime())).toBe('2026-09-30 01:20')
+    expect(dateTimeLabel(new Date(2026, 0, 5, 23, 59).getTime())).toBe('2026-01-05 23:59')
+    expect(dateTimeLabel(new Date(2026, 11, 31, 0, 0).getTime())).toBe('2026-12-31 00:00')
+  })
+
+  it('0 / 非法 / 负数返回空串（调用方自己给兜底文案）', () => {
+    expect(dateTimeLabel(0)).toBe('')
+    expect(dateTimeLabel(null)).toBe('')
+    expect(dateTimeLabel(undefined)).toBe('')
+    expect(dateTimeLabel('abc')).toBe('')
+    expect(dateTimeLabel(-1)).toBe('')
   })
 })

@@ -62,6 +62,21 @@ export function toDateStr(ts) {
 }
 
 /**
+ * 「日期 + 时分」：'2026-09-30 01:20'；非法 / 0 返回 ''。
+ * 不依赖 `toLocaleString` —— App 端 JS 引擎没有 Intl，`toLocaleString()` 只能给出
+ * 引擎自带的固定格式（真机实测与 H5 不一致），跨端展示会漂移，这里手工拼。
+ */
+export function dateTimeLabel(ts) {
+  const n = Number(ts)
+  if (!isFinite(n) || n <= 0) return ''
+  const d = new Date(n)
+  return (
+    d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+    ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes())
+  )
+}
+
+/**
  * 最近 n 个月的 'YYYY-MM' 列表（含当月），**从旧到新**。
  * 用 Date 逐月回退，跨年/跨月由 Date 自己处理，不做手工进位。
  */

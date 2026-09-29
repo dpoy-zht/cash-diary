@@ -25,9 +25,32 @@ export function parseAmountBound(str) {
   return Math.round(parseFloat(s) * 100)
 }
 
-/** 1990 → '19.90'；180000 → '1,800.00'（千分位 + 两位小数） */
+/**
+ * 整数千分位分组：1234567 → '1,234,567'。
+ *
+ * **为什么不用 `toLocaleString`**：Android 上 uni-app 的 app-service JS 引擎没有 Intl
+ * （真机实测 `typeof Intl === 'undefined'`），`toLocaleString(locale, options)` 会把
+ * options 整个丢掉 —— `(1800).toLocaleString('zh-CN', {minimumFractionDigits:2})`
+ * 真机返回 '1800' 而不是 '1,800.00'。金额展示因此丢千分位、丢两位小数：
+ * 首页实际渲染成「已花 ¥1800」，与设计稿的 ¥1,800.00 不符。
+ * H5 有完整 ICU，所以这个问题在浏览器预览里根本看不出来，只在真机出现。
+ */
+export function groupThousands(n) {
+  const s = String(Math.trunc(Math.abs(Number(n) || 0)))
+  let out = ''
+  for (let i = 0; i < s.length; i += 1) {
+    if (i > 0 && (s.length - i) % 3 === 0) out += ','
+    out += s.charAt(i)
+  }
+  return out
+}
+
+/** 1990 → '19.90'；180000 → '1,800.00'（千分位 + 两位小数；实现不依赖 Intl） */
 export function formatCents(cents) {
-  return (cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const v = Number(cents)
+  const neg = isFinite(v) && v < 0
+  const fen = Math.round(Math.abs(isFinite(v) ? v : 0))
+  return (neg ? '-' : '') + groupThousands(Math.floor(fen / 100)) + '.' + String(fen % 100).padStart(2, '0')
 }
 
 /** (1990, 'expense') → '-¥19.90'；中国习惯：红支绿收，符号带正负 */
@@ -49,10 +72,10 @@ export function keypadInput(current, key) {
   return current + key
 }
 
-/** 记账页大数字展示：'1990' → '1,990'；'19.9' → '19.9' */
+/** 记账页大数字展示：'1990' → '1,990'；'19.9' → '19.9'（千分位同样手写，理由见 groupThousands） */
 export function displayAmount(str) {
   if (!str) return '0.00'
   const parts = str.split('.')
-  const intPart = parts[0] ? Number(parts[0]).toLocaleString('zh-CN') : '0'
+  const intPart = parts[0] ? groupThousands(parts[0]) : '0'
   return parts.length > 1 ? intPart + '.' + parts[1] : intPart
 }

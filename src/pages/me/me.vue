@@ -110,9 +110,11 @@ import * as backupService from '../../services/backup.js'
 import { backupFileName, validateBackup } from '../../utils/backup.js'
 import { saveTextFile, pickBackupText, exportDocFileToUser, exportResultMessage } from '../../utils/backup-file.js'
 import { formatCents, parseAmountToCents } from '../../utils/money.js'
+import { dateTimeLabel } from '../../utils/date.js'
 import { streakDays, levelOf } from '../../utils/stats.js'
 import {
   requestNotifyPermission,
+  explainNotifyDenied,
   REMIND_PREF_KEY,
   normalizeRemindEnabled
 } from '../../utils/notify.js'
@@ -314,6 +316,17 @@ function loadRemindPref() {
   } catch (e) { /* 读不到就保持默认开启，不打扰用户 */ }
 }
 
+/**
+ * 用户主动开启提醒时申请通知权限。
+ * 必须把结果告诉他：真机上一旦选过「拒绝且不再询问」，系统不再弹窗、直接返回
+ * deniedAlways —— 不提示的话，开关看着是开的，通知却永远不会来。
+ */
+function askNotifyPermission() {
+  requestNotifyPermission(function (r) {
+    if (!r.granted) explainNotifyDenied(r)
+  })
+}
+
 function toggleRemind() {
   const prev = remindOn.value
   const next = !prev
@@ -326,7 +339,7 @@ function toggleRemind() {
     return
   }
   if (next) {
-    requestNotifyPermission() // 开启时顺带申请通知权限（App 端；H5 自动跳过）
+    askNotifyPermission() // 开启时申请通知权限（App 端；H5 自动跳过）
     uni.showToast({ title: '超支系统通知已开启', icon: 'none' })
   } else {
     uni.showToast({ title: '超支系统通知已关闭', icon: 'none' })
@@ -354,7 +367,7 @@ function toggleDaily() {
   dailyOn.value = saved.enabled
   dailyHm.value = saved.hm
   if (next) {
-    requestNotifyPermission()
+    askNotifyPermission()
     uni.showToast({ title: '每天 ' + saved.hm + ' 提醒你记账', icon: 'none' })
   } else {
     uni.showToast({ title: '已关闭每日提醒', icon: 'none' })
@@ -371,7 +384,7 @@ function onDailyTimeChange(e) {
   }
   dailyOn.value = saved.enabled
   dailyHm.value = saved.hm
-  requestNotifyPermission()
+  askNotifyPermission()
   uni.showToast({ title: '每天 ' + saved.hm + ' 提醒你记账', icon: 'none' })
 }
 
@@ -637,7 +650,7 @@ async function doWebdavRestore() {
     return
   }
   const counts = remote.counts || {}
-  const when = remote.exportedAt ? new Date(remote.exportedAt).toLocaleString() : '未知时间'
+  const when = dateTimeLabel(remote.exportedAt) || '未知时间'
   uni.showModal({
     title: '从云端恢复',
     content: '云端备份：' + counts.transaction_record + ' 笔流水，' + when + '。\n\n恢复会覆盖本机全部数据，确定继续吗？',

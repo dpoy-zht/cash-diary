@@ -10,7 +10,8 @@ import {
   pushRouteFor,
   PAYLOAD_OVER_BUDGET,
   PAYLOAD_DAILY,
-  PAYLOAD_FIXED
+  PAYLOAD_FIXED,
+  parsePermissionResult
 } from '../src/utils/notify.js'
 
 /**
@@ -110,5 +111,37 @@ describe('T4.1 —— 通知 payload 与点击路由', () => {
     ;[PAYLOAD_OVER_BUDGET, PAYLOAD_DAILY, PAYLOAD_FIXED].forEach(function (p) {
       expect(registered).toContain(pushRouteFor(p))
     })
+  })
+})
+
+describe('parsePermissionResult —— 通知权限回执解析（T4.1 真机补充）', () => {
+  const P = 'android.permission.POST_NOTIFICATIONS'
+
+  it('允许：granted 数组里有该权限', () => {
+    expect(parsePermissionResult({ granted: [P], deniedPresent: [], deniedAlways: [] }))
+      .toEqual({ granted: true, deniedAlways: false })
+  })
+
+  it('本次拒绝：进了 deniedPresent', () => {
+    expect(parsePermissionResult({ granted: [], deniedPresent: [P], deniedAlways: [] }))
+      .toEqual({ granted: false, deniedAlways: false })
+  })
+
+  it('永久拒绝：进了 deniedAlways，且判定优先级高于 granted', () => {
+    // 真机实测（小米 14 Pro / Android 16）：用户选过「拒绝且不再询问」后，
+    // 系统不再弹窗、直接返回 deniedAlways —— 此时界面必须能提示去系统设置，
+    // 否则开关看着是开的，通知永远不会来。
+    expect(parsePermissionResult({ granted: [], deniedPresent: [], deniedAlways: [P] }))
+      .toEqual({ granted: false, deniedAlways: true })
+    expect(parsePermissionResult({ granted: [P], deniedAlways: [P] }))
+      .toEqual({ granted: false, deniedAlways: true })
+  })
+
+  it('异常 / 空回执不崩，一律按「没拿到」处理', () => {
+    expect(parsePermissionResult(null)).toEqual({ granted: false, deniedAlways: false })
+    expect(parsePermissionResult(undefined)).toEqual({ granted: false, deniedAlways: false })
+    expect(parsePermissionResult({})).toEqual({ granted: false, deniedAlways: false })
+    expect(parsePermissionResult({ granted: null, deniedAlways: null }))
+      .toEqual({ granted: false, deniedAlways: false })
   })
 })

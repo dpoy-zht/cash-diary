@@ -55,30 +55,91 @@ export function normalizeRemindEnabled(raw) {
   return !(raw === false || raw === 0 || raw === '0' || raw === 'false')
 }
 
+/** 后台静默申请的启动周期守卫（只在没有 onResult 时生效） */
+let permRequested = false
+
 /**
  * 申请 Android 13+ 的通知权限（POST_NOTIFICATIONS）。
  * - 非 Android / 低版本 / 无 plus 环境：直接返回 true（默认视为可用）。
- * - 每个启动周期最多调用一次真实申请（模块级守卫）；系统会记住用户的选择。
- * - 全程 try/catch：权限失败不阻塞主流程，最坏情况是通知发不出来（静默）。
+ * - 不传 onResult = 后台静默申请（首页/提醒引擎启动时用），每个启动周期最多一次。
+ * - **传 onResult = 用户在设置页主动开启**，此时必须把真实结果告诉他：
+ *   真机实测，一旦用户选过「拒绝且不再询问」，系统会记住并直接返回 deniedAlways，
+ *   **连弹窗都不再出现** —— 如果这里不回调，用户会以为提醒开好了，实际永远不会响。
+ *
+ * @param {(r:{granted:boolean, deniedAlways:boolean}) => void} [onResult]
  */
-let permRequested = false
-export function requestNotifyPermission() {
+export function requestNotifyPermission(onResult) {
+  const cb = typeof onResult === 'function' ? onResult : null
+  const report = function (r) {
+    if (!cb) return
+    try { cb(r) } catch (e) { /* 回调自身出错不影响主流程 */ }
+  }
   try {
     if (typeof plus === 'undefined' || !plus.os || !plus.android) return true
     if (plus.os.name !== 'Android') return true
     const major = parseInt(plus.os.version, 10)
     if (!(major >= 13)) return true
-    if (permRequested) return true
+    if (!cb && permRequested) return true
     permRequested = true
     plus.android.requestPermissions(
       ['android.permission.POST_NOTIFICATIONS'],
-      function () { /* 用户允许或已授予，无需处理 */ },
-      function () { /* 用户拒绝：保持静默，通知可能发不出来，不阻塞页面 */ }
+      function (res) { report(parsePermissionResult(res)) },
+      function () { report({ granted: false, deniedAlways: false }) }
     )
+    return true
+  } catch (e) {
+    report({ granted: false, deniedAlways: false })
+    return false
+  }
+}
+
+/**
+ * 解析 plus.android.requestPermissions 的回执（纯函数，可单测）。
+ * 三个字段都是数组：granted / deniedPresent / deniedAlways。
+ * 注意 deniedAlways 必须优先判断 —— 永久拒绝时系统直接把权限放进 deniedAlways，
+ * 此时再申请也不会弹窗，只能引导用户去系统设置里手动打开。
+ */
+export function parsePermissionResult(res) {
+  const r = res || {}
+  const always = !!(r.deniedAlways && r.deniedAlways.length)
+  const granted = !always && !!(r.granted && r.granted.length)
+  return { granted: granted, deniedAlways: always }
+}
+
+/** 跳系统「应用通知设置」页；失败返回 false（调用方退回纯文字提示） */
+export function openNotificationSettings() {
+  try {
+    if (typeof plus === 'undefined' || !plus.android || !plus.runtime) return false
+    const main = plus.android.runtimeMainActivity()
+    const Intent = plus.android.importClass('android.content.Intent')
+    const Settings = plus.android.importClass('android.provider.Settings')
+    const intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+    intent.putExtra('android.provider.extra.APP_PACKAGE', main.getPackageName())
+    main.startActivity(intent)
     return true
   } catch (e) {
     return false
   }
+}
+
+/**
+ * 权限没拿到时的统一提示（me 页开启每日提醒时调用）。
+ * 永久拒绝 → 弹窗给「去设置」；普通拒绝 → 轻提示。
+ */
+export function explainNotifyDenied(result) {
+  if (result && result.deniedAlways) {
+    uni.showModal({
+      title: '通知权限被拒绝了',
+      content: '系统不会再弹权限问询，需要到「系统设置 → 应用管理 → 奶龙记账 → 通知」里手动打开。\n\n不打开的话，提醒只会显示在应用内。',
+      confirmText: '去设置',
+      cancelText: '知道了',
+      success: function (r) {
+        if (r.confirm) openNotificationSettings()
+      }
+    })
+    return
+  }
+  uni.showToast({ title: '没给通知权限，提醒只会在应用内显示', icon: 'none' })
 }
 
 /**
