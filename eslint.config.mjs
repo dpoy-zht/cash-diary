@@ -43,6 +43,7 @@ export default [
         CSS: 'readonly',
         // Node 环境（vitest 测试里读源码文件用）
         process: 'readonly',
+        Buffer: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',

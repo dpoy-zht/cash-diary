@@ -6,6 +6,7 @@ import { useAccountStore } from './stores/account.js'
 import { listenPushClick, pushRouteFor } from './utils/notify.js'
 import { checkForUpdate, updateNow } from './services/update.js'
 import { startReminders, refreshReminders } from './services/reminder.js'
+import { checkRemoteOnStart, uploadBackup, reasonText } from './services/webdav.js'
 // #ifdef H5
 import { setPersistErrorHandler, flush as flushMemory } from './db/memory.js'
 // #endif
@@ -68,7 +69,66 @@ onLaunch(() => {
       })
     })
     .catch(function () { /* 离线/超时静默 */ })
+
+  /**
+   * 云备份比对（T4.5）：配过 WebDAV 的话，启动后悄悄看一眼云端与本机谁更新。
+   *
+   * 三条约束：
+   * - 延迟 3s 再查：别和首屏渲染抢网络与主线程
+   * - 12h 节流 + 失败全静默（都在 services/webdav.js 里）：云端连不上绝不能影响记账
+   * - 只有真的"不一致"才提示，一致/没配过/查不到都是一句话都不说
+   */
+  setTimeout(function () {
+    checkRemoteOnStart()
+      .then(function (r) {
+        if (!r.checked || r.action === 'none' || r.action === 'same') return
+        promptWebdavDiff(r)
+      })
+      .catch(function () { /* 静默 */ })
+  }, 3000)
 })
+
+/**
+ * 启动比对发现差异时的提示。
+ * - 云端更新 → 引导到「我的」去恢复（恢复是整库覆盖，必须让用户在那边的确认框里再点一次）
+ * - 本机可能更新 → 直接问要不要上传（上传不动本地数据，安全）
+ */
+function promptWebdavDiff(r) {
+  const n = (r.counts && r.counts.transaction_record) || 0
+  if (r.action === 'remote-newer') {
+    uni.showModal({
+      title: '云端有更新',
+      content: '云端备份（' + n + ' 笔流水）比本机上次同步的更新。去「我的 → 云备份」看看吗？',
+      confirmText: '去查看',
+      cancelText: '稍后',
+      success: function (res) {
+        if (res.confirm) uni.reLaunch({ url: '/pages/me/me' })
+      }
+    })
+    return
+  }
+  if (r.action === 'local-newer') {
+    uni.showModal({
+      title: '要把本机的账传上去吗？',
+      content: '云端那份还是上次同步时的版本。现在上传会用本机数据覆盖云端。',
+      confirmText: '立即上传',
+      cancelText: '稍后',
+      success: function (res) {
+        if (!res.confirm) return
+        uni.showLoading({ title: '正在上传…', mask: true })
+        uploadBackup()
+          .then(function (u) {
+            uni.hideLoading()
+            uni.showToast({ title: '已上传 ' + u.counts.transaction_record + ' 笔流水', icon: 'none' })
+          })
+          .catch(function (err) {
+            uni.hideLoading()
+            uni.showToast({ title: (err && err.message) || reasonText('network'), icon: 'none' })
+          })
+      }
+    })
+  }
+}
 
 /**
  * 每次回到前台重排一轮提醒（T4.1）：

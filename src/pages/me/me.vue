@@ -64,6 +64,8 @@
             <view class="fn-switch-dot" />
           </view>
         </view>
+        <!-- 云备份：右侧直接显示"配没配"，不用点进去才知道 -->
+        <text v-else-if="f.key === 'webdav'" class="fn-arrow">{{ webdavRight }}</text>
         <text v-else class="fn-arrow">{{ f.right || '›' }}</text>
       </view>
     </view>
@@ -88,6 +90,8 @@
       </view>
       <text class="dev-note">开发期工具，正式版会移除。</text>
     </view>
+
+    <webdav-sheet v-if="webdavShow" :config="webdavCfg" @close="webdavShow = false" @save="onWebdavSave" />
 
     <tab-bar current="me" />
   </view>
@@ -115,6 +119,8 @@ import {
 import { getDailyConfig, saveDailyConfig, refreshReminders } from '../../services/reminder.js'
 import { DEFAULT_DAILY_HM } from '../../utils/reminder.js'
 import { checkForUpdate, currentAppVersion, updateNow } from '../../services/update.js'
+import * as webdavService from '../../services/webdav.js'
+import WebdavSheet from '../../components/webdav-sheet/webdav-sheet.vue'
 import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
@@ -200,6 +206,7 @@ const fns = [
   { key: 'fixed', name: '固定支出', color: '#ffb74d', icon: 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z' },
   { key: 'category', name: '分类管理', color: '#ff8a65', icon: 'M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.41l9 9c.37.36.87.59 1.41.59s1.04-.23 1.41-.59l7-7c.36-.37.59-.87.59-1.41s-.23-1.04-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z' },
   { key: 'export', name: '数据备份与恢复', color: '#81c784', icon: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z' },
+  { key: 'webdav', name: '云备份（WebDAV）', color: '#4db6ac', icon: 'M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z' },
   { key: 'update', name: '检查更新', color: '#7986cb', icon: 'M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z' },
   { key: 'remind', name: '超支提醒', color: '#4dd0e1', icon: 'M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z' },
   { key: 'daily', name: '每日记账提醒', color: '#64b5f6', icon: 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z' },
@@ -250,6 +257,10 @@ function tapFn(f) {
   }
   if (f.key === 'export') {
     openBackupMenu()
+    return
+  }
+  if (f.key === 'webdav') {
+    openWebdavMenu()
     return
   }
   uni.showToast({ title: f.name + ' 还在计划里', icon: 'none' })
@@ -519,6 +530,137 @@ async function doRestoreApply(obj) {
   }
 }
 
+/* ---- 云备份（WebDAV，T4.5）----
+ * 交互只有四条：上传（覆盖云端）、从云端恢复、改设置、清除配置。
+ * 不做"自动上传"：备份是用户自己的事，静默覆盖云端可能把另一台设备的账冲掉。
+ * 启动时只做"比对提示"（见 App.vue），点不点由用户决定。
+ */
+const webdavShow = ref(false)
+const webdavCfg = ref(webdavService.loadConfig())
+const webdavReady = ref(webdavService.isReady())
+
+/** 右侧状态：未设置 / 待同步 / 已同步 9/29 */
+const webdavRight = computed(function () {
+  if (!webdavReady.value) return '未设置'
+  const ts = webdavService.lastSyncAt()
+  if (!ts) return '待同步'
+  const d = new Date(ts)
+  return '已同步 ' + (d.getMonth() + 1) + '/' + d.getDate()
+})
+
+function refreshWebdavState() {
+  webdavCfg.value = webdavService.loadConfig()
+  webdavReady.value = webdavService.isReady()
+}
+
+function openWebdavMenu() {
+  const ready = webdavReady.value
+  const items = ready
+    ? ['上传到云端（覆盖云端）', '从云端恢复', '修改设置', '清除配置']
+    : ['设置 WebDAV', '从云端恢复']
+  uni.showActionSheet({
+    itemList: items,
+    success: function (res) {
+      if (!ready) {
+        if (res.tapIndex === 0) webdavShow.value = true
+        else if (res.tapIndex === 1) doWebdavRestore()
+        return
+      }
+      if (res.tapIndex === 0) doWebdavUpload()
+      else if (res.tapIndex === 1) doWebdavRestore()
+      else if (res.tapIndex === 2) webdavShow.value = true
+      else if (res.tapIndex === 3) confirmWebdavClear()
+    }
+  })
+}
+
+function onWebdavSave(v) {
+  const saved = webdavService.saveConfig(v)
+  refreshWebdavState()
+  webdavShow.value = false
+  // 三样缺一都认证不过去，别让用户以为"存上了就能用"
+  if (!saved.url || !saved.user || !saved.pass) {
+    uni.showToast({ title: '地址、账号、密码都要填哦', icon: 'none' })
+    return
+  }
+  uni.showToast({ title: '云备份已配置', icon: 'none' })
+}
+
+function confirmWebdavClear() {
+  uni.showModal({
+    title: '清除云备份配置',
+    content: '只删除本机保存的地址与密码，云端那份备份文件不会被删除。',
+    confirmText: '清除',
+    confirmColor: UI_DANGER,
+    success: function (res) {
+      if (!res.confirm) return
+      webdavService.clearConfig()
+      refreshWebdavState()
+      uni.showToast({ title: '已清除', icon: 'none' })
+    }
+  })
+}
+
+async function doWebdavUpload() {
+  uni.showLoading({ title: '正在上传…', mask: true })
+  try {
+    const r = await webdavService.uploadBackup()
+    uni.hideLoading()
+    refreshWebdavState()
+    uni.showToast({ title: '已上传 ' + r.counts.transaction_record + ' 笔流水', icon: 'none' })
+  } catch (err) {
+    uni.hideLoading()
+    uni.showToast({ title: (err && err.message) || '上传失败', icon: 'none' })
+  }
+}
+
+/**
+ * 从云端恢复。先拉取并展示"云端那份有多少笔、什么时候的"，
+ * 用户确认后再覆盖 —— 恢复是整库替换，必须先让人看清要拿什么换什么。
+ */
+async function doWebdavRestore() {
+  uni.showLoading({ title: '正在拉取…', mask: true })
+  let remote
+  try {
+    remote = await webdavService.fetchRemote()
+  } catch (e) {
+    remote = { ok: false, reason: 'network' }
+  }
+  uni.hideLoading()
+  if (!remote.ok) {
+    uni.showToast({ title: webdavService.reasonText(remote.reason), icon: 'none' })
+    return
+  }
+  const counts = remote.counts || {}
+  const when = remote.exportedAt ? new Date(remote.exportedAt).toLocaleString() : '未知时间'
+  uni.showModal({
+    title: '从云端恢复',
+    content: '云端备份：' + counts.transaction_record + ' 笔流水，' + when + '。\n\n恢复会覆盖本机全部数据，确定继续吗？',
+    confirmText: '覆盖恢复',
+    confirmColor: UI_DANGER,
+    success: async function (res) {
+      if (!res.confirm) return
+      uni.showLoading({ title: '恢复中…', mask: true })
+      try {
+        const c = await webdavService.restoreFromRemote()
+        // 整库被替换：四个 store 全部重读，查询缓存也要失效（同 doRestoreApply）
+        await categoryStore.reload()
+        await accountStore.reload()
+        await budgetStore.load()
+        metaStore.bumpData()
+        refreshReminders()
+        await txStore.refresh(metaStore.ym)
+        uni.hideLoading()
+        refreshWebdavState()
+        uni.showToast({ title: '已恢复 ' + c.transaction_record + ' 笔流水', icon: 'none' })
+      } catch (err) {
+        uni.hideLoading()
+        uni.showToast({ title: (err && err.message) || '恢复失败', icon: 'none' })
+      }
+    }
+  })
+}
+
 /* ---- 重置数据（开发期工具，两次确认）---- */
 function confirmReset() {
   uni.showModal({
@@ -577,6 +719,7 @@ onShow(function () {
   }
   loadRemindPref()
   loadDailyPref()
+  refreshWebdavState()
   txStore.refresh(metaStore.ym)
 })
 </script>
