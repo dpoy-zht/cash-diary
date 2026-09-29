@@ -109,11 +109,96 @@ CREATE TABLE IF NOT EXISTS fixed_expense (
 CREATE INDEX IF NOT EXISTS idx_fixed_acc ON fixed_expense(account_id);
 `
 
-/** 迁移登记：按版本号顺序执行。新增结构变更 → 追加一项，禁止修改已发布的版本。 */
+/**
+ * 迁移登记：按版本号顺序执行。新增结构变更 → 追加一项，禁止修改已发布的版本。
+ *
+ * T2.6：每个迁移新增 `statements` 数组 —— **每条 SQL 一个元素**，执行时不再按
+ * 分号盲切（旧 splitSql 会把 SQL 字符串字面量里的分号切坏）。`sql` 保留为
+ * 可读原文（历史文档口径），statements 是权威执行源，两者一致性由 schema 测试锁定。
+ */
 export const MIGRATIONS = [
-  { version: 1, name: 'v1_init', sql: SCHEMA_SQL },
-  { version: 2, name: 'v2_multi_account', sql: ACCOUNT_SQL },
-  { version: 3, name: 'v3_budget', sql: BUDGET_SQL },
-  { version: 4, name: 'v4_query_index', sql: INDEX_SQL },
-  { version: 5, name: 'v5_fixed_expense', sql: FIXED_EXPENSE_SQL }
+  {
+    version: 1,
+    name: 'v1_init',
+    sql: SCHEMA_SQL,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS category (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  name    TEXT    NOT NULL,
+  type    TEXT    NOT NULL CHECK (type IN ('income','expense')),
+  icon    TEXT    NOT NULL DEFAULT '',
+  sort    INTEGER NOT NULL DEFAULT 0
+)`,
+      `CREATE TABLE IF NOT EXISTS transaction_record (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id  INTEGER NOT NULL,
+  type         TEXT    NOT NULL CHECK (type IN ('income','expense')),
+  amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+  note         TEXT    NOT NULL DEFAULT '',
+  occurred_at  INTEGER NOT NULL,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL,
+  deleted_at   INTEGER
+)`,
+      'CREATE INDEX IF NOT EXISTS idx_tx_time ON transaction_record(occurred_at)',
+      'CREATE INDEX IF NOT EXISTS idx_tx_del  ON transaction_record(deleted_at)'
+    ]
+  },
+  {
+    version: 2,
+    name: 'v2_multi_account',
+    sql: ACCOUNT_SQL,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS account (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT    NOT NULL,
+  created_at INTEGER NOT NULL
+)`,
+      'ALTER TABLE transaction_record ADD COLUMN account_id INTEGER NOT NULL DEFAULT 1',
+      'CREATE INDEX IF NOT EXISTS idx_tx_account ON transaction_record(account_id)'
+    ]
+  },
+  {
+    version: 3,
+    name: 'v3_budget',
+    sql: BUDGET_SQL,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS budget (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id  INTEGER NOT NULL DEFAULT 1,
+  category_id INTEGER,
+  limit_cents INTEGER NOT NULL CHECK (limit_cents > 0),
+  updated_at  INTEGER NOT NULL
+)`,
+      'CREATE INDEX IF NOT EXISTS idx_budget_acc ON budget(account_id)'
+    ]
+  },
+  {
+    version: 4,
+    name: 'v4_query_index',
+    sql: INDEX_SQL,
+    statements: [
+      'CREATE INDEX IF NOT EXISTS idx_tx_account_time ON transaction_record(account_id, occurred_at)'
+    ]
+  },
+  {
+    version: 5,
+    name: 'v5_fixed_expense',
+    sql: FIXED_EXPENSE_SQL,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS fixed_expense (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id     INTEGER NOT NULL DEFAULT 1,
+  category_id    INTEGER NOT NULL,
+  amount_cents   INTEGER NOT NULL CHECK (amount_cents > 0),
+  note           TEXT    NOT NULL DEFAULT '',
+  day_of_month   INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 28),
+  last_posted_ym TEXT    NOT NULL DEFAULT '',
+  enabled        INTEGER NOT NULL DEFAULT 1,
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL
+)`,
+      'CREATE INDEX IF NOT EXISTS idx_fixed_acc ON fixed_expense(account_id)'
+    ]
+  }
 ]

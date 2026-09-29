@@ -29,6 +29,19 @@ describe('MIGRATIONS —— 迁移登记表', () => {
       expect(m.sql.length).toBeGreaterThan(0)
     }
   })
+
+  it('T2.6：statements 与 sql 内容一致（防两份漂移），且每条无尾分号', () => {
+    const norm = function (s) { return s.replace(/;/g, ' ').replace(/\s+/g, ' ').trim() }
+    for (const m of MIGRATIONS) {
+      expect(Array.isArray(m.statements)).toBe(true)
+      expect(m.statements.length).toBeGreaterThan(0)
+      for (const st of m.statements) {
+        expect(typeof st).toBe('string')
+        expect(st.trim().endsWith(';')).toBe(false)
+        expect(norm(m.sql)).toContain(norm(st))
+      }
+    }
+  })
 })
 
 describe('v5 —— 固定支出表', () => {

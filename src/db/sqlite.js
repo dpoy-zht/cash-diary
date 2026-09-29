@@ -58,14 +58,19 @@ async function appliedVersions() {
 
 export async function init() {
   await openDatabase()
+  // 外键约束默认关闭，显式打开（当前 schema 未声明 REFERENCES，纯为将来加约束兜底；
+  // 删除分类/账本的保护仍以应用层检查为准）
+  await executeBatch(['PRAGMA foreign_keys = ON'])
   await executeBatch(splitSql('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)'))
   const done = await appliedVersions()
   for (const mig of MIGRATIONS) {
     if (done.indexOf(mig.version) !== -1) continue
     // 每个版本的「迁移 SQL + 版本登记」必须原子：中途失败整体回滚并中止启动，
-    // 否则会出现"半迁移"——重启后既无新结构、也无登记记录，无法判定也无法续跑
+    // 否则会出现"半迁移"——重启后既无新结构、也无登记记录，无法判定也无法续跑。
+    // 语句来源用 statements（每条一元素，T2.6），历史迁移无 statements 时退回 splitSql
     await transaction(async function () {
-      await executeBatch(splitSql(mig.sql))
+      const stmts = mig.statements || splitSql(mig.sql)
+      await executeBatch(stmts)
       await executeBatch([
         'INSERT INTO schema_migrations (version, applied_at) VALUES (' + mig.version + ', ' + Date.now() + ')'
       ])
