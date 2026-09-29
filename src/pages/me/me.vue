@@ -426,6 +426,9 @@ async function doReset() {
   try {
     await resetAll()
     await categoryStore.init()
+    // resetAll 重建了默认账本与预算相关数据，两个 store 必须重读，
+    // 否则继续引用已不存在的账本 id（account 的 init 有 ready 守卫，要用 reload）
+    await Promise.all([accountStore.reload(), budgetStore.load()])
     await txStore.refresh(metaStore.ym)
     uni.hideLoading()
     uni.showToast({ title: '已重置', icon: 'none' })
