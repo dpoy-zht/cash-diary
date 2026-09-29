@@ -4,7 +4,7 @@
  * 让 App 正式版（SQLite）与浏览器预览共用同一套上层代码。
  */
 
-import { DEFAULT_ACCOUNT_ID, aid } from '../utils/constant.js'
+import { aid } from '../utils/constant.js'
 
 const LS_KEY = 'cashDiary.memory.v1'
 
@@ -130,8 +130,9 @@ export async function txSearch(noteKw, categoryIds, accountId, limit) {
 
 export async function txInsert(rec) {
   const id = nid()
-  const row = Object.assign({ account_id: DEFAULT_ACCOUNT_ID }, rec)
-  data.transaction_record.push(Object.assign({ id: id }, row))
+  // account_id 与 sqlite 侧同口径：写入时经 aid() 消毒，非法值落默认账本
+  const row = Object.assign({ id: id }, rec, { account_id: aid(rec.account_id) })
+  data.transaction_record.push(row)
   persist()
   return id
 }
@@ -139,8 +140,9 @@ export async function txInsert(rec) {
 export async function txUpdate(id, patch) {
   const row = data.transaction_record.find(function (r) { return r.id === id })
   if (row) {
+    // 与 sqlite 侧同构：updated_at 由适配器维护（patch 显式带则以 patch 为准）
     Object.keys(patch).forEach(function (k) { row[k] = patch[k] })
-    row.updated_at = Date.now()
+    if (patch.updated_at === undefined) row.updated_at = Date.now()
     persist()
   }
 }
@@ -249,11 +251,17 @@ export async function accountStats() {
 
 /* ---------- 预算 CRUD ---------- */
 
-/** 某账本的全部预算（总预算 category_id = null + 各分类预算） */
+/** 某账本的全部预算（总预算在前 + 各分类预算按 id 升序 —— 与 sqlite 的
+    `ORDER BY category_id IS NULL DESC, id ASC` 同口径，契约测试覆盖） */
 export async function budgetList(accountId) {
   const a = aid(accountId)
   return data.budget
     .filter(function (b) { return aid(b.account_id) === a })
+    .sort(function (x, y) {
+      const nx = x.category_id == null ? 1 : 0
+      const ny = y.category_id == null ? 1 : 0
+      return ny - nx || (x.id - y.id)
+    })
     .map(function (b) { return Object.assign({}, b) })
 }
 
@@ -349,7 +357,8 @@ export async function fixedExpenseList(accountId) {
 
 export async function fixedExpenseInsert(rec) {
   const id = nid()
-  data.fixed_expense.push(Object.assign({ id: id, account_id: DEFAULT_ACCOUNT_ID }, rec))
+  // 与 sqlite 侧同口径：account_id 经 aid() 消毒（rec 显式带的非法值不允许穿透）
+  data.fixed_expense.push(Object.assign({ id: id }, rec, { account_id: aid(rec.account_id) }))
   persist()
   return id
 }

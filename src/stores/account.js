@@ -66,15 +66,12 @@ export const useAccountStore = defineStore('account', function () {
     persistCurrent()
   }
 
-  /** 新建账本并自动切过去（sqlite 拿不到自增 id，故刷新后取 id 最大的那个） */
+  /** 新建账本并自动切过去（sqlite/memory 都直接返回新建的 id，无需再扫描列表） */
   async function create(name) {
-    await accountService.create(name)
+    const created = await accountService.create(name)
     await refresh()
-    const newest = list.value.reduce(function (m, a) {
-      return !m || a.id > m.id ? a : m
-    }, null)
-    if (newest) setCurrent(newest.id)
-    return newest
+    if (created && created.id) setCurrent(created.id)
+    return created
   }
 
   async function rename(id, name) {

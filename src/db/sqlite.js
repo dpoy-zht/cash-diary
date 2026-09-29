@@ -93,17 +93,34 @@ export async function txMonthSummary(start, end, accountId) {
   )
 }
 
+/** 新增流水，返回新 id（plus.sqlite 拿不到 executeSql 的自增回执，
+    需在同一连接立刻执行 last_insert_rowid()；契约见 tests/contract.test.js） */
 export async function txInsert(rec) {
   const cols = ['account_id', 'category_id', 'type', 'amount_cents', 'note', 'occurred_at', 'created_at', 'updated_at']
   const vals = cols.map(function (c) {
     return c === 'account_id' ? String(aid(rec[c])) : sqlValue(rec[c])
   }).join(', ')
   await executeBatch(['INSERT INTO transaction_record (' + cols.join(',') + ') VALUES (' + vals + ')'])
+  return lastInsertId()
 }
 
+/** 同连接取自增 id（无参数绑定风险：无外部输入） */
+async function lastInsertId() {
+  const rows = await select('SELECT last_insert_rowid() AS id')
+  return rows && rows[0] ? Number(rows[0].id) : 0
+}
+
+/** 更新流水。字段白名单拒绝非预期字段（对齐 fixedExpenseUpdate 风格）；
+    updated_at 由适配器统一维护（memory 侧同构），补齐"编辑但没传 updated_at"的口径。 */
+const TX_UPDATE_FIELDS = ['category_id', 'type', 'amount_cents', 'note', 'occurred_at', 'deleted_at', 'updated_at']
+
 export async function txUpdate(id, patch) {
-  const sets = Object.keys(patch).map(function (k) { return k + ' = ' + sqlValue(patch[k]) }).join(', ')
-  await executeBatch(['UPDATE transaction_record SET ' + sets + ' WHERE id = ' + Number(id)])
+  const sets = TX_UPDATE_FIELDS
+    .filter(function (k) { return patch[k] !== undefined })
+    .map(function (k) { return k + ' = ' + sqlValue(patch[k]) })
+  if (patch.updated_at === undefined) sets.push('updated_at = ' + Date.now())
+  if (!sets.length) return
+  await executeBatch(['UPDATE transaction_record SET ' + sets.join(', ') + ' WHERE id = ' + Number(id)])
 }
 
 export async function txSoftDelete(id) {
@@ -158,7 +175,7 @@ export async function accountCount() {
   return Number(rows[0].c)
 }
 
-/** 新建账本。允许显式指定 id（默认账本必须恒为 1，与迁移里的 DEFAULT 1 对齐） */
+/** 新建账本。允许显式指定 id（默认账本必须恒为 1，与迁移里的 DEFAULT 1 对齐）。返回新 id */
 export async function accountInsert(acc) {
   const cols = ['name', 'created_at']
   const vals = [sqlValue(acc.name), String(Number(acc.created_at || Date.now()))]
@@ -167,6 +184,7 @@ export async function accountInsert(acc) {
     vals.unshift(String(Number(acc.id)))
   }
   await executeBatch(['INSERT INTO account (' + cols.join(',') + ') VALUES (' + vals.join(', ') + ')'])
+  return lastInsertId()
 }
 
 export async function accountRename(id, name) {
@@ -300,8 +318,8 @@ export async function fixedExpenseInsert(rec) {
     sqlValue(rec.note) + ', ' + Number(rec.day_of_month) + ', ' + sqlValue(rec.last_posted_ym) + ', ' +
     (rec.enabled ? 1 : 0) + ', ' + Number(rec.created_at) + ', ' + Number(rec.updated_at) + ')'
   ])
-  const rows = await select('SELECT MAX(id) AS id FROM fixed_expense')
-  return rows && rows[0] ? Number(rows[0].id) : 0
+  // 与 txInsert/accountInsert 同口径：同连接 last_insert_rowid()，不依赖 MAX(id)（并发下会错）
+  return lastInsertId()
 }
 
 export async function fixedExpenseUpdate(id, patch) {
