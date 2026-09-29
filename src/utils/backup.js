@@ -49,6 +49,8 @@ export function backupFileName(nowTs) {
 export const AUTO_BACKUP_INTERVAL = 24 * 60 * 60 * 1000
 /** 自动备份文件名前缀：清理旧文件时只动带此前缀的，用户手动导出的备份绝不碰 */
 export const AUTO_BACKUP_PREFIX = '奶龙记账-自动备份-'
+/** 上次自动备份时间戳的存储键（services/backup.js 写入，数据体检读来判断"备份过旧"） */
+export const AUTO_BACKUP_LAST_KEY = 'cashDiary.autoBackup.lastAt'
 /** 自动备份保留份数（清理时只留最新 N 份） */
 export const AUTO_KEEP_COUNT = 3
 

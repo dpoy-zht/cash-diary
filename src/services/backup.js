@@ -15,7 +15,8 @@ import {
   autoBackupFileName,
   keepAutoBackupFiles,
   AUTO_BACKUP_INTERVAL,
-  AUTO_KEEP_COUNT
+  AUTO_KEEP_COUNT,
+  AUTO_BACKUP_LAST_KEY
 } from '../utils/backup.js'
 import { saveTextFile, listAutoBackupNames, removeDocFile } from '../utils/backup-file.js'
 import { buildTxCsvRows, toCsv, withBom, csvFileName } from '../utils/csv.js'
@@ -76,8 +77,6 @@ export async function restoreBackup(obj) {
 
 /* ---------------- 自动备份（打开 App 时静默执行） ---------------- */
 
-const AUTO_LAST_KEY = 'cashDiary.autoBackup.lastAt'
-
 /**
  * 自动备份：距上次成功备份超过 24h 时，把整库写进应用私有目录（保留最近 3 份）。
  *
@@ -94,7 +93,7 @@ export async function autoBackupIfNeeded(nowTs) {
 
   let lastAt = 0
   try {
-    lastAt = Number(uni.getStorageSync(AUTO_LAST_KEY)) || 0
+    lastAt = Number(uni.getStorageSync(AUTO_BACKUP_LAST_KEY)) || 0
   } catch (e) { /* 读不到按从未备份处理 */ }
   if (!shouldAutoBackup(lastAt, nowTs, AUTO_BACKUP_INTERVAL)) {
     return { ran: false, reason: 'fresh' }
@@ -104,7 +103,7 @@ export async function autoBackupIfNeeded(nowTs) {
     const text = await exportJson()
     await saveTextFile(autoBackupFileName(nowTs), text)
     try {
-      uni.setStorageSync(AUTO_LAST_KEY, nowTs == null ? Date.now() : Number(nowTs))
+      uni.setStorageSync(AUTO_BACKUP_LAST_KEY, nowTs == null ? Date.now() : Number(nowTs))
     } catch (e) { /* 标记写失败最多导致下次多备一份，不致命 */ }
 
     // 清理旧自动备份：只留最近 AUTO_KEEP_COUNT 份（失败不影响本次备份结果）
