@@ -66,12 +66,17 @@ export const useAccountStore = defineStore('account', function () {
     persistCurrent()
   }
 
-  /** 新建账本并自动切过去（sqlite/memory 都直接返回新建的 id，无需再扫描列表） */
+  /**
+   * 新建账本并自动切过去。
+   *
+   * ⚠️ `accountService.create()` 返回的是**数字 id**（两个适配器的 accountInsert 都返回 id），
+   * 不是对象 —— 曾按 `created.id` 取值，导致新建后根本没切过去（T2.4 引入的回归）。
+   */
   async function create(name) {
-    const created = await accountService.create(name)
+    const newId = Number(await accountService.create(name))
     await refresh()
-    if (created && created.id) setCurrent(created.id)
-    return created
+    if (newId) setCurrent(newId)
+    return newId
   }
 
   async function rename(id, name) {
