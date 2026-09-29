@@ -26,11 +26,11 @@
       </view>
     </view>
 
-    <!-- 3. 本月攒钱小目标（点一下可设置目标金额） -->
+    <!-- 3. 累计攒钱目标（点一下可设置目标金额；进度按累计口径，按月口径见 T3.8） -->
     <view class="goal-card" hover-class="goal-hover" @click="editGoal">
       <image class="goal-img" src="/static/milo/milo-rich.webp" mode="aspectFit" />
       <view class="goal-main">
-        <text class="goal-title">本月攒钱小目标</text>
+        <text class="goal-title">累计攒钱目标</text>
         <text class="goal-sub">{{ goalText }}</text>
         <view class="goal-bar"><view class="goal-bar-i" :style="{ width: goalPct + '%' }" /></view>
         <text class="goal-tip">{{ goalTip }}</text>
@@ -143,7 +143,7 @@ const savedCents = computed(function () {
   return txStore.overview.incomeCents
 })
 const goalText = computed(function () {
-  if (!goalCents.value) return '点一下设置攒钱小目标'
+  if (!goalCents.value) return '点一下设置攒钱目标'
   return '已存 ¥' + formatCents(savedCents.value) + ' / 目标 ¥' + formatCents(goalCents.value)
 })
 const goalPct = computed(function () {
@@ -159,7 +159,7 @@ const goalTip = computed(function () {
 
 function editGoal() {
   uni.showModal({
-    title: '本月攒钱小目标',
+    title: '累计攒钱目标',
     editable: true,
     placeholderText: '输入目标金额（元）',
     content: goalCents.value ? String(goalCents.value / 100) : '',
@@ -397,7 +397,7 @@ async function doRestoreApply(obj) {
 function confirmReset() {
   uni.showModal({
     title: '重置数据',
-    content: '会清空本机全部流水并恢复内置分类。备份导出功能尚未完成，重置后无法找回。',
+    content: '会清空本机全部流水并恢复内置分类。重置前可先在「数据备份与恢复」导出备份，重置后无法找回。',
     confirmText: '继续',
     cancelText: '取消',
     success: function (r1) {
