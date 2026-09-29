@@ -41,6 +41,8 @@ export default [
         FileReader: 'readonly',
         TextEncoder: 'readonly',
         CSS: 'readonly',
+        // Node 环境（vitest 测试里读源码文件用）
+        process: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',

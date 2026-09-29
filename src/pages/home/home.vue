@@ -391,7 +391,7 @@ onShow(async function () {
 .ib {
   width: 18px;
   height: 18px;
-  background: #8a7450;
+  background: var(--cd-icon);
 }
 
 /* ---- 月份切换 ---- */
@@ -407,7 +407,7 @@ onShow(async function () {
   height: 28px;
   border-radius: 50%;
   background: var(--cd-primary-lt);
-  color: #8a7450;
+  color: var(--cd-icon);
   font-size: 16px;
   font-weight: 700;
   display: flex;
@@ -462,7 +462,7 @@ onShow(async function () {
 .bal-col-label {
   font-size: 13px;
   font-weight: 700;
-  color: #8a7450;
+  color: var(--cd-icon);
 }
 .bal-col-num {
   display: block;
@@ -536,7 +536,7 @@ onShow(async function () {
 .s-icon {
   width: 16px;
   height: 16px;
-  background: #b89968;
+  background: var(--cd-icon-2);
   flex: none;
 }
 .s-input {
@@ -558,7 +558,7 @@ onShow(async function () {
 }
 .s-clear-i {
   font-size: 14px;
-  color: #8a7450;
+  color: var(--cd-icon);
   line-height: 1;
 }
 /* 搜索结果计数行 */
@@ -575,7 +575,7 @@ onShow(async function () {
 .sm-clear {
   font-size: 12px;
   font-weight: 700;
-  color: #8a7450;
+  color: var(--cd-icon);
 }
 
 /* ---- 分段 ---- */
@@ -593,7 +593,7 @@ onShow(async function () {
   border-radius: var(--cd-r-pill);
   font-size: 14px;
   font-weight: 700;
-  color: #b89968;
+  color: var(--cd-icon-2);
 }
 .seg-item.on {
   background: var(--cd-primary);
@@ -648,7 +648,7 @@ onShow(async function () {
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #ffe97a, #ffc93c);
+  background: radial-gradient(circle at 30% 30%, #ffe97a, var(--cd-primary-deep));
   box-shadow: var(--cd-sh-pop);
   display: flex;
   align-items: center;
@@ -714,7 +714,7 @@ onShow(async function () {
   flex: 1;
   background: var(--cd-surface);
   border: 1.5px solid var(--cd-primary);
-  color: #8a7450;
+  color: var(--cd-icon);
   border-radius: var(--cd-r-pill);
   padding: 12px 0;
   font-size: 14px;

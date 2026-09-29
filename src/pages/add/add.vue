@@ -269,7 +269,7 @@ watch(
 .ib {
   width: 20px;
   height: 20px;
-  background: #8a7450;
+  background: var(--cd-icon);
 }
 .type-switch {
   display: flex;

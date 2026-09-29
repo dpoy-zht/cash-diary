@@ -46,7 +46,7 @@ const emoji = computed(function () {
 .ci-glyph {
   width: 70%;
   height: 70%;
-  background: #ffffff;
+  background: var(--cd-surface);
 }
 /* emoji 兜底（老数据）：emoji 字形本身几乎撑满字框，所以字号比上面的外框小一档才视觉一致 */
 .ci-emoji {

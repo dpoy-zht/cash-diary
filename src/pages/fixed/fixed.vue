@@ -26,7 +26,7 @@
             <view class="row-pen" :style="iconEdit" />
           </view>
         </view>
-        <switch :checked="f.enabled" color="#FFD93D" class="row-switch" @change="onToggle(f, $event)" />
+        <switch :checked="f.enabled" :color="UI_PRIMARY" class="row-switch" @change="onToggle(f, $event)" />
         <view class="row-del" @click="onRemove(f)"><text class="row-del-i">×</text></view>
       </view>
     </view>
@@ -81,7 +81,7 @@
         <!-- 启停（编辑时可直接在这里改，不用退回列表拨开关） -->
         <view class="f-row">
           <text class="f-row-label">启用自动记账</text>
-          <switch :checked="form.enabled" color="#FFD93D" class="f-row-switch" @change="onEnabledChange" />
+          <switch :checked="form.enabled" :color="UI_PRIMARY" class="f-row-switch" @change="onEnabledChange" />
         </view>
 
         <view class="form-row">
@@ -101,6 +101,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useFixedStore } from '../../stores/fixed.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { formatCents } from '../../utils/money.js'
+import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 const store = useFixedStore()
@@ -193,7 +194,7 @@ function onRemove(f) {
     title: '删除固定支出',
     content: '删掉后每月就不再自动记账了（已记的流水不受影响）',
     confirmText: '删除',
-    confirmColor: '#b93b39',
+    confirmColor: UI_DANGER,
     success: function (res) {
       if (!res.confirm) return
       store.remove(f.id).catch(function () {
@@ -247,7 +248,7 @@ onShow(function () {
 .ib {
   width: 18px;
   height: 18px;
-  background: #8a7450;
+  background: var(--cd-icon);
 }
 
 .tip-card {
@@ -329,7 +330,7 @@ onShow(function () {
 .row-pen {
   width: 13px;
   height: 13px;
-  background: #b89968;
+  background: var(--cd-icon-2);
   flex: none;
   margin-left: 6px;
 }
@@ -442,7 +443,7 @@ onShow(function () {
   padding: 7px 14px;
   border-radius: var(--cd-r-pill);
   background: var(--cd-primary-lt);
-  color: #8a7450;
+  color: var(--cd-icon);
   font-size: 13px;
   font-weight: 700;
 }
@@ -461,7 +462,7 @@ onShow(function () {
 .amt-y {
   font-size: 18px;
   font-weight: 800;
-  color: #8a7450;
+  color: var(--cd-icon);
 }
 .amt-input {
   flex: 1;
@@ -486,7 +487,7 @@ onShow(function () {
   color: var(--cd-ink);
 }
 .day-arr {
-  color: #b89968;
+  color: var(--cd-icon-2);
   font-size: 16px;
 }
 .note-input {
@@ -520,7 +521,7 @@ onShow(function () {
   flex: 1;
   background: var(--cd-surface);
   border: 1.5px solid var(--cd-primary);
-  color: #8a7450;
+  color: var(--cd-icon);
   border-radius: var(--cd-r-pill);
   padding: 12px 0;
   font-size: 14px;

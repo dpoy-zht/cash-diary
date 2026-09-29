@@ -218,7 +218,7 @@ onShow(function () {
 .ib {
   width: 18px;
   height: 18px;
-  background: #8a7450;
+  background: var(--cd-icon);
 }
 
 /* ---- 总预算卡 ---- */
@@ -231,7 +231,7 @@ onShow(function () {
 }
 .tc-label {
   font-size: 12px;
-  color: #8a7450;
+  color: var(--cd-icon);
 }
 .tc-empty {
   display: block;
@@ -268,7 +268,7 @@ onShow(function () {
 .tc-tip {
   display: block;
   font-size: 11px;
-  color: #8a7450;
+  color: var(--cd-icon);
   margin-top: 6px;
 }
 .tc-edit {
@@ -304,10 +304,10 @@ onShow(function () {
 .bar-i {
   height: 100%;
   border-radius: 3px;
-  background: #ffffff;
+  background: var(--cd-surface);
 }
 .bar-i.safe {
-  background: #ffffff;
+  background: var(--cd-surface);
 }
 .bar-i.warn {
   background: #ffb74d;

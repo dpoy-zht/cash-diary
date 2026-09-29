@@ -87,7 +87,7 @@ function go(t) {
   font-weight: 600;
 }
 .tab.on {
-  color: #e8a317;
+  color: var(--cd-gold-ink);
 }
 /* 中间凸起的 + */
 .plus {

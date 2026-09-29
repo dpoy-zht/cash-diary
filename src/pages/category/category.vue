@@ -85,6 +85,7 @@ import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useCategoryStore } from '../../stores/category.js'
 import * as categoryService from '../../services/category.js'
+import { UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -214,7 +215,7 @@ function doRemove(c) {
     title: '删除分类',
     content: '确定删除「' + c.name + '」吗？',
     confirmText: '删除',
-    confirmColor: '#b93b39',
+    confirmColor: UI_DANGER,
     success: async function (res) {
       if (!res.confirm) return
       try {
@@ -283,7 +284,7 @@ onShow(function () {
 .ib {
   width: 18px;
   height: 18px;
-  background: #8a7450;
+  background: var(--cd-icon);
 }
 
 .seg {
@@ -300,7 +301,7 @@ onShow(function () {
   border-radius: var(--cd-r-pill);
   font-size: 14px;
   font-weight: 700;
-  color: #b89968;
+  color: var(--cd-icon-2);
 }
 .seg-item.on {
   background: var(--cd-primary);
@@ -343,7 +344,7 @@ onShow(function () {
   margin-top: 2px;
 }
 .row-arrow {
-  color: #d4c4a0;
+  color: var(--cd-icon-3);
   font-size: 18px;
 }
 .row-empty {

@@ -104,6 +104,7 @@ import {
   normalizeRemindEnabled
 } from '../../utils/notify.js'
 import { checkForUpdate, currentAppVersion, updateNow } from '../../services/update.js'
+import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -184,7 +185,7 @@ function editGoal() {
 const aboutVersionText = currentAppVersion()
 
 const fns = [
-  { key: 'budget', name: '预算设置', color: '#ffd93d', icon: 'M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 15l-4-4 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z' },
+  { key: 'budget', name: '预算设置', color: UI_PRIMARY, icon: 'M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 15l-4-4 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z' },
   { key: 'fixed', name: '固定支出', color: '#ffb74d', icon: 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z' },
   { key: 'category', name: '分类管理', color: '#ff8a65', icon: 'M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.41l9 9c.37.36.87.59 1.41.59s1.04-.23 1.41-.59l7-7c.36-.37.59-.87.59-1.41s-.23-1.04-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z' },
   { key: 'export', name: '数据备份与恢复', color: '#81c784', icon: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z' },
@@ -385,7 +386,7 @@ async function doRestore() {
       c.transaction_record + ' 笔流水、' + c.budget + ' 条预算\n\n' +
       '⚠️ 恢复会覆盖当前全部数据，无法撤销。',
     confirmText: '覆盖并恢复',
-    confirmColor: '#b93b39',
+    confirmColor: UI_DANGER,
     cancelText: '取消',
     success: function (res) {
       if (res.confirm) doRestoreApply(obj)
@@ -431,7 +432,7 @@ function confirmResetTwice() {
     title: '再次确认',
     content: '重置后无法撤销，确定要清空吗？',
     confirmText: '确认重置',
-    confirmColor: '#b93b39',
+    confirmColor: UI_DANGER,
     cancelText: '我再想想',
     success: function (r2) {
       if (!r2.confirm) return
@@ -504,7 +505,7 @@ onShow(function () {
 .head-level {
   display: block;
   font-size: 12px;
-  color: #8a7450;
+  color: var(--cd-icon);
   margin-top: 4px;
 }
 .head-chip {
@@ -516,7 +517,7 @@ onShow(function () {
 }
 .head-chip-t {
   font-size: 11px;
-  color: #8a7450;
+  color: var(--cd-icon);
   font-weight: 600;
 }
 
@@ -551,13 +552,13 @@ onShow(function () {
   color: var(--cd-income);
 }
 .sc-gold {
-  color: #e8a317;
+  color: var(--cd-gold-ink);
 }
 
 /* ---- 3. 攒钱目标卡 ---- */
 .goal-card {
   margin: 0 16px;
-  background: linear-gradient(135deg, #ffe9a8, #ffd93d);
+  background: linear-gradient(135deg, var(--cd-primary-lt), var(--cd-primary));
   border-radius: 20px;
   padding: 16px;
   display: flex;
@@ -586,7 +587,7 @@ onShow(function () {
 .goal-sub {
   display: block;
   font-size: 11px;
-  color: #8a7450;
+  color: var(--cd-icon);
   margin-top: 2px;
 }
 .goal-bar {
@@ -598,13 +599,13 @@ onShow(function () {
 }
 .goal-bar-i {
   height: 100%;
-  background: #ffffff;
+  background: var(--cd-surface);
   border-radius: 3px;
 }
 .goal-tip {
   display: block;
   font-size: 11px;
-  color: #8a7450;
+  color: var(--cd-icon);
   margin-top: 4px;
 }
 
@@ -640,7 +641,7 @@ onShow(function () {
 .fn-glyph {
   width: 20px;
   height: 20px;
-  background: #ffffff;
+  background: var(--cd-surface);
 }
 .fn-name {
   flex: 1;
@@ -649,7 +650,7 @@ onShow(function () {
   color: var(--cd-ink);
 }
 .fn-arrow {
-  color: #d4c4a0;
+  color: var(--cd-icon-3);
   font-size: 18px;
 }
 /* 记账提醒开关：胶囊滑块，开启用主题黄，与页面开关/分段控件同一套视觉 */
@@ -681,7 +682,7 @@ onShow(function () {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--cd-surface);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s var(--cd-ease);
 }
@@ -726,7 +727,7 @@ onShow(function () {
   margin: 16px 16px 8px;
   text-align: center;
   font-size: 11px;
-  color: #d4c4a0;
+  color: var(--cd-icon-3);
 }
 
 /* ---- 7. 开发期工具 ---- */

@@ -43,7 +43,7 @@ defineEmits(['update:modelValue'])
   transition: transform var(--cd-dur) var(--cd-ease);
 }
 .cat.on .cat-cic {
-  box-shadow: 0 0 0 3px var(--cd-primary-deep), 0 0 0 5.5px #ffffff;
+  box-shadow: 0 0 0 3px var(--cd-primary-deep), 0 0 0 5.5px var(--cd-surface);
   transform: scale(1.08);
 }
 .cat-name {

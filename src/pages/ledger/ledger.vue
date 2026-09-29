@@ -69,6 +69,7 @@ import { useAccountStore } from '../../stores/account.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { formatCents } from '../../utils/money.js'
 import { balanceCents } from '../../utils/stats.js'
+import { UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -101,7 +102,7 @@ const expenseText = computed(function () {
 })
 
 /** 列表行图标底色：轮流用参考包里的几个色，保证同名账本也不会撞色 */
-const ROW_COLORS = ['#ff8a65', '#81c784', '#f48fb1', '#ffc93c', '#ba68c8', '#4dd0e1']
+const ROW_COLORS = ['#ff8a65', '#81c784', '#f48fb1', 'var(--cd-primary-deep)', '#ba68c8', '#4dd0e1']
 function colorOfIndex(id) {
   const n = Number(id) || 1
   return ROW_COLORS[(n - 1) % ROW_COLORS.length]
@@ -199,7 +200,7 @@ function removeLedger(l) {
     title: '删除账本',
     content: '确定删除「' + l.name + '」吗？',
     confirmText: '删除',
-    confirmColor: '#b93b39',
+    confirmColor: UI_DANGER,
     success: function (res) {
       if (!res.confirm) return
       accountStore
@@ -260,7 +261,7 @@ onShow(function () {
 .ib {
   width: 18px;
   height: 18px;
-  background: #8a7450;
+  background: var(--cd-icon);
 }
 
 /* ---- 当前账本卡 ---- */
@@ -284,7 +285,7 @@ onShow(function () {
 }
 .lc-label {
   font-size: 12px;
-  color: #8a7450;
+  color: var(--cd-icon);
 }
 .lc-name {
   display: block;

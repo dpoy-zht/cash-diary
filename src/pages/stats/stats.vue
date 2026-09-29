@@ -339,12 +339,12 @@ onShow(function () {
 .ib {
   width: 18px;
   height: 18px;
-  background: #8a7450;
+  background: var(--cd-icon);
 }
 /* 月份胶囊：统计页自己选分析哪个月 */
 .month-chip {
   background: var(--cd-primary-lt);
-  color: #8a7450;
+  color: var(--cd-icon);
   font-size: 13px;
   font-weight: 700;
   padding: 7px 12px;
@@ -366,7 +366,7 @@ onShow(function () {
   border-radius: var(--cd-r-pill);
   font-size: 14px;
   font-weight: 700;
-  color: #b89968;
+  color: var(--cd-icon-2);
 }
 .seg-item.on {
   background: var(--cd-primary);
@@ -403,7 +403,7 @@ onShow(function () {
 .donut-center {
   position: absolute;
   inset: 25%;
-  background: #ffe082;
+  background: var(--cd-primary-mid);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -569,7 +569,7 @@ onShow(function () {
 .ts-item {
   font-size: 12px;
   font-weight: 700;
-  color: #b89968;
+  color: var(--cd-icon-2);
   padding: 4px 12px;
   border-radius: var(--cd-r-pill);
 }
@@ -613,14 +613,14 @@ onShow(function () {
 .bar-fill {
   width: 100%;
   border-radius: 8px 8px 3px 3px;
-  background: #ffe082;
+  background: var(--cd-primary-mid);
   transition: height 240ms var(--cd-ease);
 }
 .bar-fill.max {
-  background: #ffc93c;
+  background: var(--cd-primary-deep);
 }
 .bar-fill.income {
-  background: #a5d6a7;
+  background: var(--cd-income-lt);
 }
 .bar-fill.income.max {
   background: var(--cd-income);

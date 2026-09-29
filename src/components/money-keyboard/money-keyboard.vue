@@ -106,6 +106,6 @@ function tap(k) {
 .key-del {
   width: 24px;
   height: 24px;
-  background: #8a7450;
+  background: var(--cd-icon);
 }
 </style>
