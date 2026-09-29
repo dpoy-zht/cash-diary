@@ -50,10 +50,19 @@
           <view class="fn-glyph" :style="maskOf(f)" />
         </view>
         <text class="fn-name">{{ f.name }}</text>
-        <!-- 记账提醒：开关样式替代箭头，点击整行切换 -->
+        <!-- 超支提醒：开关样式替代箭头，点击整行切换 -->
         <view v-if="f.key === 'remind'" class="fn-right">
           <text class="fn-switch-label">{{ remindOn ? '已开启' : '已关闭' }}</text>
           <view class="fn-switch" :class="{ on: remindOn }"><view class="fn-switch-dot" /></view>
+        </view>
+        <!-- 每日记账提醒：点时间=改时间（顺带开启），点开关=开关。右侧整体阻止冒泡，避免连带整行切换 -->
+        <view v-else-if="f.key === 'daily'" class="fn-right" @click.stop>
+          <picker class="fn-picker" mode="time" :value="dailyHm" @change="onDailyTimeChange">
+            <text class="fn-time" :class="{ off: !dailyOn }">{{ dailyOn ? dailyHm : '未开启' }}</text>
+          </picker>
+          <view class="fn-switch" :class="{ on: dailyOn }" @click="toggleDaily">
+            <view class="fn-switch-dot" />
+          </view>
         </view>
         <text v-else class="fn-arrow">{{ f.right || '›' }}</text>
       </view>
@@ -103,6 +112,8 @@ import {
   REMIND_PREF_KEY,
   normalizeRemindEnabled
 } from '../../utils/notify.js'
+import { getDailyConfig, saveDailyConfig, refreshReminders } from '../../services/reminder.js'
+import { DEFAULT_DAILY_HM } from '../../utils/reminder.js'
 import { checkForUpdate, currentAppVersion, updateNow } from '../../services/update.js'
 import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
@@ -190,7 +201,8 @@ const fns = [
   { key: 'category', name: '分类管理', color: '#ff8a65', icon: 'M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.41l9 9c.37.36.87.59 1.41.59s1.04-.23 1.41-.59l7-7c.36-.37.59-.87.59-1.41s-.23-1.04-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z' },
   { key: 'export', name: '数据备份与恢复', color: '#81c784', icon: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z' },
   { key: 'update', name: '检查更新', color: '#7986cb', icon: 'M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z' },
-  { key: 'remind', name: '记账提醒', color: '#4dd0e1', icon: 'M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z' },
+  { key: 'remind', name: '超支提醒', color: '#4dd0e1', icon: 'M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z' },
+  { key: 'daily', name: '每日记账提醒', color: '#64b5f6', icon: 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z' },
   { key: 'skin', name: '皮肤（当前：奶龙黄）', color: '#ba68c8', icon: 'M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7-1c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5L6.89 16.5c.8 2.04 2.78 3.5 5.11 3.5z' },
   { key: 'about', name: '关于', color: '#a1887f', right: aboutVersionText, icon: 'M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z' }
 ]
@@ -218,6 +230,10 @@ function tapFn(f) {
   }
   if (f.key === 'remind') {
     toggleRemind()
+    return
+  }
+  if (f.key === 'daily') {
+    toggleDaily()
     return
   }
   if (f.key === 'budget') {
@@ -273,7 +289,7 @@ function checkUpdateManual() {
     })
 }
 
-/* ---- 记账提醒开关（控制超支系统通知；状态持久化，重装/清数据后回到默认开启） ---- */
+/* ---- 超支提醒开关（控制超预算系统通知；状态持久化，重装/清数据后回到默认开启） ---- */
 const remindOn = ref(true)
 
 function loadRemindPref() {
@@ -299,6 +315,48 @@ function toggleRemind() {
   } else {
     uni.showToast({ title: '超支系统通知已关闭', icon: 'none' })
   }
+}
+
+/* ---- 每日记账提醒（T4.1）：开关 + 提醒时刻。默认关闭，用户主动开启 ---- */
+const dailyOn = ref(false)
+const dailyHm = ref(DEFAULT_DAILY_HM)
+
+function loadDailyPref() {
+  const c = getDailyConfig()
+  dailyOn.value = c.enabled
+  dailyHm.value = c.hm
+}
+
+/** 开关切换：写盘失败就回滚界面状态，不假装成功 */
+function toggleDaily() {
+  const next = !dailyOn.value
+  const saved = saveDailyConfig({ enabled: next, hm: dailyHm.value })
+  if (!saved) {
+    uni.showToast({ title: '保存失败，请重试', icon: 'none' })
+    return
+  }
+  dailyOn.value = saved.enabled
+  dailyHm.value = saved.hm
+  if (next) {
+    requestNotifyPermission()
+    uni.showToast({ title: '每天 ' + saved.hm + ' 提醒你记账', icon: 'none' })
+  } else {
+    uni.showToast({ title: '已关闭每日提醒', icon: 'none' })
+  }
+}
+
+/** 改时间即视为想开启（用户都点进来选时间了），否则这个 picker 意义不明 */
+function onDailyTimeChange(e) {
+  const hm = (e && e.detail && e.detail.value) || dailyHm.value
+  const saved = saveDailyConfig({ hm: hm, enabled: true })
+  if (!saved) {
+    uni.showToast({ title: '保存失败，请重试', icon: 'none' })
+    return
+  }
+  dailyOn.value = saved.enabled
+  dailyHm.value = saved.hm
+  requestNotifyPermission()
+  uni.showToast({ title: '每天 ' + saved.hm + ' 提醒你记账', icon: 'none' })
 }
 
 /* ---- 数据备份与恢复 ---- */
@@ -404,6 +462,8 @@ async function doRestoreApply(obj) {
     await budgetStore.load()
     // 整库被替换：查询缓存必须失效，否则 refresh 会命中旧缓存读到恢复前的数据
     metaStore.bumpData()
+    // 固定支出配置也换了，缴费提醒得按恢复后的配置重排（T4.1）
+    refreshReminders()
     await txStore.refresh(metaStore.ym)
     uni.hideLoading()
     uni.showToast({ title: '已恢复 ' + counts.transaction_record + ' 笔流水', icon: 'none' })
@@ -452,6 +512,8 @@ async function doReset() {
     await Promise.all([accountStore.reload(), budgetStore.load()])
     // 整库重建：查询缓存必须失效（T3.10），否则首页/账本页会拿缓存的旧数据
     metaStore.bumpData()
+    // 固定支出已清空，缴费提醒也要跟着重排（T4.1）
+    refreshReminders()
     await txStore.refresh(metaStore.ym)
     uni.hideLoading()
     uni.showToast({ title: '已重置', icon: 'none' })
@@ -468,6 +530,7 @@ onShow(function () {
     goalCents.value = 0
   }
   loadRemindPref()
+  loadDailyPref()
   txStore.refresh(metaStore.ym)
 })
 </script>
@@ -661,6 +724,22 @@ onShow(function () {
 }
 .fn-switch-label {
   font-size: 12px;
+  color: var(--cd-ink-2);
+}
+/* 每日提醒的时刻胶囊：点它开系统时间选择器 */
+.fn-picker {
+  padding: 4px 10px;
+  background: var(--cd-primary-lt);
+  border-radius: var(--cd-r-pill);
+}
+.fn-time {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cd-icon);
+  font-variant-numeric: tabular-nums;
+}
+.fn-time.off {
+  font-weight: 400;
   color: var(--cd-ink-2);
 }
 .fn-switch {

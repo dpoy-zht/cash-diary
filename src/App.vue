@@ -1,10 +1,11 @@
 <script setup>
-import { onLaunch } from '@dcloudio/uni-app'
+import { onLaunch, onShow } from '@dcloudio/uni-app'
 import { initDB } from './db/index.js'
 import { useCategoryStore } from './stores/category.js'
 import { useAccountStore } from './stores/account.js'
-import { listenPushClick } from './utils/notify.js'
+import { listenPushClick, pushRouteFor } from './utils/notify.js'
 import { checkForUpdate, updateNow } from './services/update.js'
+import { startReminders, refreshReminders } from './services/reminder.js'
 // #ifdef H5
 import { setPersistErrorHandler, flush as flushMemory } from './db/memory.js'
 // #endif
@@ -15,6 +16,8 @@ onLaunch(() => {
   // 账本要先就绪：流水查询都带"当前账本"过滤，账本没初始化好会查错账本
   initDB()
     .then(() => Promise.all([categoryStore.init(), accountStore.init()]))
+    // 数据就绪后再起提醒引擎：固定支出要读库，账本没初始化好会读错账本
+    .then(() => startReminders(function () { return accountStore.currentId }))
     .catch((err) => console.error('[cash-diary] 初始化失败：', err))
 
   // #ifdef H5
@@ -36,12 +39,15 @@ onLaunch(() => {
   })
   // #endif
 
-  // 点系统通知直达对应页面：超支通知 → 预算页（等路由就绪后再跳，冷启动直接跳会丢）
+  // 点系统通知直达对应页面（路由表见 utils/notify.js 的 PUSH_ROUTES）：
+  // 超支 → 预算页；每日提醒 → 记一笔；缴费提醒 → 固定支出页。
+  // 等路由就绪后再跳，冷启动直接跳会丢。
   listenPushClick(function (payload) {
-    if (payload !== 'over-budget') return
+    const url = pushRouteFor(payload)
+    if (!url) return
     setTimeout(function () {
       try {
-        uni.navigateTo({ url: '/pages/budget/budget' })
+        uni.navigateTo({ url: url })
       } catch (e) { /* 跳转失败落在首页，可接受 */ }
     }, 800)
   })
@@ -62,6 +68,18 @@ onLaunch(() => {
       })
     })
     .catch(function () { /* 离线/超时静默 */ })
+})
+
+/**
+ * 每次回到前台重排一轮提醒（T4.1）：
+ * ① 补发「今天已经过点但还没提醒过」的那条（冷启动补偿，这是"重启后提醒仍在"的关键）；
+ * ② 顺手重排定时器 —— 设备休眠/改时钟会让长 setTimeout 变不可靠，回前台重新对齐最稳。
+ * 引擎还没起来（首次 initDB 未完成）时是 no-op。
+ */
+onShow(function () {
+  try {
+    refreshReminders()
+  } catch (e) { /* 提醒排定失败绝不能影响 App 启动 */ }
 })
 </script>
 

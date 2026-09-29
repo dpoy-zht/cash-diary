@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as accountService from '../services/account.js'
+import { refreshReminders } from '../services/reminder.js'
 
 /** 上次选中的账本 id，切 App 回来还在同一个账本 */
 const CUR_KEY = 'cashDiary.currentAccountId'
@@ -64,6 +65,10 @@ export const useAccountStore = defineStore('account', function () {
   function setCurrent(id) {
     currentId.value = id
     persistCurrent()
+    // 切了账本就换了一套固定支出配置，缴费提醒必须按新账本重排（T4.1）
+    try {
+      refreshReminders()
+    } catch (e) { /* 提醒排定失败不影响账本切换 */ }
   }
 
   /**

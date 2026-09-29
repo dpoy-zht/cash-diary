@@ -208,7 +208,7 @@ const overDetail = computed(function () {
   return '本月已花 ¥' + formatCents(s.spentCents) + '，超出预算 ¥' + formatCents(-s.remainCents)
 })
 
-/** 「记账提醒」开关：我的页可关。读不到/异常时默认开（与 normalizeRemindEnabled 的默认语义一致） */
+/** 「超支提醒」开关：我的页可关。读不到/异常时默认开（与 normalizeRemindEnabled 的默认语义一致） */
 function remindEnabled() {
   try {
     return normalizeRemindEnabled(uni.getStorageSync(REMIND_PREF_KEY))
@@ -220,7 +220,7 @@ function remindEnabled() {
 /**
  * 超支自动提醒：应用内弹窗 + 系统本地通知（App 端），每账本每月合计只来一次。
  * 去重键两路共用 —— 弹过（发过）就都不再来第二次。
- * 系统通知受「记账提醒」开关控制（我的页）；应用内弹窗是预算功能本身，不受开关影响。
+ * 系统通知受「超支提醒」开关控制（我的页）；应用内弹窗是预算功能本身，不受开关影响。
  */
 function maybeAlertOver() {
   const s = budgetStat.value

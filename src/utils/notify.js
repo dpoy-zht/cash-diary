@@ -18,8 +18,33 @@ export function notifySupported() {
   }
 }
 
-/** 「记账提醒」系统通知开关的存储键（me 页写入并展示，home 页发送通知前读取） */
+/** 「超支提醒」系统通知开关的存储键（me 页写入并展示，home 页发送通知前读取） */
 export const REMIND_PREF_KEY = 'cashDiary.remind.enabled'
+
+/* ---------------------------------------------------------------------------
+   通知 payload（T4.1）：点击通知后据此决定跳到哪个页面。
+   同一条 payload 由 notifyLocal 写入、由 listenPushClick 读回，两端必须一致，
+   因此常量与路由表都放在本文件，改一处就改这一份。
+   --------------------------------------------------------------------------- */
+export const PAYLOAD_OVER_BUDGET = 'over-budget' // 超预算（首页触发）
+export const PAYLOAD_DAILY = 'daily-remind' // 每日记账提醒
+export const PAYLOAD_FIXED = 'fixed-due' // 固定支出缴费提醒
+
+/** payload → 目标页面路由；未知 payload 返回空串（调用方不跳转） */
+export const PUSH_ROUTES = {
+  [PAYLOAD_OVER_BUDGET]: '/pages/budget/budget',
+  [PAYLOAD_DAILY]: '/pages/add/add',
+  [PAYLOAD_FIXED]: '/pages/fixed/fixed'
+}
+
+/**
+ * payload 到路由的映射（纯函数，可单测）。
+ * 每日提醒直达「记一笔」（提升打开率就是让它离记账只有一步）；
+ * 缴费提醒去固定支出页（用户要看是哪一笔、要不要改配置）。
+ */
+export function pushRouteFor(payload) {
+  return PUSH_ROUTES[String(payload == null ? '' : payload)] || ''
+}
 
 /**
  * 归一化提醒开关：**默认开启**（没存过 = 开）。
@@ -59,14 +84,19 @@ export function requestNotifyPermission() {
 /**
  * 发一条本地系统通知。App 端返回 true；其他端 / 异常返回 false（调用方无需兜底提示，
  * 因为通知永远与应用内提醒同时出现，用户至少能看到应用内的那份）。
- * payload 固定为 'over-budget'，点击通知的后续行为可以据此路由（暂未处理点击事件）。
+ *
+ * @param {string} title 通知标题
+ * @param {string} content 通知正文
+ * @param {string} [payload] 点击后用于路由的标记（见 PAYLOAD_* / pushRouteFor）；
+ *   不传保持历史行为 'over-budget'，老调用点（首页超支）无需改动。
  */
-export function notifyLocal(title, content) {
+export function notifyLocal(title, content, payload) {
   try {
     if (!notifySupported()) return false
     const opts = { cover: false }
     if (title) opts.title = String(title)
-    plus.push.createMessage(String(content || ''), 'over-budget', opts)
+    const tag = payload == null ? PAYLOAD_OVER_BUDGET : String(payload)
+    plus.push.createMessage(String(content || ''), tag, opts)
     return true
   } catch (e) {
     return false
