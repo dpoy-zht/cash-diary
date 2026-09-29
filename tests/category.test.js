@@ -154,4 +154,37 @@ describe('分类管理（增删改 + 排序）', () => {
       expect(all.find(function (c) { return c.id === expense[1].id }).count).toBe(0)
     })
   })
+
+  describe('可选图标清单（T3.4 按类型过滤）', () => {
+    it('不传类型时返回全部 19 个（兼容旧调用方）', () => {
+      expect(categoryService.iconOptions().length).toBe(19)
+      expect(categoryService.iconOptions(null).length).toBe(19)
+      expect(categoryService.iconOptions('xxx').length).toBe(19)
+    })
+
+    it('支出：含「其他」，不含工资/红包(收入)等收入语义图标', () => {
+      const keys = categoryService.iconOptions('expense')
+      expect(keys).toContain('more')
+      expect(keys).toContain('breakfast')
+      expect(keys).not.toContain('salary')
+      expect(keys).not.toContain('redbag')
+      expect(keys.length).toBe(12)
+    })
+
+    it('收入：含「其他」，不含奶茶/打车等支出语义图标', () => {
+      const keys = categoryService.iconOptions('income')
+      expect(keys).toContain('more')
+      expect(keys).toContain('salary')
+      expect(keys).not.toContain('milktea')
+      expect(keys).not.toContain('taxi')
+      expect(keys.length).toBe(8)
+    })
+
+    it('每个内置分类的图标都能在自己的类型清单里找到（过滤器不自相矛盾）', async () => {
+      const all = await categoryService.listAll()
+      all.forEach(function (c) {
+        expect(categoryService.iconOptions(c.type), c.name).toContain(c.icon)
+      })
+    })
+  })
 })

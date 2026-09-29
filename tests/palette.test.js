@@ -3,11 +3,12 @@ import {
   CATEGORY_TINTS,
   CATEGORY_COLORS,
   CATEGORY_ICONS,
+  CATEGORY_ICON_GROUPS,
   tintOf,
   colorOf,
   iconMaskStyle
 } from '../src/utils/palette.js'
-import { DEFAULT_CATEGORIES } from '../src/services/category.js'
+import { DEFAULT_CATEGORIES, iconOptions } from '../src/services/category.js'
 
 describe('tintOf —— 兜底底色（纯展示层）', () => {
   it('兜底表为 8 个合法十六进制色，且互不重复', () => {
@@ -77,6 +78,44 @@ describe('内置分类与 v2.0 参考包对齐', () => {
     expect(income.map(function (c) { return c.sort })).toEqual(
       Array.from({ length: 8 }, function (_v, i) { return i + 1 })
     )
+  })
+
+  it('内置分类的图标都在本类型的可选清单里（过滤器不会把既有图标藏起来）', () => {
+    DEFAULT_CATEGORIES.forEach(function (c) {
+      expect(iconOptions(c.type), c.name + ' / ' + c.icon).toContain(c.icon)
+    })
+  })
+})
+
+describe('CATEGORY_ICON_GROUPS —— 图标语义分组（T3.4）', () => {
+  function grouped() {
+    return []
+      .concat(CATEGORY_ICON_GROUPS.common)
+      .concat(CATEGORY_ICON_GROUPS.expense)
+      .concat(CATEGORY_ICON_GROUPS.income)
+  }
+
+  it('19 个图标全部被分组覆盖，没有"永远选不到"的图标', () => {
+    const g = grouped()
+    Object.keys(CATEGORY_ICONS).forEach(function (k) {
+      expect(g.indexOf(k), k + ' 未被任何分组覆盖').toBeGreaterThan(-1)
+    })
+  })
+
+  it('分组里的 key 都有图标定义，且不重复', () => {
+    const g = grouped()
+    expect(new Set(g).size).toBe(g.length)
+    g.forEach(function (k) {
+      expect(CATEGORY_ICONS[k], k + ' 没有图标定义').toBeTruthy()
+    })
+  })
+
+  it('收入图标不进支出组，反之亦然；「其他」为两类共用', () => {
+    expect(CATEGORY_ICON_GROUPS.expense).not.toContain('salary')
+    expect(CATEGORY_ICON_GROUPS.expense).not.toContain('redbag')
+    expect(CATEGORY_ICON_GROUPS.income).not.toContain('milktea')
+    expect(CATEGORY_ICON_GROUPS.income).not.toContain('taxi')
+    expect(CATEGORY_ICON_GROUPS.common).toEqual(['more'])
   })
 })
 

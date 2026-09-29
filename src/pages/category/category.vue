@@ -111,7 +111,13 @@ function countOf(t) {
   return all.value.filter(function (c) { return c.type === t }).length
 }
 
-const iconKeys = categoryService.iconOptions()
+/**
+ * 图标清单随当前类型变化（T3.4）：支出列表里不该出现「工资」这类收入语义的图标。
+ * 换图标面板打开时当前列表就是被编辑分类所属类型，所以用同一个 type 即可。
+ */
+const iconKeys = computed(function () {
+  return categoryService.iconOptions(type.value)
+})
 
 async function reload() {
   all.value = await categoryService.listWithStats()

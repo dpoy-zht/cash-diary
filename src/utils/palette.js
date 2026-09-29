@@ -75,6 +75,31 @@ export const CATEGORY_ICONS = {
     'M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 4H6v-4h6v4z',
 }
 
+/**
+ * 图标语义分组（T3.4）：新建/换图标时按分类类型过滤，
+ * 避免给"支出"分类选到「工资」，或给"收入"分类选到「奶茶」这种明显不搭的图标。
+ *
+ * - `common`：两类共用（「其他」）。
+ * - 这里必须与 CATEGORY_ICONS 保持一一覆盖，否则会有点不出来的图标（有测试守着）。
+ */
+export const CATEGORY_ICON_GROUPS = {
+  common: ['more'],
+  expense: [
+    'breakfast',
+    'lunch',
+    'snack',
+    'milktea',
+    'bus',
+    'taxi',
+    'shop',
+    'home',
+    'fun',
+    'med',
+    'gift'
+  ],
+  income: ['salary', 'bonus', 'part', 'invest', 'redbag', 'reimb', 'sell']
+}
+
 /** 兜底轮换色：未知分类 / 老数据按 id 取色时用 */
 export const CATEGORY_TINTS = [
   '#ff8a65',

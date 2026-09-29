@@ -10,7 +10,7 @@
  * - 分类是**全局的**（不按账本区分）：多账本共用一套分类，符合使用直觉。
  */
 import * as categoryRepo from '../db/repository/category.js'
-import { CATEGORY_ICONS } from '../utils/palette.js'
+import { CATEGORY_ICONS, CATEGORY_ICON_GROUPS } from '../utils/palette.js'
 import { TYPE_EXPENSE, TYPE_INCOME } from '../utils/constant.js'
 
 /** 内置分类：12 支出 + 8 收入（对齐 v2.0 参考包的 20 个分类） */
@@ -61,9 +61,21 @@ export async function listWithStats() {
   })
 }
 
-/** 可选图标清单（供"新建/换图标"选择器用） */
-export function iconOptions() {
-  return Object.keys(CATEGORY_ICONS)
+/**
+ * 可选图标清单（供"新建/换图标"选择器用）。
+ *
+ * 传 type 时只返回该类型语义匹配的图标（T3.4）：支出里不该出现「工资」这种收入图标。
+ * 顺序按 CATEGORY_ICONS 的声明顺序过滤得出，保证选择器里图标位置稳定、不随分组表漂移。
+ * 不传 type / 类型非法时返回全部 19 个（兼容旧调用方）。
+ *
+ * @param {string} [type] 'expense' | 'income'
+ * @returns {string[]} icon key 列表
+ */
+export function iconOptions(type) {
+  const all = Object.keys(CATEGORY_ICONS)
+  if (type !== TYPE_EXPENSE && type !== TYPE_INCOME) return all
+  const picked = (CATEGORY_ICON_GROUPS[type] || []).concat(CATEGORY_ICON_GROUPS.common || [])
+  return all.filter(function (k) { return picked.indexOf(k) !== -1 })
 }
 
 function cleanName(name) {
