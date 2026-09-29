@@ -62,10 +62,14 @@ export async function init() {
   const done = await appliedVersions()
   for (const mig of MIGRATIONS) {
     if (done.indexOf(mig.version) !== -1) continue
-    await executeBatch(splitSql(mig.sql))
-    await executeBatch([
-      'INSERT INTO schema_migrations (version, applied_at) VALUES (' + mig.version + ', ' + Date.now() + ')'
-    ])
+    // 每个版本的「迁移 SQL + 版本登记」必须原子：中途失败整体回滚并中止启动，
+    // 否则会出现"半迁移"——重启后既无新结构、也无登记记录，无法判定也无法续跑
+    await transaction(async function () {
+      await executeBatch(splitSql(mig.sql))
+      await executeBatch([
+        'INSERT INTO schema_migrations (version, applied_at) VALUES (' + mig.version + ', ' + Date.now() + ')'
+      ])
+    })
   }
 }
 
