@@ -82,6 +82,33 @@ export function ymLabel(ym) {
   return Number(parts[1]) + '月'
 }
 
+/**
+ * 'YYYY-MM-DD' → 当天 00:00 的毫秒时间戳；非法（含 2026-02-30 这种不存在的日期）返回 null。
+ * 与 tsFromDateStr 的区别：那个会把时间部分顶成"此刻"，这个固定 00:00 —— 区间筛选必须用它。
+ */
+export function dateStrStart(dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr == null ? '' : dateStr).trim())
+  if (!m) return null
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  const dt = new Date(y, mo - 1, d, 0, 0, 0, 0)
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null
+  return dt.getTime()
+}
+
+/**
+ * 'YYYY-MM-DD' → **次日** 00:00（左闭右开区间的右端点）。
+ * 用它是为了让"结束日期"含当天：用户选 9-30，就该查到 9-30 23:59 的账。
+ */
+export function dateStrEndExclusive(dateStr) {
+  const s = dateStrStart(dateStr)
+  if (s === null) return null
+  const d = new Date(s)
+  d.setDate(d.getDate() + 1)
+  return d.getTime()
+}
+
 /** date 输入框字符串 → 毫秒时间戳（时间部分取当前时刻；空值返回当前时间） */
 export function tsFromDateStr(dstr) {
   const now = new Date()

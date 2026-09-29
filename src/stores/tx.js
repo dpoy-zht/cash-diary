@@ -4,6 +4,7 @@ import * as txService from '../services/tx.js'
 import { useAccountStore } from './account.js'
 import { useMetaStore } from './meta.js'
 import { lastNMonths, monthRange, toDateStr } from '../utils/date.js'
+import { emptyFilters, normalizeFilters, hasAnyFilter } from '../utils/search.js'
 import { monthlySummaries, periodRange, trendSpecFor, sumByType, bucketSummaries } from '../utils/stats.js'
 
 /** 趋势图统计的月份数 */
@@ -24,27 +25,45 @@ export const useTxStore = defineStore('tx', function () {
   const periodSummary = ref({ expenseCents: 0, incomeCents: 0 })
   const periodTrend = ref([])
 
-  /** 首页搜索：跨月流水（备注/分类名命中）。关键词为空时结果清空，回到月份视图 */
+  /**
+   * 首页搜索：跨月流水（备注/分类名命中）+ 组合筛选（T4.3）。
+   * 关键词与筛选**任一存在**就算"搜索中"：只按"支出 + 20~100 元"找账也是合法的用法。
+   */
   const searchKeyword = ref('')
+  const searchFilters = ref(emptyFilters())
   const searchResults = ref([])
 
   /** 搜索是否生效（列表区据此切换数据源） */
   function isSearching() {
-    return searchKeyword.value.trim() !== ''
+    return searchKeyword.value.trim() !== '' || hasAnyFilter(searchFilters.value)
   }
 
-  async function search(kw) {
+  /**
+   * 执行搜索。
+   * @param {string} kw 关键词
+   * @param {object} [filters] 筛选条件（原始输入即可，服务层会归一化）
+   */
+  async function search(kw, filters) {
     const text = String(kw == null ? '' : kw)
     searchKeyword.value = text
-    if (!text.trim()) {
+    searchFilters.value = normalizeFilters(
+      filters === undefined ? searchFilters.value : filters
+    )
+    if (!isSearching()) {
       searchResults.value = []
       return
     }
-    searchResults.value = await txService.search(text, currentAccount())
+    searchResults.value = await txService.search(text, currentAccount(), searchFilters.value)
+  }
+
+  /** 只改筛选、沿用当前关键词（筛选面板点"应用"走这条） */
+  async function searchWithFilters(filters) {
+    return search(searchKeyword.value, filters)
   }
 
   function clearSearch() {
     searchKeyword.value = ''
+    searchFilters.value = emptyFilters()
     searchResults.value = []
   }
 
@@ -186,9 +205,11 @@ export const useTxStore = defineStore('tx', function () {
     periodSummary,
     periodTrend,
     searchKeyword,
+    searchFilters,
     searchResults,
     isSearching,
     search,
+    searchWithFilters,
     clearSearch,
     loadMonth,
     loadOverview,

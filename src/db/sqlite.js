@@ -2,7 +2,8 @@
  * App 端存储：HTML5+ plus.sqlite（原生 SQLite）。
  * 迁移机制：schema_migrations 表登记已执行版本，启动时按序补跑未执行的迁移脚本。
  */
-import { sqlValue, likePattern } from './sql-value.js'
+import { sqlValue } from './sql-value.js'
+import { buildTxSearchSql } from './tx-search-sql.js'
 import { MIGRATIONS } from './schema.js'
 import { aid } from '../utils/constant.js'
 
@@ -287,22 +288,31 @@ export async function txListByRange(start, end, accountId) {
  * 搜索：备注包含 noteKw（LIKE 包含匹配，通配符已转义）或分类命中 categoryIds。
  * 两个条件为"或"的关系；都为空则返回空（避免全表扫描式误用）。
  */
-export async function txSearch(noteKw, categoryIds, accountId, limit) {
-  const max = Math.max(1, Math.floor(Number(limit) || 100))
-  const kw = String(noteKw || '')
-  const ids = (Array.isArray(categoryIds) ? categoryIds : [])
-    .map(Number)
-    .filter(function (n) { return n > 0 })
-  const conds = []
-  if (kw) conds.push('note LIKE ' + likePattern(kw) + " ESCAPE '\\'")
-  if (ids.length) conds.push('category_id IN (' + ids.join(',') + ')')
-  if (!conds.length) return []
-  return select(
-    'SELECT * FROM transaction_record ' +
-    'WHERE deleted_at IS NULL AND account_id = ' + aid(accountId) + ' ' +
-    'AND (' + conds.join(' OR ') + ') ' +
-    'ORDER BY occurred_at DESC LIMIT ' + max
-  )
+/**
+ * 搜索（T4.3 起支持组合筛选）。语义与 memory.js 的同名函数**必须逐条一致**：
+ *
+ * - 关键词组（组内 OR）：`note LIKE 关键词` **或** `category_id IN 关键词命中的分类`
+ *   —— 也就是原来的行为，用户搜"奶茶"既能搜到备注、也能搜到分类叫"奶茶"的账。
+ * - 显式筛选组（组内 AND）：类型 / 分类多选 / 金额区间 / 日期区间，**逐条收窄**。
+ * - 两组之间是 AND：关键词负责"找"，筛选负责"筛"。
+ * - 一组都没有 → 返回空数组（不做全表扫描）。
+ *
+ * ⚠️ SQL 的拼装与转义细节（sqlValue / likePattern / 括号结构）全在
+ * `db/tx-search-sql.js` 里，那里是纯函数、有逐字断言；本函数只负责"拼不出来就别查"。
+ * 之所以挪走：plus.sqlite 不支持参数绑定，值全是拼串，而这段代码在开发机上跑不到
+ * （只有真机有 plus.sqlite），拼错一个字符就是"搜不到任何东西"。
+ *
+ * @param {string} noteKw 关键词（空串 = 不按关键词过滤）
+ * @param {number[]} kwCategoryIds 关键词命中的分类 id（与 noteKw 是「或」）
+ * @param {number} accountId 账本
+ * @param {number} limit 返回上限
+ * @param {{type?:string, categoryIds?:number[], minCents?:number, maxCents?:number, startTs?:number, endTs?:number}} [filters]
+ */
+export async function txSearch(noteKw, kwCategoryIds, accountId, limit, filters) {
+  // SQL 拼装抽到 tx-search-sql.js 里做成纯函数，好在 Node 侧逐字断言（见那边的注释）
+  const sql = buildTxSearchSql(noteKw, kwCategoryIds, accountId, limit, filters)
+  if (!sql) return []
+  return select(sql)
 }
 
 /* ---------- 固定支出 CRUD（每月自动补记的配置，v5） ---------- */

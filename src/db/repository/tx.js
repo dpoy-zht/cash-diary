@@ -87,8 +87,11 @@ export async function listByRange(startTs, endTs, accountId) {
   return rows.map(normalizeTx)
 }
 
-/** 搜索（备注包含关键词或分类命中），按发生时间倒序、有上限 */
-export async function search(noteKw, categoryIds, accountId, limit) {
-  const rows = await getStorage().txSearch(noteKw, categoryIds, aid(accountId), limit)
+/**
+ * 搜索：关键词（备注或分类名命中）+ 组合筛选（类型/分类/金额区间/日期区间），
+ * 按发生时间倒序、有上限。筛选条件的语义见 utils/search.js（页面/服务层已归一化）。
+ */
+export async function search(noteKw, categoryIds, accountId, limit, filters) {
+  const rows = await getStorage().txSearch(noteKw, categoryIds, aid(accountId), limit, filters)
   return rows.map(normalizeTx)
 }

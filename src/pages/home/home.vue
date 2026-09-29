@@ -43,21 +43,27 @@
       </view>
     </view>
 
-    <!-- 搜索：备注/分类名跨月匹配，输入即搜（防抖 300ms） -->
-    <view class="search-bar">
-      <view class="s-icon" :style="iconSearch" />
-      <input
-        class="s-input"
-        v-model="kw"
-        placeholder="搜备注或分类，比如 奶茶"
-        confirm-type="search"
-        @input="onKwInput"
-      />
-      <view v-if="kw" class="s-clear" @click="onClearSearch"><text class="s-clear-i">×</text></view>
+    <!-- 搜索：备注/分类名跨月匹配，输入即搜（防抖 300ms）；右侧是组合筛选入口（T4.3） -->
+    <view class="search-row">
+      <view class="search-bar">
+        <view class="s-icon" :style="iconSearch" />
+        <input
+          class="s-input"
+          v-model="kw"
+          placeholder="搜备注或分类，比如 奶茶"
+          confirm-type="search"
+          @input="onKwInput"
+        />
+        <view v-if="kw" class="s-clear" @click="onClearKw"><text class="s-clear-i">×</text></view>
+      </view>
+      <view class="filter-btn" :class="{ on: filterCount > 0 }" @click="filterShow = true">
+        <view class="fb-glyph" :style="iconFilter" />
+        <text v-if="filterCount" class="fb-badge">{{ filterCount }}</text>
+      </view>
     </view>
 
-    <!-- 全部 / 支出 / 收入 -->
-    <view class="seg">
+    <!-- 全部 / 支出 / 收入（搜索时类型交给筛选面板，避免两个"类型"控件互相打架） -->
+    <view v-if="!searching" class="seg">
       <view
         v-for="s in segs"
         :key="s.key"
@@ -70,7 +76,7 @@
     <!-- 流水（按天分组；搜索时切换为跨月结果） -->
     <view class="txn-card">
       <view v-if="searching" class="search-meta">
-        <text class="sm-txt">找到 {{ filtered.length }} 条「{{ kw }}」</text>
+        <text class="sm-txt">{{ searchMetaText }}</text>
         <text class="sm-clear" @click="onClearSearch">清除</text>
       </view>
       <block v-if="filtered.length">
@@ -109,6 +115,13 @@
       </view>
     </view>
 
+    <filter-sheet
+      v-if="filterShow"
+      :filters="txStore.searchFilters"
+      :categories="categoryStore.list"
+      @close="filterShow = false"
+      @apply="onApplyFilter"
+    />
     <edit-sheet
       :record="editing"
       :categories="editingCats"
@@ -135,7 +148,9 @@ import { groupByDay, dayLabel, ymOf } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
 import { requestNotifyPermission, notifyLocal, REMIND_PREF_KEY, normalizeRemindEnabled } from '../../utils/notify.js'
+import { countFilters, filterSummary } from '../../utils/search.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
+import FilterSheet from '../../components/filter-sheet/filter-sheet.vue'
 
 /**
  * 首页（v2.0）：月份切换 + 余额卡 + 全部/支出/收入分段 + 按日流水 + FAB。
@@ -167,14 +182,23 @@ const searching = computed(function () {
 })
 function onKwInput() {
   clearTimeout(kwTimer)
-  kwTimer = setTimeout(async function () {
-    try {
-      await txStore.search(kw.value)
-    } catch (e) {
-      uni.showToast({ title: '搜索失败', icon: 'none' })
-    }
-  }, 300)
+  kwTimer = setTimeout(runSearch, 300)
 }
+/** 按当前关键词 + 当前筛选重查（store 里 filters 传 undefined 表示沿用现值） */
+async function runSearch() {
+  try {
+    await txStore.search(kw.value)
+  } catch (e) {
+    uni.showToast({ title: '搜索失败', icon: 'none' })
+  }
+}
+/** 输入框里的 × ：只清关键词，**保留筛选**（筛选项在面板里单独清） */
+function onClearKw() {
+  clearTimeout(kwTimer)
+  kw.value = ''
+  runSearch()
+}
+/** 结果行上的"清除"：关键词与筛选一起清掉，回到月份视图 */
 function onClearSearch() {
   clearTimeout(kwTimer)
   kw.value = ''
@@ -256,8 +280,38 @@ const emptyTitle = computed(function () {
   return searching.value ? '没找到相关记录' : '今天还没记账哦~'
 })
 const emptySub = computed(function () {
-  return searching.value ? '换个关键词试试，支持备注和分类名' : '点下面的加号，记一笔今天的小花费吧'
+  return searching.value
+    ? '换个关键词，或者放宽筛选条件试试'
+    : '点下面的加号，记一笔今天的小花费吧'
 })
+
+/* ---- 组合筛选（T4.3）：入口角标 + 条件摘要 + 应用 ---- */
+const filterShow = ref(false)
+const filterCount = computed(function () {
+  return countFilters(txStore.searchFilters)
+})
+const filterText = computed(function () {
+  return filterSummary(txStore.searchFilters, function (id) {
+    const c = catMap.value.get(id)
+    return c ? c.name : ''
+  })
+})
+/** 结果行那行小字：关键词与筛选任一存在都要说清楚"到底按什么筛的" */
+const searchMetaText = computed(function () {
+  const n = filtered.value.length
+  const k = kw.value.trim()
+  const head = k ? '找到 ' + n + ' 条「' + k + '」' : '筛选出 ' + n + ' 条'
+  return filterText.value ? head + ' · ' + filterText.value : head
+})
+
+async function onApplyFilter(filters) {
+  filterShow.value = false
+  try {
+    await txStore.searchWithFilters(filters)
+  } catch (e) {
+    uni.showToast({ title: '筛选失败', icon: 'none' })
+  }
+}
 const groups = computed(function () {
   return groupByDay(filtered.value)
 })
@@ -328,6 +382,7 @@ function openEdit(r) {
 
 const iconCoin = svgMaskStyle('M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93V18h-2v1.93A8.01 8.01 0 014.07 13H6v-2H4.07A8.01 8.01 0 0111 4.07V6h2V4.07A8.01 8.01 0 0119.93 11H18v2h1.93A8.01 8.01 0 0113 19.93z')
 const iconSearch = svgMaskStyle('M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z')
+const iconFilter = svgMaskStyle('M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z')
 const iconBell = svgMaskStyle('M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z')
 const iconHeart = svgMaskStyle('M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z')
 
@@ -523,8 +578,54 @@ onShow(async function () {
 }
 
 /* ---- 搜索框 ---- */
-.search-bar {
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 8px 16px 0;
+}
+/* 筛选按钮：与搜索条同高，开筛选时变蛋黄实底 + 右上角数字角标 */
+.filter-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--cd-r-pill);
+  background: var(--cd-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--cd-sh-card);
+}
+.filter-btn.on {
+  background: var(--cd-primary);
+}
+.fb-glyph {
+  width: 20px;
+  height: 20px;
+  background: var(--cd-icon-2);
+}
+.filter-btn.on .fb-glyph {
+  background: var(--cd-ink);
+}
+.fb-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: var(--cd-r-pill);
+  background: var(--cd-danger-ink);
+  color: var(--cd-btn-ink);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 4px;
+}
+.search-bar {
+  flex: 1;
+  min-width: 0;
   background: var(--cd-surface);
   border-radius: var(--cd-r-pill);
   padding: 9px 14px;
@@ -569,10 +670,17 @@ onShow(async function () {
   padding: 10px 0 2px;
 }
 .sm-txt {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--cd-ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sm-clear {
+  flex: none;
+  margin-left: 8px;
   font-size: 12px;
   font-weight: 700;
   color: var(--cd-icon);

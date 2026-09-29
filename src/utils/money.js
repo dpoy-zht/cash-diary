@@ -12,6 +12,19 @@ export function parseAmountToCents(str) {
   return cents > 0 ? cents : null
 }
 
+/**
+ * 金额"区间端点"输入 → 整数分；空 / 非法 → null（表示该侧不限）。
+ *
+ * 与 parseAmountToCents 的区别：**允许 0**（金额区间下界写 0 是合理的），
+ * 且不校验"必须大于 0"。规则与它保持一致（最多 2 位小数、最多 9 位整数）。
+ */
+export function parseAmountBound(str) {
+  const s = String(str === null || str === undefined ? '' : str).trim()
+  if (!s) return null
+  if (!/^\d{1,9}(\.\d{1,2})?$/.test(s)) return null
+  return Math.round(parseFloat(s) * 100)
+}
+
 /** 1990 → '19.90'；180000 → '1,800.00'（千分位 + 两位小数） */
 export function formatCents(cents) {
   return (cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

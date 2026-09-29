@@ -6,6 +6,7 @@ import * as txRepo from '../db/repository/tx.js'
 import * as categoryRepo from '../db/repository/category.js'
 import { parseAmountToCents } from '../utils/money.js'
 import { replaceDateKeepTime } from '../utils/date.js'
+import { normalizeFilters, hasAnyFilter } from '../utils/search.js'
 
 /**
  * 构造一条待入库流水。校验失败抛错：
@@ -139,17 +140,26 @@ export const SEARCH_LIMIT = 100
 
 /**
  * 流水搜索：关键词命中**备注**或**分类名**（都不区分大小写），
+ * 叠加可选筛选（T4.3：类型 / 分类多选 / 金额区间 / 日期区间）。
  * 跨所有月份，按发生时间倒序，上限 SEARCH_LIMIT 条。
- * 关键词为空白直接返回空数组；分类名命中转成分类 id 交给存储层查，
- * 这样 SQLite 端可以一条 SQL 完成，不用把全表捞到 JS。
+ *
+ * - 关键词与筛选可以只用其一：只给筛选（不输关键词）也要能查
+ * - 两者都没有才返回空数组（避免无意中做全表扫描）
+ * - 分类名命中转成分类 id 交给存储层查，SQLite 端一条 SQL 完成，不把全表捞到 JS
+ * - 筛选条件在这里经 normalizeFilters 归一化：**存储层拿到的永远是规整对象**，
+ *   两个适配器因此不需要各自再做一遍脏值防御
  */
-export async function search(keyword, accountId) {
+export async function search(keyword, accountId, filters) {
   const kw = String(keyword == null ? '' : keyword).trim()
-  if (!kw) return []
-  const lower = kw.toLowerCase()
-  const cats = await categoryRepo.listAll()
-  const ids = cats
-    .filter(function (c) { return c.name && String(c.name).toLowerCase().indexOf(lower) !== -1 })
-    .map(function (c) { return c.id })
-  return txRepo.search(kw, ids, accountId, SEARCH_LIMIT)
+  const f = normalizeFilters(filters)
+  if (!kw && !hasAnyFilter(f)) return []
+  let ids = []
+  if (kw) {
+    const lower = kw.toLowerCase()
+    const cats = await categoryRepo.listAll()
+    ids = cats
+      .filter(function (c) { return c.name && String(c.name).toLowerCase().indexOf(lower) !== -1 })
+      .map(function (c) { return c.id })
+  }
+  return txRepo.search(kw, ids, accountId, SEARCH_LIMIT, f)
 }

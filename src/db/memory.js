@@ -158,22 +158,56 @@ export async function txMonthSummary(start, end, accountId) {
   return Object.keys(agg).map(function (type) { return { type: type, total: agg[type] } })
 }
 
+/** 正整数 id 数组：取整、丢非法、保序（与 db/tx-search-sql.js 的 idList 对应，两边要一致） */
+function posIntIds(v) {
+  return (Array.isArray(v) ? v : [])
+    .map(function (n) { return Math.round(Number(n)) })
+    .filter(function (n) { return isFinite(n) && n > 0 })
+}
+
 /**
- * 搜索：备注包含 noteKw（不区分大小写的包含匹配）或分类命中 categoryIds，
- * 两个条件"或"；都为空返回空。与 sqlite.js 的 txSearch 签名一致。
+ * 搜索（T4.3 起支持组合筛选）。语义与 sqlite.js 的同名函数**逐条一致**（契约）：
+ * - 关键词组（组内 OR）：备注包含 noteKw（不区分大小写）或分类命中 kwCategoryIds
+ * - 显式筛选组（组内 AND）：类型 / 分类 / 金额区间 / 日期区间
+ * - 两组之间 AND；一组都没有 → 空数组
+ * 注意 sqlite 的 LIKE 对 ASCII 不区分大小写，这里用 toLowerCase 对齐这一行为。
+ * 金额比较用整数分，日期区间左闭右开 [startTs, endTs)。
  */
-export async function txSearch(noteKw, categoryIds, accountId, limit) {
+export async function txSearch(noteKw, kwCategoryIds, accountId, limit, filters) {
   const a = aid(accountId)
   const max = Math.max(1, Math.floor(Number(limit) || 100))
   const kw = String(noteKw || '').toLowerCase()
-  const ids = (Array.isArray(categoryIds) ? categoryIds : []).map(Number)
-  if (!kw && !ids.length) return []
+  const kwIds = posIntIds(kwCategoryIds)
+  const f = filters && typeof filters === 'object' ? filters : {}
+
+  const fIds = posIntIds(f.categoryIds)
+  const type = f.type === 'expense' || f.type === 'income' ? f.type : ''
+  const min = f.minCents === null || f.minCents === undefined || !isFinite(Number(f.minCents)) ? null : Math.round(Number(f.minCents))
+  const maxC = f.maxCents === null || f.maxCents === undefined || !isFinite(Number(f.maxCents)) ? null : Math.round(Number(f.maxCents))
+  const start = f.startTs === null || f.startTs === undefined || !isFinite(Number(f.startTs)) ? null : Math.round(Number(f.startTs))
+  const end = f.endTs === null || f.endTs === undefined || !isFinite(Number(f.endTs)) ? null : Math.round(Number(f.endTs))
+
+  const kwActive = !!kw || kwIds.length > 0
+  const filtered = !!(fIds.length || type || min !== null || maxC !== null || start !== null || end !== null)
+  if (!kwActive && !filtered) return []
+
   return data.transaction_record
     .filter(function (r) {
       if (r.deleted_at != null || aid(r.account_id) !== a) return false
-      const hitNote = kw && String(r.note || '').toLowerCase().indexOf(kw) !== -1
-      const hitCat = ids.indexOf(Number(r.category_id)) !== -1
-      return hitNote || hitCat
+      if (kwActive) {
+        const hitNote = !!kw && String(r.note || '').toLowerCase().indexOf(kw) !== -1
+        const hitCat = kwIds.indexOf(Number(r.category_id)) !== -1
+        if (!hitNote && !hitCat) return false
+      }
+      if (fIds.length && fIds.indexOf(Number(r.category_id)) === -1) return false
+      if (type && r.type !== type) return false
+      const cents = Number(r.amount_cents) || 0
+      if (min !== null && cents < min) return false
+      if (maxC !== null && cents > maxC) return false
+      const ts = Number(r.occurred_at) || 0
+      if (start !== null && ts < start) return false
+      if (end !== null && ts >= end) return false
+      return true
     })
     .sort(function (x, y) { return y.occurred_at - x.occurred_at })
     .slice(0, max)
