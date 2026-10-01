@@ -16,7 +16,7 @@ import { toDateStr } from './date.js'
 
 /** 筛选项的完整形态（空值 = 不参与过滤） */
 export function emptyFilters() {
-  return { type: '', categoryIds: [], minCents: null, maxCents: null, startTs: null, endTs: null }
+  return { type: '', categoryIds: [], tagIds: [], minCents: null, maxCents: null, startTs: null, endTs: null }
 }
 
 /** 金额（分）：非负数整数，其余（空/非法/负数）→ null */
@@ -67,7 +67,15 @@ export function normalizeFilters(raw) {
     startTs = endTs
     endTs = t
   }
-  return { type: type, categoryIds: normIds(f.categoryIds), minCents: minCents, maxCents: maxCents, startTs: startTs, endTs: endTs }
+  return {
+    type: type,
+    categoryIds: normIds(f.categoryIds),
+    tagIds: normIds(f.tagIds),
+    minCents: minCents,
+    maxCents: maxCents,
+    startTs: startTs,
+    endTs: endTs
+  }
 }
 
 /** 是否设置了任何筛选（决定列表是否切到"搜索结果"视图） */
@@ -76,6 +84,7 @@ export function hasAnyFilter(raw) {
   return !!(
     f.type ||
     f.categoryIds.length ||
+    f.tagIds.length ||
     f.minCents !== null ||
     f.maxCents !== null ||
     f.startTs !== null ||
@@ -89,6 +98,7 @@ export function countFilters(raw) {
   let n = 0
   if (f.type) n += 1
   if (f.categoryIds.length) n += 1
+  if (f.tagIds.length) n += 1
   if (f.minCents !== null || f.maxCents !== null) n += 1
   if (f.startTs !== null || f.endTs !== null) n += 1
   return n
@@ -98,8 +108,9 @@ export function countFilters(raw) {
  * 筛选条件的一句话摘要（搜索结果区那行小字）。
  * @param {object} raw 任意筛选输入
  * @param {(id:number)=>string} [catNameOf] 分类 id → 名称；缺省用 #id
+ * @param {(id:number)=>string} [tagNameOf] 标签 id → 名称；缺省用 #id
  */
-export function filterSummary(raw, catNameOf) {
+export function filterSummary(raw, catNameOf, tagNameOf) {
   const f = normalizeFilters(raw)
   const parts = []
   if (f.type) parts.push(f.type === 'expense' ? '支出' : '收入')
@@ -109,6 +120,13 @@ export function filterSummary(raw, catNameOf) {
       return n || '#' + id
     })
     parts.push(names.length > 2 ? names.slice(0, 2).join('、') + ' 等 ' + names.length + ' 类' : names.join('、'))
+  }
+  if (f.tagIds.length) {
+    const names = f.tagIds.map(function (id) {
+      const n = typeof tagNameOf === 'function' ? tagNameOf(id) : ''
+      return n || '#' + id
+    })
+    parts.push('标签 ' + (names.length > 2 ? names.slice(0, 2).join('、') + ' 等 ' + names.length + ' 个' : names.join('、')))
   }
   if (f.minCents !== null || f.maxCents !== null) {
     const lo = f.minCents === null ? '' : formatCents(f.minCents)

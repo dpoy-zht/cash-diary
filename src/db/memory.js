@@ -190,14 +190,25 @@ export async function txSearch(noteKw, kwCategoryIds, accountId, limit, filters)
   const f = filters && typeof filters === 'object' ? filters : {}
 
   const fIds = posIntIds(f.categoryIds)
+  const tIds = posIntIds(f.tagIds)
   const type = f.type === 'expense' || f.type === 'income' ? f.type : ''
   const min = f.minCents === null || f.minCents === undefined || !isFinite(Number(f.minCents)) ? null : Math.round(Number(f.minCents))
   const maxC = f.maxCents === null || f.maxCents === undefined || !isFinite(Number(f.maxCents)) ? null : Math.round(Number(f.maxCents))
   const start = f.startTs === null || f.startTs === undefined || !isFinite(Number(f.startTs)) ? null : Math.round(Number(f.startTs))
   const end = f.endTs === null || f.endTs === undefined || !isFinite(Number(f.endTs)) ? null : Math.round(Number(f.endTs))
 
+  // 标签筛选：任一命中即可（与 sqlite 侧 tx-search-sql.js 的 EXISTS 语义一致）。
+  // 先算出「哪些流水挂了所选标签」，避免在 filter 里对每条流水线性扫关联表。
+  let txHasTag = null
+  if (tIds.length) {
+    txHasTag = {}
+    data.transaction_tag.forEach(function (r) {
+      if (tIds.indexOf(Number(r.tag_id)) !== -1) txHasTag[Number(r.transaction_id)] = 1
+    })
+  }
+
   const kwActive = !!kw || kwIds.length > 0
-  const filtered = !!(fIds.length || type || min !== null || maxC !== null || start !== null || end !== null)
+  const filtered = !!(fIds.length || tIds.length || type || min !== null || maxC !== null || start !== null || end !== null)
   if (!kwActive && !filtered) return []
 
   return data.transaction_record
@@ -209,6 +220,7 @@ export async function txSearch(noteKw, kwCategoryIds, accountId, limit, filters)
         if (!hitNote && !hitCat) return false
       }
       if (fIds.length && fIds.indexOf(Number(r.category_id)) === -1) return false
+      if (txHasTag && !txHasTag[Number(r.id)]) return false
       if (type && r.type !== type) return false
       const cents = Number(r.amount_cents) || 0
       if (min !== null && cents < min) return false

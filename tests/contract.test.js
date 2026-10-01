@@ -125,4 +125,34 @@ describe('适配器契约 —— memory 侧（T2.4）', () => {
     await s.txInsert(Object.assign({}, base, { category_id: 1, type: 'expense', amount_cents: 100, note: 'KFC', occurred_at: 40 }))
     expect((await s.txSearch('kfc', [], 1, 100, {})).length).toBe(1)
   })
+
+  it('契约7：标签筛选——任一命中即可（与 sqlite 侧 EXISTS 语义一致）', async () => {
+    await s.accountInsert({ id: 1, name: '日常账本', created_at: 1 })
+    const base = { account_id: 1, created_at: 1, updated_at: 1, deleted_at: null }
+    const tx1 = await s.txInsert(Object.assign({}, base, { category_id: 1, type: 'expense', amount_cents: 100, note: 'a', occurred_at: 10 }))
+    const tx2 = await s.txInsert(Object.assign({}, base, { category_id: 1, type: 'expense', amount_cents: 200, note: 'b', occurred_at: 20 }))
+    const tx3 = await s.txInsert(Object.assign({}, base, { category_id: 1, type: 'expense', amount_cents: 300, note: 'c', occurred_at: 30 }))
+    const t1 = await s.tagInsert({ account_id: 1, name: '报销', color: '', sort: 1, created_at: 1, updated_at: 1 })
+    const t2 = await s.tagInsert({ account_id: 1, name: '出差', color: '', sort: 2, created_at: 1, updated_at: 1 })
+
+    await s.txTagSetForTx(tx1, [t1])
+    await s.txTagSetForTx(tx2, [t2])
+    await s.txTagSetForTx(tx3, [t1, t2])
+
+    // 任一命中：挂 t1 的两条都出来（不是"同时挂上两个"）
+    const byT1 = await s.txSearch('', [], 1, 100, { tagIds: [t1] })
+    expect(byT1.map(function (r) { return r.note }).sort()).toEqual(['a', 'c'])
+    const byBoth = await s.txSearch('', [], 1, 100, { tagIds: [t1, t2] })
+    expect(byBoth.length).toBe(3)
+
+    // 标签与其它条件之间是 AND
+    expect((await s.txSearch('', [], 1, 100, { tagIds: [t1], minCents: 200 })).map(function (r) { return r.note })).toEqual(['c'])
+
+    // 软删除的流水不再被标签筛出来
+    await s.txSoftDelete(tx1)
+    expect((await s.txSearch('', [], 1, 100, { tagIds: [t1] })).map(function (r) { return r.note })).toEqual(['c'])
+
+    // 只有标签一个条件也算"筛过"，不会返回全表
+    expect(await s.txSearch('', [], 1, 100, {})).toEqual([])
+  })
 })

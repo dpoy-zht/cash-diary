@@ -21,12 +21,13 @@ const at = function (y, mo, d, h, mi) {
 }
 
 describe('T4.3 —— 筛选条件归一化（纯函数）', () => {
-  it('emptyFilters：六项全空，且每次返回新对象（避免共享状态）', () => {
+  it('emptyFilters：七项全空，且每次返回新对象（避免共享状态）', () => {
     const a = emptyFilters()
     const b = emptyFilters()
-    expect(a).toEqual({ type: '', categoryIds: [], minCents: null, maxCents: null, startTs: null, endTs: null })
+    expect(a).toEqual({ type: '', categoryIds: [], tagIds: [], minCents: null, maxCents: null, startTs: null, endTs: null })
     expect(a).not.toBe(b)
     expect(a.categoryIds).not.toBe(b.categoryIds)
+    expect(a.tagIds).not.toBe(b.tagIds)
   })
 
   it('normCents：空/非法/负数 → null；0 是合法的（区间下界）', () => {
@@ -353,5 +354,65 @@ describe('T4.3 —— buildTxSearchSql（结构与转义）', () => {
     expect(buildTxSearchSql('', [], 1, 100, 'oops')).toBe('')
     expect(buildTxSearchSql('', [], 1, 100, 42)).toBe('')
     expect(buildTxSearchSql('', [], 1, 100, undefined)).toBe('')
+  })
+})
+
+describe('T5.1 —— 标签筛选（条件归一化 + SQL 结构 + 转义）', () => {
+  const BASE = 'SELECT * FROM transaction_record WHERE deleted_at IS NULL AND account_id = '
+  const TAIL = ' ORDER BY occurred_at DESC LIMIT 100'
+
+  it('normalizeFilters：tagIds 与 categoryIds 同规格（丢非正整数、去重、升序）', () => {
+    const f = normalizeFilters({ tagIds: [3, '2', 2, -1, 0, NaN, 'x', 2.6] })
+    expect(f.tagIds).toEqual([2, 3])
+    expect(normalizeFilters({ tagIds: 'nope' }).tagIds).toEqual([])
+    expect(normalizeFilters({}).tagIds).toEqual([])
+  })
+
+  it('hasAnyFilter / countFilters：只有标签也算筛过', () => {
+    expect(hasAnyFilter({ tagIds: [] })).toBe(false)
+    expect(hasAnyFilter({ tagIds: [1] })).toBe(true)
+    expect(countFilters({ tagIds: [1] })).toBe(1)
+    expect(countFilters({ tagIds: [1], categoryIds: [2], type: 'expense' })).toBe(3)
+  })
+
+  it('filterSummary：标签维度自成一节，多于 2 个折叠为"等 N 个"', () => {
+    const s1 = filterSummary({ tagIds: [1] }, null, function (id) { return id === 1 ? '报销' : '' })
+    expect(s1).toBe('标签 报销')
+    const s2 = filterSummary({ tagIds: [1, 2, 3] }, null, function (id) { return 'T' + id })
+    expect(s2).toBe('标签 T1、T2 等 3 个')
+    // 缺 tagNameOf 时退化成 #id，不抛错
+    expect(filterSummary({ tagIds: [7] })).toBe('标签 #7')
+  })
+
+  it('SQL：标签用 EXISTS 子查询（任一命中），而不是 JOIN', () => {
+    const sql = buildTxSearchSql('', [], 1, 100, { tagIds: [2, 1] })
+    expect(sql).toBe(
+      BASE + '1 AND ' +
+      'EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = transaction_record.id ' +
+      'AND tt.tag_id IN (2,1))' +
+      TAIL
+    )
+  })
+
+  it('SQL：标签 id 脏值 → 整条条件消失；全是脏值则根本没有可用条件（返回空串）', () => {
+    // 混了脏值：合法的仍被保留（与分类同样的保序行为）
+    expect(buildTxSearchSql('', [], 1, 100, { tagIds: [2, -1, 'x'] })).toContain('tt.tag_id IN (2)')
+    // 只给脏值 → 条件不成立，等于没筛
+    expect(buildTxSearchSql('', [], 1, 100, { tagIds: ["1') OR 1=1 --"] })).toBe('')
+  })
+
+  it('SQL：标签与其它筛选条件之间是 AND', () => {
+    const sql = buildTxSearchSql('', [], 1, 100, { tagIds: [1], type: 'expense', minCents: 500 })
+    expect(sql).toContain("type = 'expense'")
+    expect(sql).toContain('amount_cents >= 500')
+    // 条件的拼接顺序与构造器一致：分类 → 标签 → 类型 → 金额 → 日期
+    expect(sql).toContain("AND type = 'expense' AND amount_cents >= 500")
+    expect(sql.indexOf('tt.tag_id IN (1)')).toBeLessThan(sql.indexOf("type = 'expense'"))
+  })
+
+  it('SQL：标签条件里出现的 tt.tag_id 值都经过单引号转义（无注入面）', () => {
+    const sql = buildTxSearchSql('', [], 1, 100, { tagIds: [1, 2] })
+    expect(sql).not.toContain("' OR")
+    expect((sql.match(/transaction_tag/g) || []).length).toBe(1)
   })
 })

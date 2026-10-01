@@ -8,12 +8,14 @@
  *
  * 语义（与 db/memory.js 的 txSearch 逐条一致，改一边必须改另一边）：
  * - 关键词组（组内 OR）：`note LIKE 关键词` 或 `category_id IN 关键词命中的分类`
- * - 筛选组（组内 AND）：类型 / 分类多选 / 金额区间 / 日期区间
+ * - 筛选组（组内 AND）：类型 / 分类多选 / 标签多选 / 金额区间 / 日期区间
  * - 两组之间 AND；一组都没有 → 返回空串（调用方据此跳过查询，不扫全表）
  * - 日期区间左闭右开 [startTs, endTs)
+ * - **标签是"任一命中"**：挂了多选里任意一个标签的流水就算命中（EXISTS 子查询），
+ *   不是"同时挂上全部所选标签"——后者对用户来说几乎筛不出东西。
  *
  * 安全：所有动态值经 sqlValue（单引号翻倍）；关键词走 likePattern（额外转义 % _ \，
- * 且 SQL 侧配 ESCAPE '\'）；分类 id 也过一遍 sqlValue ——
+ * 且 SQL 侧配 ESCAPE '\'）；分类/标签 id 也过一遍 sqlValue ——
  * 即便上游给了脏值，也只会变成一个字符串字面量，拼不出 SQL 结构。
  */
 import { sqlValue, likePattern } from './sql-value.js'
@@ -59,6 +61,15 @@ export function buildTxSearchSql(noteKw, kwCategoryIds, accountId, limit, filter
 
   const fIds = idList(f.categoryIds)
   if (fIds) conds.push('category_id IN (' + fIds + ')')
+
+  // 标签多选：任一命中即可（EXISTS 比 JOIN + DISTINCT 更省事，也不会因多条关联产生重复行）
+  const tIds = idList(f.tagIds)
+  if (tIds) {
+    conds.push(
+      'EXISTS (SELECT 1 FROM transaction_tag tt WHERE tt.transaction_id = transaction_record.id ' +
+      'AND tt.tag_id IN (' + tIds + '))'
+    )
+  }
 
   const type = f.type === 'expense' || f.type === 'income' ? f.type : ''
   if (type) conds.push('type = ' + sqlValue(type))
