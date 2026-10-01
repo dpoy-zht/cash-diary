@@ -130,6 +130,20 @@ export function colorOf(category) {
 }
 
 /**
+ * 标签颜色（T5.1）。
+ *
+ * 与分类不同：标签的 `color` 字段存的是**色 key**（`c1`..`c8`），不是 category 那样的 icon key ——
+ * 这样换配色只改这里的映射表，历史数据不用迁移。
+ * 认不出（老数据 / 空串 / 脏值）就按 tag.id 取一个稳定色，保证永远有颜色可用。
+ */
+export function tagColorOf(tag) {
+  const t = tag || {}
+  const m = /^c([1-8])$/.exec(String(t.color || ''))
+  if (m) return CATEGORY_TINTS[Number(m[1]) - 1]
+  return tintOf(t.id)
+}
+
+/**
  * 取白色图标的 mask 样式；该分类没有 SVG 图标时返回 null（调用方退回 emoji）。
  */
 export function iconMaskStyle(category) {

@@ -36,6 +36,23 @@
         <text v-if="!catList.length" class="chips-empty">还没有分类</text>
       </scroll-view>
 
+      <!-- 标签（多选，任一命中即可；不随类型联动——标签不带收支类型） -->
+      <template v-if="tags.length">
+        <text class="f-label">标签（可多选）</text>
+        <scroll-view scroll-x class="chips">
+          <view
+            v-for="t in tags"
+            :key="t.id"
+            class="chip"
+            :class="{ active: tagIds.indexOf(t.id) >= 0 }"
+            @click="toggleTag(t.id)"
+          >
+            <view class="chip-dot" :style="{ background: tagColorOf(t) }" />
+            <text class="chip-name">{{ t.name }}</text>
+          </view>
+        </scroll-view>
+      </template>
+
       <!-- 金额区间（元） -->
       <text class="f-label">金额区间（元）</text>
       <view class="amount-row">
@@ -72,7 +89,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { colorOf } from '../../utils/palette.js'
+import { colorOf, tagColorOf } from '../../utils/palette.js'
 import { parseAmountBound } from '../../utils/money.js'
 import { dateStrStart, dateStrEndExclusive, toDateStr } from '../../utils/date.js'
 import { minSelectableDate } from '../../utils/entry.js'
@@ -86,7 +103,8 @@ import { minSelectableDate } from '../../utils/entry.js'
  */
 const props = defineProps({
   filters: { type: Object, default: null },
-  categories: { type: Array, default: function () { return [] } }
+  categories: { type: Array, default: function () { return [] } },
+  tags: { type: Array, default: function () { return [] } }
 })
 const emit = defineEmits(['close', 'apply'])
 
@@ -98,6 +116,7 @@ const types = [
 
 const type = ref('')
 const catIds = ref([])
+const tagIds = ref([])
 const minStr = ref('')
 const maxStr = ref('')
 const startStr = ref('')
@@ -120,6 +139,7 @@ watch(
     const v = f || {}
     type.value = v.type || ''
     catIds.value = Array.isArray(v.categoryIds) ? v.categoryIds.slice() : []
+    tagIds.value = Array.isArray(v.tagIds) ? v.tagIds.slice() : []
     minStr.value = v.minCents === null || v.minCents === undefined ? '' : (v.minCents / 100).toFixed(2)
     maxStr.value = v.maxCents === null || v.maxCents === undefined ? '' : (v.maxCents / 100).toFixed(2)
     startStr.value = v.startTs ? toDateStr(v.startTs) : ''
@@ -143,6 +163,13 @@ function toggleCat(id) {
   else catIds.value.push(id)
 }
 
+/** 标签不随类型联动：标签本身不带收支类型，切"支出/收入"不该把它清掉 */
+function toggleTag(id) {
+  const i = tagIds.value.indexOf(id)
+  if (i >= 0) tagIds.value.splice(i, 1)
+  else tagIds.value.push(id)
+}
+
 function onStart(e) {
   startStr.value = e.detail.value || ''
 }
@@ -155,6 +182,7 @@ function onApply() {
   emit('apply', {
     type: type.value,
     categoryIds: catIds.value.slice(),
+    tagIds: tagIds.value.slice(),
     minCents: parseAmountBound(minStr.value),
     maxCents: parseAmountBound(maxStr.value),
     startTs: dateStrStart(startStr.value),

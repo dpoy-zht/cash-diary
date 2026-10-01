@@ -6,6 +6,7 @@ import {
   CATEGORY_ICON_GROUPS,
   tintOf,
   colorOf,
+  tagColorOf,
   iconMaskStyle
 } from '../src/utils/palette.js'
 import { DEFAULT_CATEGORIES, iconOptions } from '../src/services/category.js'
@@ -156,5 +157,24 @@ describe('iconMaskStyle —— 白色图标的 mask 样式', () => {
     expect(iconMaskStyle({ icon: '' })).toBeNull()
     expect(iconMaskStyle({})).toBeNull()
     expect(iconMaskStyle(null)).toBeNull()
+  })
+})
+
+describe('T5.1 —— tagColorOf（标签取色）', () => {
+  it('c1..c8 映射到 CATEGORY_TINTS 的对应项', () => {
+    expect(tagColorOf({ id: 99, color: 'c1' })).toBe(CATEGORY_TINTS[0])
+    expect(tagColorOf({ id: 99, color: 'c8' })).toBe(CATEGORY_TINTS[7])
+  })
+
+  it('色 key 认不出（空串 / 脏值 / 越界）时按 id 取稳定色，永远有颜色可用', () => {
+    expect(tagColorOf({ id: 3, color: '' })).toBe(tintOf(3))
+    expect(tagColorOf({ id: 3, color: 'nope' })).toBe(tintOf(3))
+    expect(tagColorOf({ id: 3, color: 'c9' })).toBe(tintOf(3))
+    expect(tagColorOf({ id: 3 })).toBe(tintOf(3))
+    expect(typeof tagColorOf(null)).toBe('string')
+  })
+
+  it('色 key 优先于 id：同一个 id 换色即换色（不依赖 id 兜底）', () => {
+    expect(tagColorOf({ id: 1, color: 'c5' })).not.toBe(tagColorOf({ id: 1, color: 'c6' }))
   })
 })

@@ -119,6 +119,7 @@
       v-if="filterShow"
       :filters="txStore.searchFilters"
       :categories="categoryStore.list"
+      :tags="tagStore.list"
       @close="filterShow = false"
       @apply="onApplyFilter"
     />
@@ -141,6 +142,7 @@ import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { useBudgetStore } from '../../stores/budget.js'
 import { useAccountStore } from '../../stores/account.js'
+import { useTagStore } from '../../stores/tag.js'
 import * as backupService from '../../services/backup.js'
 import * as fixedService from '../../services/fixed.js'
 import { buildEditInput } from '../../services/tx.js'
@@ -162,6 +164,7 @@ const categoryStore = useCategoryStore()
 const metaStore = useMetaStore()
 const budgetStore = useBudgetStore()
 const accountStore = useAccountStore()
+const tagStore = useTagStore()
 
 const seg = ref('all')
 const segs = [
@@ -291,10 +294,16 @@ const filterCount = computed(function () {
   return countFilters(txStore.searchFilters)
 })
 const filterText = computed(function () {
-  return filterSummary(txStore.searchFilters, function (id) {
-    const c = catMap.value.get(id)
-    return c ? c.name : ''
-  })
+  return filterSummary(
+    txStore.searchFilters,
+    function (id) {
+      const c = catMap.value.get(id)
+      return c ? c.name : ''
+    },
+    function (id) {
+      return tagStore.nameOf(id)
+    }
+  )
 })
 /** 结果行那行小字：关键词与筛选任一存在都要说清楚"到底按什么筛的" */
 const searchMetaText = computed(function () {
@@ -396,9 +405,9 @@ onShow(async function () {
     if (autoPosted > 0) metaStore.bumpData()
   } catch (e) { /* 补记失败不阻塞页面，下次打开会再试 */ }
 
-  // 预算与流水一起加载完再判断超支，否则会拿旧数据算
+  // 预算、流水、标签一起加载完再判断超支，否则会拿旧数据算
   try {
-    await Promise.all([budgetStore.load(), txStore.refresh(metaStore.ym)])
+    await Promise.all([budgetStore.load(), txStore.refresh(metaStore.ym), tagStore.load()])
     maybeAlertOver()
     if (autoPosted > 0) {
       uni.showToast({ title: '已自动记入 ' + autoPosted + ' 笔固定支出', icon: 'none' })
