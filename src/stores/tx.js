@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as txService from '../services/tx.js'
+import * as tagService from '../services/tag.js'
 import { useAccountStore } from './account.js'
 import { useMetaStore } from './meta.js'
 import { lastNMonths, monthRange, toDateStr, prevYmOf } from '../utils/date.js'
@@ -152,10 +153,23 @@ export const useTxStore = defineStore('tx', function () {
     reportPrevRecords.value = prevRows
   }
 
-  async function add(ym, input) {
-    await txService.addTx(Object.assign({}, input, { accountId: currentAccount() }))
+  /**
+   * 新增一笔流水。
+   * @param {string} ym 月份（'YYYY-MM'）
+   * @param {object} input buildAddInput 的产物
+   * @param {number[]} [tagIds] 要挂的标签（可空）
+   * @returns {Promise<number>} 新流水 id
+   *
+   * 标签在同一次调用里落库：记账页只需要 `txStore.add(ym, input, tagIds)` 一句，
+   * 不用自己先记账再补标签（那样两个写操作分散在页面里，容易漏掉其中一个）。
+   */
+  async function add(ym, input, tagIds) {
+    const id = await txService.addTx(Object.assign({}, input, { accountId: currentAccount() }))
+    const ids = Array.isArray(tagIds) ? tagIds.filter(Boolean) : []
+    if (ids.length) await tagService.setTxTags(currentAccount(), id, ids)
     bumpData()
     await refresh(ym)
+    return id
   }
 
   async function update(ym, id, input) {

@@ -98,9 +98,10 @@ export function buildEditInput(input, originalTs) {
   return out
 }
 
+/** 新增一笔流水；**返回新 id**，供调用方接着写标签关联等附属数据 */
 export async function addTx(input) {
   const rec = buildTx(input)
-  await txRepo.insert(rec)
+  return txRepo.insert(rec)
 }
 
 export async function updateTx(id, input) {

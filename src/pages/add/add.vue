@@ -39,8 +39,17 @@
     <!-- 分类宫格 -->
     <category-grid v-model="categoryId" :categories="cats" />
 
+    <!-- 标签（可多选，可现场新建） -->
+    <tag-chips v-model="tagIds" :tags="tagStore.list" @create="tagCreateShow = true" />
+
     <!-- 数字键盘 -->
     <money-keyboard @key="onKey" @confirm="save" />
+
+    <tag-create-sheet
+      v-if="tagCreateShow"
+      @close="tagCreateShow = false"
+      @submit="onTagCreate"
+    />
 
     <!-- 记好啦成功弹窗 -->
     <view v-if="successShow" class="mask">
@@ -61,6 +70,10 @@ import { computed, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
+import { useTagStore } from '../../stores/tag.js'
+import TagChips from '../../components/tag-chips/tag-chips.vue'
+import TagCreateSheet from '../../components/tag-create-sheet/tag-create-sheet.vue'
+import { MAX_TAGS_PER_TX } from '../../utils/tag.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { buildAddInput } from '../../services/tx.js'
 import { keypadInput, parseAmountToCents, displayAmount, formatCents } from '../../utils/money.js'
@@ -75,7 +88,12 @@ import { svgMaskStyle } from '../../utils/svg-icon.js'
  */
 const txStore = useTxStore()
 const categoryStore = useCategoryStore()
+const tagStore = useTagStore()
 const metaStore = useMetaStore()
+
+/** 本笔要挂的标签 id（保存时随流水一起落库） */
+const tagIds = ref([])
+const tagCreateShow = ref(false)
 
 const types = [
   { key: 'expense', name: '支出' },
@@ -129,12 +147,41 @@ function onDateChange(e) {
  * 只把"一直没动过日期"的用户带着前进；自己选过日期的（补记）保持不动。
  */
 onShow(function () {
+  // 标签列表可能被「标签管理」页改过（改名/删除），每次进页面重取一次
+  tagStore.load().catch(function () { /* 取不到不阻塞记账 */ })
   const t = toDateStr(Date.now())
   if (t === todayStr.value) return
   if (dateStr.value === todayStr.value) dateStr.value = t
   todayStr.value = t
   minDateStr.value = minSelectableDate(t)
 })
+
+/**
+ * 现场新建标签：建完**自动勾上**（用户建它就是为了马上用），
+ * 但要受"一笔最多 N 个"的限制；已达上限的就不再自动勾。
+ */
+async function onTagCreate(names) {
+  try {
+    const r = await tagStore.createMany(names.join(','))
+    tagCreateShow.value = false
+    const wanted = {}
+    r.created.forEach(function (n) { wanted[n] = 1 })
+    const next = tagIds.value.slice()
+    tagStore.list.forEach(function (t) {
+      if (wanted[t.name] && next.indexOf(t.id) < 0 && next.length < MAX_TAGS_PER_TX) next.push(t.id)
+    })
+    tagIds.value = next
+    if (r.created.length) {
+      uni.showToast({ title: '已新建 ' + r.created.length + ' 个标签', icon: 'none' })
+    } else if (r.full) {
+      uni.showToast({ title: '标签数量已达上限', icon: 'none' })
+    } else {
+      uni.showToast({ title: '这些标签已经有了', icon: 'none' })
+    }
+  } catch (err) {
+    uni.showToast({ title: (err && err.message) || '新建失败', icon: 'none' })
+  }
+}
 
 async function save() {
   if (saving.value) return // 防连点：写库期间再点不重复提交
@@ -151,7 +198,8 @@ async function save() {
   const cat = cats.value.find(function (c) { return c.id === categoryId.value })
   saving.value = true
   try {
-    // 字段名映射统一走 services/tx.js 的 buildAddInput，页面不直接拼字段
+    // 字段名映射统一走 services/tx.js 的 buildAddInput，页面不直接拼字段；
+    // 标签随流水在同一次调用里落库（见 stores/tx.js: add）
     await txStore.add(
       metaStore.ym,
       buildAddInput({
@@ -160,7 +208,8 @@ async function save() {
         type: type.value,
         note: note.value.trim(),
         ts: tsFromDateStr(dateStr.value)
-      })
+      }),
+      tagIds.value
     )
     lastSaved.value = { cents: cents, type: type.value, name: cat ? cat.name : '' }
     resetFormAfterSaved()
