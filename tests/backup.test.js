@@ -242,6 +242,16 @@ describe('老格式备份兼容（emoji 分类时代的备份文件）', () => {
    */
   function buildLegacyBackup() {
     const now = Date.now()
+    /**
+     * 两笔流水的 occurred_at 必须落在**本月**（下面「恢复后的老分类…」用例按当月查列表）。
+     *
+     * 不能写 `now - N * 86400000`：那会让时间落进上个月 —— 月初 1、2 号跑测试必挂
+     * （2026-10-01 就因此误报过一次：昨天=9/30 属上个月，断言 3 笔只拿到 1 笔）。
+     * 改用「现在」与「1 分钟前」，并显式挡住跨月的那一分钟。
+     */
+    const oneMinAgo = now - 60000
+    const sameMonth = new Date(oneMinAgo).getMonth() === new Date(now).getMonth()
+    const secondTs = sameMonth ? oneMinAgo : now
     return {
       app: BACKUP_APP,
       version: 1, // emoji 时代的备份是 v1 格式（没有 fixed_expense 字段）
@@ -254,9 +264,9 @@ describe('老格式备份兼容（emoji 分类时代的备份文件）', () => {
       ],
       transaction_record: [
         { id: 1, account_id: 1, category_id: 1, type: 'expense', amount_cents: 2500, note: '午饭',
-          occurred_at: now - 86400000, created_at: now, updated_at: now, deleted_at: null },
+          occurred_at: now, created_at: now, updated_at: now, deleted_at: null },
         { id: 2, account_id: 1, category_id: 3, type: 'income', amount_cents: 500000, note: '',
-          occurred_at: now - 2 * 86400000, created_at: now, updated_at: now, deleted_at: null }
+          occurred_at: secondTs, created_at: now, updated_at: now, deleted_at: null }
       ],
       budget: []
     }
