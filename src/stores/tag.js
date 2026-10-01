@@ -16,6 +16,8 @@ import { useMetaStore } from './meta.js'
 export const useTagStore = defineStore('tag', function () {
   /** 当前账本的标签（已排序） */
   const list = ref([])
+  /** 每个标签被多少笔未删除流水引用：{ [tagId]: count }（标签管理页展示用） */
+  const usage = ref({})
 
   const byId = computed(function () {
     const m = {}
@@ -38,6 +40,17 @@ export const useTagStore = defineStore('tag', function () {
   async function load() {
     list.value = await tagService.list(currentAccount())
     return list.value
+  }
+
+  /** 标签管理页用：引用笔数一次拿全（而不是每个标签查一次） */
+  async function loadUsage() {
+    usage.value = await tagService.usageCounts(currentAccount())
+    return usage.value
+  }
+
+  /** 某个标签被多少笔账引用（没查到按 0） */
+  function usageOf(id) {
+    return Number(usage.value[Number(id)]) || 0
   }
 
   /** 取标签对象（没找到返回 null，页面自行兜底显示） */
@@ -101,10 +114,13 @@ export const useTagStore = defineStore('tag', function () {
 
   return {
     list,
+    usage,
     byId,
     count,
     isFull,
     load,
+    loadUsage,
+    usageOf,
     tagOf,
     nameOf,
     colorOf,

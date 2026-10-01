@@ -30,6 +30,15 @@
         </picker>
       </view>
 
+      <!-- 标签：已选状态由父级持有（这样"现场新建"后能立刻回填选中） -->
+      <text class="sheet-label">标签</text>
+      <tag-chips
+        :model-value="tagIds"
+        :tags="tags"
+        @update:model-value="$emit('update:tagIds', $event)"
+        @create="$emit('createTag')"
+      />
+
       <view class="sheet-actions">
         <button class="btn-del" hover-class="btn-hover" @click="$emit('remove')">删除</button>
         <button class="btn-save" hover-class="btn-hover" @click="onSave">保存</button>
@@ -43,12 +52,17 @@ import { ref, watch } from 'vue'
 import { colorOf } from '../../utils/palette.js'
 import { toDateStr } from '../../utils/date.js'
 import { clampFutureDate, minSelectableDate } from '../../utils/entry.js'
+import TagChips from '../tag-chips/tag-chips.vue'
 
 const props = defineProps({
   record: { type: Object, default: null },
-  categories: { type: Array, default: function () { return [] } }
+  categories: { type: Array, default: function () { return [] } },
+  /** 当前账本的全部标签 */
+  tags: { type: Array, default: function () { return [] } },
+  /** 这笔流水已选的标签 id（父级持有：现场新建后要能立刻回填选中） */
+  tagIds: { type: Array, default: function () { return [] } }
 })
-const emit = defineEmits(['close', 'save', 'remove'])
+const emit = defineEmits(['close', 'save', 'remove', 'update:tagIds', 'createTag'])
 
 const amountStr = ref('')
 const catId = ref(null)
@@ -80,7 +94,9 @@ function onSave() {
     categoryId: catId.value,
     note: note.value,
     type: props.record.type,
-    dateStr: dateStr.value
+    dateStr: dateStr.value,
+    // 标签一起交出去，由父级在保存时统一落库（与记账页同一条链路）
+    tagIds: Array.isArray(props.tagIds) ? props.tagIds.slice() : []
   })
 }
 </script>
@@ -155,6 +171,13 @@ function onSave() {
   padding: 2px 0 10px;
 }
 /* 备注 + 日期同一行：备注自适应宽度，日期按钮不换行 */
+.sheet-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cd-ink-2);
+  margin: 2px 0 8px;
+}
 .sheet-meta {
   display: flex;
   align-items: center;

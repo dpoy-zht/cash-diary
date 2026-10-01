@@ -102,6 +102,86 @@ export function biggestOf(rows, type, categories) {
 }
 
 /**
+ * 按标签汇总支出（T5.1）。
+ *
+ * **一笔挂多个标签时，会在多个标签里各计一次** —— 这是"按标签看"的固有语义，不是 bug：
+ * 一笔"出差打车"既属于「出差」也属于「报销」，两处都该看到它。
+ * 因此各标签金额之和可能大于当月总支出，所以额外返回 `overlaps` 让界面如实提示，
+ * 而不是让用户自己发现"占比加起来超过 100%"。
+ *
+ * `pct` 的分母仍是**当月总支出**（不是各标签之和）：这样单看一个标签的占比仍有意义。
+ *
+ * @param {Array} rows 当月流水（已在 buildMonthlyReport 里过滤过软删除）
+ * @param {Array} tags 标签表
+ * @param {Array} txTags 流水-标签关联行
+ * @param {number} topN 取前几个
+ * @returns {{list:Array, overlaps:boolean, taggedCount:number}}
+ */
+export function tagBreakdown(rows, tags, txTags, topN) {
+  const list = Array.isArray(rows) ? rows : []
+  const n = Math.max(1, Math.floor(Number(topN) || TOP_N))
+  const nameById = {}
+  const colorById = {}
+  ;(Array.isArray(tags) ? tags : []).forEach(function (g) {
+    nameById[Number(g.id)] = String(g.name == null ? '' : g.name)
+    colorById[Number(g.id)] = String(g.color == null ? '' : g.color)
+  })
+
+  // 只统计**支出**：标签的占比是与支出结构对照着看的，收入混进来没有解释力
+  const expenseByTx = {}
+  let totalExpense = 0
+  list.forEach(function (r) {
+    if (r.type !== 'expense') return
+    const cents = Number(r.amount_cents) || 0
+    expenseByTx[Number(r.id)] = cents
+    totalExpense += cents
+  })
+
+  const idsByTx = {}
+  ;(Array.isArray(txTags) ? txTags : []).forEach(function (r) {
+    const tx = Number(r && r.transaction_id)
+    const id = Number(r && r.tag_id)
+    if (!(tx in expenseByTx) || !nameById[id]) return
+    if (!idsByTx[tx]) idsByTx[tx] = []
+    if (idsByTx[tx].indexOf(id) === -1) idsByTx[tx].push(id)
+  })
+
+  const agg = {}
+  let overlaps = false
+  let taggedCount = 0
+  Object.keys(idsByTx).forEach(function (txKey) {
+    const ids = idsByTx[txKey]
+    taggedCount += 1
+    if (ids.length > 1) overlaps = true
+    const cents = expenseByTx[Number(txKey)] || 0
+    ids.forEach(function (id) {
+      if (!agg[id]) agg[id] = { tag_id: id, name: nameById[id], count: 0, cents: 0 }
+      agg[id].count += 1
+      agg[id].cents += cents
+    })
+  })
+
+  const out = Object.keys(agg)
+    .map(function (k) { return agg[k] })
+    .sort(function (a, b) { return b.cents - a.cents || a.name.localeCompare(b.name) })
+    .slice(0, n)
+    .map(function (r, i) {
+      return {
+        rank: i + 1,
+        tag_id: r.tag_id,
+        name: r.name,
+        /** 色 key（c1..c8），页面用它取色；不在这里换成色值，保持"配色只在 palette 一处" */
+        color: colorById[r.tag_id] || '',
+        count: r.count,
+        cents: r.cents,
+        pct: totalExpense ? r.cents / totalExpense : 0
+      }
+    })
+
+  return { list: out, overlaps: overlaps, taggedCount: taggedCount, totalExpenseCents: totalExpense }
+}
+
+/**
  * 生成一份月度报告。
  *
  * @param {object} input
@@ -110,6 +190,8 @@ export function biggestOf(rows, type, categories) {
  * @param {Array} [input.prevRecords] 上月流水（算环比用；缺省视为空）
  * @param {Array} [input.categories] 分类表
  * @param {number} [input.totalBudgetCents] 当月总预算（分），0/缺省 = 未设
+ * @param {Array} [input.tags] 标签表（T5.1；缺省 = 不产出标签区块）
+ * @param {Array} [input.txTags] 流水-标签关联行（T5.1）
  * @returns {object} 见下方 return —— 页面不再做任何算术
  */
 export function buildMonthlyReport(input) {
@@ -144,6 +226,9 @@ export function buildMonthlyReport(input) {
       }
     })
 
+  /* ---- 按标签汇总（T5.1）：一笔多标签会重复计入，overlaps 交给界面如实提示 ---- */
+  const tagsBreak = tagBreakdown(rows, src.tags, src.txTags, TOP_N)
+
   /* ---- 超支天数：需要总预算才成立 ---- */
   const limit = cents(src.totalBudgetCents)
   const perDayCents = limit && days ? Math.ceil(limit / days) : 0
@@ -176,6 +261,9 @@ export function buildMonthlyReport(input) {
     },
 
     topCategories: topCategories,
+
+    /** 按标签汇总（T5.1）；没有打过任何标签时 list 为空、页面据此不渲染该区块 */
+    tagTop: tagsBreak,
 
     budget: {
       hasBudget: limit > 0,

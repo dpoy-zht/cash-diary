@@ -146,3 +146,8 @@ export async function setTxTags(accountId, txId, tagIds) {
 export async function tagRowsByTxs(txIds) {
   return tagRepo.tagRowsByTxs(txIds)
 }
+
+/** 每个标签被多少笔未删除流水引用：{ [tagId]: count }（标签管理页用） */
+export async function usageCounts(accountId) {
+  return tagRepo.usageCounts(accountId)
+}

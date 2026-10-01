@@ -140,8 +140,8 @@ describe('T4.2 —— 整库表 → CSV 行', () => {
 
   it('类型 / 分类名 / 账本名 / 金额符号都正确', () => {
     const rows = buildTxCsvRows(tables)
-    expect(rows[1]).toEqual(['2026-09-01 09:00', '收入', '工资', '12000.00', '九月工资', '日常账本'])
-    expect(rows[2]).toEqual(['2026-09-30 08:00', '支出', '餐饮', '-38.00', '早餐', '日常账本'])
+    expect(rows[1]).toEqual(['2026-09-01 09:00', '收入', '工资', '12000.00', '九月工资', '日常账本', ''])
+    expect(rows[2]).toEqual(['2026-09-30 08:00', '支出', '餐饮', '-38.00', '早餐', '日常账本', ''])
   })
 
   it('分类 / 账本 id 对不上时退化成「其他」与空串，不崩也不写 undefined', () => {
@@ -152,13 +152,58 @@ describe('T4.2 —— 整库表 → CSV 行', () => {
         { id: 1, account_id: 99, category_id: 99, type: 'expense', amount_cents: 100, note: '', occurred_at: at(2026, 9, 30, 8, 0) }
       ]
     })
-    expect(rows[1]).toEqual(['2026-09-30 08:00', '支出', '其他', '-1.00', '', ''])
+    expect(rows[1]).toEqual(['2026-09-30 08:00', '支出', '其他', '-1.00', '', '', ''])
   })
 
   it('空库 / 结构不对时只有表头，不抛错', () => {
     expect(buildTxCsvRows(null)).toEqual([TX_CSV_HEADER])
     expect(buildTxCsvRows({})).toEqual([TX_CSV_HEADER])
     expect(buildTxCsvRows({ transaction_record: null })).toEqual([TX_CSV_HEADER])
+  })
+
+  it('T5.1 标签列：多个标签用 | 连接（逗号留给 CSV 分隔符）；没打过标签留空', () => {
+    const rows = buildTxCsvRows({
+      category: [{ id: 1, name: '餐饮' }],
+      account: [{ id: 1, name: '日常账本' }],
+      tag: [{ id: 1, name: '报销' }, { id: 2, name: '出差' }],
+      transaction_tag: [
+        { transaction_id: 1, tag_id: 1 },
+        { transaction_id: 1, tag_id: 2 },
+        { transaction_id: 2, tag_id: 1 }
+      ],
+      transaction_record: [
+        { id: 1, account_id: 1, category_id: 1, type: 'expense', amount_cents: 100, note: 'a', occurred_at: at(2026, 9, 1, 8, 0) },
+        { id: 2, account_id: 1, category_id: 1, type: 'expense', amount_cents: 200, note: 'b', occurred_at: at(2026, 9, 2, 8, 0) },
+        { id: 3, account_id: 1, category_id: 1, type: 'expense', amount_cents: 300, note: 'c', occurred_at: at(2026, 9, 3, 8, 0) }
+      ]
+    })
+    expect(rows[1][6]).toBe('报销|出差')
+    expect(rows[2][6]).toBe('报销')
+    expect(rows[3][6]).toBe('') // 没打标签
+  })
+
+  it('T5.1 标签列：老备份（没有 tag 两张表）不抛错、整列为空', () => {
+    const rows = buildTxCsvRows({
+      category: [{ id: 1, name: '餐饮' }],
+      account: [{ id: 1, name: '日常账本' }],
+      transaction_record: [
+        { id: 1, account_id: 1, category_id: 1, type: 'expense', amount_cents: 100, note: '', occurred_at: at(2026, 9, 1, 8, 0) }
+      ]
+    })
+    expect(rows[1][6]).toBe('')
+  })
+
+  it('T5.1 标签列：关联指向不存在的标签时忽略（不写 undefined）', () => {
+    const rows = buildTxCsvRows({
+      category: [{ id: 1, name: '餐饮' }],
+      account: [{ id: 1, name: '日常账本' }],
+      tag: [{ id: 1, name: '报销' }],
+      transaction_tag: [{ transaction_id: 1, tag_id: 1 }, { transaction_id: 1, tag_id: 999 }],
+      transaction_record: [
+        { id: 1, account_id: 1, category_id: 1, type: 'expense', amount_cents: 100, note: '', occurred_at: at(2026, 9, 1, 8, 0) }
+      ]
+    })
+    expect(rows[1][6]).toBe('报销')
   })
 
   it('buildTxCsv：文本以 BOM 开头、表头在最前、CRLF 分行', () => {
@@ -178,7 +223,7 @@ describe('T4.2 —— 整库表 → CSV 行', () => {
     })
     const body = text.slice(1).split('\r\n')[1]
     expect(body).toContain('"奶茶,""加料"""')
-    expect(parseCsvLine(body)).toEqual(['2026-09-30 08:00', '支出', '其他', '-1.00', '奶茶,"加料"', ''])
+    expect(parseCsvLine(body)).toEqual(['2026-09-30 08:00', '支出', '其他', '-1.00', '奶茶,"加料"', '', ''])
   })
 
   it('备注带换行时会整体加引号，行数不会因此变多', () => {

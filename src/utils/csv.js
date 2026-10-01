@@ -12,8 +12,9 @@
  * （CSV injection）。这里给这类单元格前置一个单引号。注意**不能无脑给 `-` 开头加**，
  * 否则金额列 `-38.00` 会变成文本；只有"是文本又不是数字"时才加。
  */
+import { formatTagsCell } from './tag.js'
 /** 表头：顺序即列顺序。新增列只许往后追加，避免老用户的 Excel 模板错位。 */
-export const TX_CSV_HEADER = ['日期时间', '类型', '分类', '金额(元)', '备注', '账本']
+export const TX_CSV_HEADER = ['日期时间', '类型', '分类', '金额(元)', '备注', '账本', '标签']
 
 /** UTF-8 BOM（\uFEFF） */
 export const CSV_BOM = '\uFEFF'
@@ -92,8 +93,10 @@ export function csvFileName(nowTs) {
  * - 按 `occurred_at` **升序**（看账单的习惯是从早到晚）
  * - 金额：收入为正、支出为负，与首页展示的正负口径一致；Excel 里可以直接求和
  * - 分类型 / 账本名从 category / account 表按 id 映射，查不到退化成「其他」/ 空
+ * - **标签**（T5.1）：一格里放多个，用 `|` 连接。不用逗号是因为逗号是 CSV 分隔符 ——
+ *   就算加了引号包裹，用户拿 Excel 再另存也容易被拆成两列。老备份没有 tag 两张表时该列全空。
  *
- * @param {{category?:Array, account?:Array, transaction_record?:Array}} tables dumpAll() 的结果
+ * @param {{category?:Array, account?:Array, transaction_record?:Array, tag?:Array, transaction_tag?:Array}} tables dumpAll() 的结果
  */
 export function buildTxCsvRows(tables) {
   const t = tables || {}
@@ -104,6 +107,20 @@ export function buildTxCsvRows(tables) {
   const accName = {}
   ;(Array.isArray(t.account) ? t.account : []).forEach(function (a) {
     accName[Number(a.id)] = String(a.name === null || a.name === undefined ? '' : a.name)
+  })
+  const tagName = {}
+  ;(Array.isArray(t.tag) ? t.tag : []).forEach(function (g) {
+    tagName[Number(g.id)] = String(g.name === null || g.name === undefined ? '' : g.name)
+  })
+  // 流水 id → 标签名数组（按 tag id 升序，保证同一批数据导出的列内容稳定）
+  const tagsByTx = {}
+  ;(Array.isArray(t.transaction_tag) ? t.transaction_tag : []).forEach(function (r) {
+    const tx = Number(r && r.transaction_id)
+    const id = Number(r && r.tag_id)
+    const name = tagName[id]
+    if (!tx || !name) return
+    if (!tagsByTx[tx]) tagsByTx[tx] = []
+    if (tagsByTx[tx].indexOf(name) === -1) tagsByTx[tx].push(name)
   })
 
   const rows = [TX_CSV_HEADER.slice()]
@@ -120,7 +137,8 @@ export function buildTxCsvRows(tables) {
       catName[Number(r.category_id)] || '其他',
       centsToYuan(r.amount_cents, !income),
       r.note || '',
-      accName[Number(r.account_id)] || ''
+      accName[Number(r.account_id)] || '',
+      formatTagsCell(tagsByTx[Number(r.id)])
     ])
   })
   return rows

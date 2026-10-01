@@ -172,8 +172,14 @@ export const useTxStore = defineStore('tx', function () {
     return id
   }
 
-  async function update(ym, id, input) {
+  /**
+   * 编辑一笔流水。
+   * @param {number[]} [tagIds] 传入则**覆写**标签集合；不传（undefined）表示不动标签。
+   *   刻意区分"传空数组"与"不传"：前者是"把标签全清掉"，后者是"这次不碰标签"。
+   */
+  async function update(ym, id, input, tagIds) {
     await txService.updateTx(id, input)
+    if (Array.isArray(tagIds)) await tagService.setTxTags(currentAccount(), id, tagIds)
     bumpData()
     await refresh(ym)
   }

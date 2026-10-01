@@ -87,6 +87,7 @@
             :key="r.id"
             :record="r"
             :category="catOf(r.category_id)"
+            :tags="tagsOf(r.id)"
             @click="openEdit(r)"
           />
         </block>
@@ -126,16 +127,24 @@
     <edit-sheet
       :record="editing"
       :categories="editingCats"
+      :tags="tagStore.list"
+      v-model:tag-ids="editTagIds"
       @close="closeEdit"
       @save="onSave"
       @remove="onRemove"
+      @create-tag="editTagCreateShow = true"
+    />
+    <tag-create-sheet
+      v-if="editTagCreateShow"
+      @close="editTagCreateShow = false"
+      @submit="onEditTagCreate"
     />
     <tab-bar current="home" />
   </view>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
@@ -153,6 +162,7 @@ import { requestNotifyPermission, notifyLocal, REMIND_PREF_KEY, normalizeRemindE
 import { countFilters, filterSummary } from '../../utils/search.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 import FilterSheet from '../../components/filter-sheet/filter-sheet.vue'
+import TagCreateSheet from '../../components/tag-create-sheet/tag-create-sheet.vue'
 
 /**
  * 首页（v2.0）：月份切换 + 余额卡 + 全部/支出/收入分段 + 按日流水 + FAB。
@@ -324,6 +334,27 @@ async function onApplyFilter(filters) {
 const groups = computed(function () {
   return groupByDay(filtered.value)
 })
+
+/* ---- 列表项的标签（T5.1）----
+ * 一次把当前列表所有流水的标签批量查回来（`tagStore.mapByTxs`），
+ * 而不是每条流水各查一次 —— 列表长起来就是 N+1。
+ * 监听 filtered 而不是在 onShow 里查：搜索、切月、切分段、改完账都会换列表，
+ * 挂在数据上才不会漏掉任何一条路径。
+ */
+const tagMapByTx = ref({})
+watch(filtered, function (list) {
+  const ids = (list || []).map(function (r) { return r.id })
+  if (!ids.length) { tagMapByTx.value = {}; return }
+  tagStore.mapByTxs(ids)
+    .then(function (m) { tagMapByTx.value = m })
+    .catch(function () { tagMapByTx.value = {} })
+}, { immediate: true })
+
+/** 把某条流水的 tagId 换成标签对象（已被删的标签自动跳过，不显示占位） */
+function tagsOf(txId) {
+  const ids = tagMapByTx.value[txId] || []
+  return ids.map(function (id) { return tagStore.tagOf(id) }).filter(Boolean)
+}
 const catMap = computed(function () {
   return new Map(categoryStore.list.map(function (c) { return [c.id, c] }))
 })
@@ -362,7 +393,8 @@ async function onSave(payload) {
   try {
     // 字段映射统一走 service 层：dateStr → occurred_at 会保留原记录的时/分（buildEditInput）
     const dto = buildEditInput(payload, rec.occurred_at)
-    await txStore.update(metaStore.ym, rec.id, dto)
+    // 标签一起覆写（payload.tagIds 由编辑弹层交回；空数组表示"标签全清掉"）
+    await txStore.update(metaStore.ym, rec.id, dto, payload.tagIds)
     editing.value = null
     // 改到别的月份后这条记录会从当前列表消失，必须说一句，否则用户以为"保存把账弄丢了"
     const movedTo = dto.ts && ymOf(dto.ts) !== metaStore.ym ? ymOf(dto.ts) : ''
@@ -385,8 +417,37 @@ function onRemove() {
     }
   })
 }
-function openEdit(r) {
+/** 编辑中这笔流水已选的标签（父级持有：现场新建标签后要能立刻回填选中） */
+const editTagIds = ref([])
+const editTagCreateShow = ref(false)
+
+async function openEdit(r) {
   editing.value = r
+  editTagIds.value = []
+  try {
+    const map = await tagStore.mapByTxs([r.id])
+    editTagIds.value = map[r.id] || []
+  } catch (e) { /* 取不到标签不影响编辑其它字段 */ }
+}
+
+/** 编辑弹层里现场新建标签：建完立刻勾上 */
+async function onEditTagCreate(names) {
+  try {
+    const res = await tagStore.createMany(names.join(','))
+    editTagCreateShow.value = false
+    const wanted = {}
+    res.created.forEach(function (n) { wanted[n] = 1 })
+    const next = editTagIds.value.slice()
+    tagStore.list.forEach(function (t) {
+      if (wanted[t.name] && next.indexOf(t.id) < 0 && next.length < 5) next.push(t.id)
+    })
+    editTagIds.value = next
+    if (res.created.length) uni.showToast({ title: '已新建 ' + res.created.length + ' 个标签', icon: 'none' })
+    else if (res.full) uni.showToast({ title: '标签数量已达上限', icon: 'none' })
+    else uni.showToast({ title: '这些标签已经有了', icon: 'none' })
+  } catch (err) {
+    uni.showToast({ title: (err && err.message) || '新建失败', icon: 'none' })
+  }
 }
 
 const iconCoin = svgMaskStyle('M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93V18h-2v1.93A8.01 8.01 0 014.07 13H6v-2H4.07A8.01 8.01 0 0111 4.07V6h2V4.07A8.01 8.01 0 0119.93 11H18v2h1.93A8.01 8.01 0 0113 19.93z')

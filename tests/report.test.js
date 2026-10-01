@@ -4,6 +4,7 @@ import {
   monthOverMonth,
   dailyExpense,
   biggestOf,
+  tagBreakdown,
   TOP_N
 } from '../src/utils/report.js'
 
@@ -308,5 +309,78 @@ describe('T4.4 —— 月度报告整体 buildMonthlyReport', () => {
     const direct = sumByType(SEPT)
     expect(r.expenseCents).toBe(direct.expenseCents)
     expect(r.incomeCents).toBe(direct.incomeCents)
+  })
+})
+
+describe('T5.1 —— 按标签汇总（tagBreakdown）', () => {
+  const tags = [
+    { id: 1, name: '报销', color: 'c1' },
+    { id: 2, name: '出差', color: 'c2' },
+    { id: 3, name: '没人用', color: 'c3' }
+  ]
+  function tx(id, type, cents, day) {
+    return { id, type, amount_cents: cents, occurred_at: at(2026, 9, day), deleted_at: null }
+  }
+
+  it('只统计支出；收入即使挂了标签也不进榜', () => {
+    const rows = [tx(1, 'expense', 1000, 1), tx(2, 'income', 5000, 2)]
+    const r = tagBreakdown(rows, tags, [{ transaction_id: 1, tag_id: 1 }, { transaction_id: 2, tag_id: 1 }], TOP_N)
+    expect(r.list.length).toBe(1)
+    expect(r.list[0].cents).toBe(1000)
+    expect(r.list[0].count).toBe(1)
+    expect(r.list[0].pct).toBe(1)
+  })
+
+  it('一笔多标签会在多个标签里各计一次，并置 overlaps 让界面如实提示', () => {
+    const rows = [tx(1, 'expense', 1000, 1)]
+    const r = tagBreakdown(rows, tags, [{ transaction_id: 1, tag_id: 1 }, { transaction_id: 1, tag_id: 2 }], TOP_N)
+    expect(r.list.length).toBe(2)
+    expect(r.list.map(function (x) { return x.cents })).toEqual([1000, 1000])
+    expect(r.taggedCount).toBe(1)
+    expect(r.overlaps).toBe(true)
+    // 分母是当月总支出而不是各标签之和 —— 单看一个标签的占比仍然有意义
+    expect(r.list[0].pct).toBe(1)
+  })
+
+  it('一笔只挂一个标签时 overlaps 为 false', () => {
+    const rows = [tx(1, 'expense', 1000, 1), tx(2, 'expense', 500, 2)]
+    const r = tagBreakdown(rows, tags, [{ transaction_id: 1, tag_id: 1 }, { transaction_id: 2, tag_id: 2 }], TOP_N)
+    expect(r.overlaps).toBe(false)
+    expect(r.list.map(function (x) { return x.name })).toEqual(['报销', '出差'])
+  })
+
+  it('按金额降序、最多取 TOP_N；带出 color 供界面取色', () => {
+    const rows = [tx(1, 'expense', 300, 1), tx(2, 'expense', 900, 2)]
+    const r = tagBreakdown(rows, tags, [{ transaction_id: 1, tag_id: 1 }, { transaction_id: 2, tag_id: 2 }], TOP_N)
+    expect(r.list[0].name).toBe('出差')
+    expect(r.list[0].color).toBe('c2')
+    expect(r.list.length).toBeLessThanOrEqual(TOP_N)
+  })
+
+  it('关联指向不存在的标签 / 指向已删流水 → 直接忽略，不崩也不写 undefined', () => {
+    const rows = [tx(1, 'expense', 100, 1)]
+    const r = tagBreakdown(rows, tags, [{ transaction_id: 1, tag_id: 999 }, { transaction_id: 888, tag_id: 1 }], TOP_N)
+    expect(r.list).toEqual([])
+    expect(r.overlaps).toBe(false)
+  })
+
+  it('没有标签数据时返回空列表（页面据此不渲染该区块）', () => {
+    expect(tagBreakdown([tx(1, 'expense', 100, 1)], tags, [], TOP_N).list).toEqual([])
+    expect(tagBreakdown(null, null, null, TOP_N).list).toEqual([])
+  })
+
+  it('buildMonthlyReport 透传 tags / txTags 到 tagTop', () => {
+    const rep = buildMonthlyReport({
+      ym: '2026-09',
+      records: [tx(1, 'expense', 2000, 3)],
+      categories: [{ id: 1, name: '餐饮' }],
+      tags: tags,
+      txTags: [{ transaction_id: 1, tag_id: 1 }]
+    })
+    expect(rep.tagTop.list.length).toBe(1)
+    expect(rep.tagTop.list[0].name).toBe('报销')
+    // 不传 tags / txTags 时区块自然为空，不抛错
+    const bare = buildMonthlyReport({ ym: '2026-09', records: [tx(1, 'expense', 2000, 3)], categories: [] })
+    expect(bare.tagTop.list).toEqual([])
   })
 })

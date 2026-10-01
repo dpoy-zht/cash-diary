@@ -393,6 +393,16 @@ export async function tagRefCount(tagId) {
   return Number(rows[0] && rows[0].c)
 }
 
+/** 每个标签被多少笔**未删除**流水引用（标签管理页展示 + 删除前检查；一次查完，不做 N 次） */
+export async function tagUsageCounts(accountId) {
+  return select(
+    'SELECT tt.tag_id AS tag_id, COUNT(*) AS c FROM transaction_tag tt ' +
+    'JOIN transaction_record t ON t.id = tt.transaction_id ' +
+    'WHERE t.deleted_at IS NULL AND t.account_id = ' + aid(accountId) + ' ' +
+    'GROUP BY tt.tag_id'
+  )
+}
+
 /** 覆写一笔流水的标签集合（先清后插，包在同一事务里，避免中途失败留下半套标签） */
 export async function txTagSetForTx(txId, tagIds) {
   const id = Number(txId)

@@ -186,6 +186,34 @@ describe('标签数据层（memory 适配器全链路）', () => {
     expect(Array.isArray(dump.tag)).toBe(true)
     expect(Array.isArray(dump.transaction_tag)).toBe(true)
   })
+
+  it('tagUsageCounts：一次拿到每个标签的引用笔数，且只算未删除的流水', async () => {
+    const t1 = await tagRepo.insert(tagRow('报销', 0))
+    const t2 = await tagRepo.insert(tagRow('出差', 1))
+    const t3 = await tagRepo.insert(tagRow('没人用', 2))
+    const base = { account_id: 1, category_id: 1, type: 'expense', amount_cents: 100, note: '', created_at: 1, updated_at: 1, deleted_at: null }
+    const tx1 = await s.txInsert(Object.assign({}, base, { occurred_at: 1 }))
+    const tx2 = await s.txInsert(Object.assign({}, base, { occurred_at: 2 }))
+    const tx3 = await s.txInsert(Object.assign({}, base, { occurred_at: 3 }))
+    await tagRepo.setTagsForTx(tx1, [t1, t2])
+    await tagRepo.setTagsForTx(tx2, [t1])
+    await tagRepo.setTagsForTx(tx3, [t2])
+    await s.txSoftDelete(tx3)
+
+    const counts = await tagRepo.usageCounts(1)
+    expect(counts[t1]).toBe(2)
+    expect(counts[t2]).toBe(1) // tx3 已软删除，不再计入
+    expect(counts[t3]).toBeUndefined()
+  })
+
+  it('tagUsageCounts：别的账本的流水不计入本账本', async () => {
+    await s.accountInsert({ id: 2, name: '旅行', created_at: 1 })
+    const t = await tagRepo.insert(tagRow('报销', 0))
+    const txOther = await s.txInsert({ account_id: 2, category_id: 1, type: 'expense', amount_cents: 100, note: '', occurred_at: 1, created_at: 1, updated_at: 1, deleted_at: null })
+    await tagRepo.setTagsForTx(txOther, [t])
+    expect(await tagRepo.usageCounts(1)).toEqual({})
+    expect((await tagRepo.usageCounts(2))[t]).toBe(1)
+  })
 })
 
 describe('备份 v3 —— 标签随备份走，且老备份仍能恢复', () => {

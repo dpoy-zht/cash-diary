@@ -68,6 +68,22 @@
         </view>
       </view>
 
+      <!-- 按标签看（T5.1）：一笔都没打过标签时整块不显示，不留空区块 -->
+      <view v-if="report.tagTop.list.length" class="card">
+        <text class="card-title">按标签看</text>
+        <view v-for="t in report.tagTop.list" :key="t.tag_id" class="rank-row">
+          <view class="tag-dot" :style="{ background: tagColorOf(t) }"></view>
+          <view class="rank-main">
+            <view class="rank-line">
+              <text class="rank-name">{{ t.name }}</text>
+              <text class="rank-amt">¥{{ fmt(t.cents) }}<text class="rank-pct">{{ Math.round(t.pct * 100) }}%</text></text>
+            </view>
+            <view class="bar"><view class="bar-i" :style="{ width: Math.round(t.pct * 100) + '%', background: tagColorOf(t) }" /></view>
+          </view>
+        </view>
+        <text v-if="report.tagTop.overlaps" class="card-foot">一笔账可以挂多个标签，所以上面几项加起来可能超过当月总支出</text>
+      </view>
+
       <!-- 最大一笔 -->
       <view v-if="report.biggest.expense" class="card">
         <text class="card-title">最大的一笔</text>
@@ -105,8 +121,11 @@ import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useBudgetStore } from '../../stores/budget.js'
 import { useMetaStore } from '../../stores/meta.js'
+import { useTagStore } from '../../stores/tag.js'
+import * as tagService from '../../services/tag.js'
 import { buildMonthlyReport } from '../../utils/report.js'
 import { formatCents } from '../../utils/money.js'
+import { tagColorOf } from '../../utils/palette.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -122,6 +141,7 @@ const txStore = useTxStore()
 const categoryStore = useCategoryStore()
 const budgetStore = useBudgetStore()
 const metaStore = useMetaStore()
+const tagStore = useTagStore()
 
 /** 报告快照：每次 reload 整体重建，避免页面里出现半新半旧的数字 */
 const report = ref(null)
@@ -136,14 +156,27 @@ const chipText = computed(function () {
 
 function load() {
   report.value = null
-  return Promise.all([txStore.loadReport(ym.value), categoryStore.init(), budgetStore.load()])
-    .then(function () {
+  return Promise.all([
+    txStore.loadReport(ym.value),
+    categoryStore.init(),
+    budgetStore.load(),
+    tagStore.load()
+  ])
+    .then(async function () {
+      // 标签关联按当月流水一次取回（buildMonthlyReport 要的是原始关联行）
+      let txTags = []
+      try {
+        const ids = (txStore.reportRecords || []).map(function (r) { return r.id })
+        txTags = await tagService.tagRowsByTxs(ids)
+      } catch (e) { /* 取不到标签不影响报告主体，标签区块自然为空 */ }
       report.value = buildMonthlyReport({
         ym: ym.value,
         records: txStore.reportRecords,
         prevRecords: txStore.reportPrevRecords,
         categories: categoryStore.list,
-        totalBudgetCents: budgetStore.totalCents
+        totalBudgetCents: budgetStore.totalCents,
+        tags: tagStore.list,
+        txTags: txTags
       })
     })
     .catch(function () {
@@ -374,6 +407,13 @@ onShow(function () {
   align-items: center;
   gap: 10px;
   padding: 8px 0;
+}
+/* 标签行的色点：宽度与 .rank-no 一致，让"分类 TOP"与"按标签看"两组排行的左边缘对齐 */
+.tag-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 .rank-no {
   width: 16px;

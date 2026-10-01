@@ -533,6 +533,22 @@ export async function tagRefCount(tagId) {
   return n
 }
 
+/** 每个标签被多少笔**未删除**流水引用（一次算完，与 sqlite 侧同口径） */
+export async function tagUsageCounts(accountId) {
+  const a = aid(accountId)
+  const live = {}
+  data.transaction_record.forEach(function (r) {
+    if (r.deleted_at == null && aid(r.account_id) === a) live[r.id] = 1
+  })
+  const agg = {}
+  data.transaction_tag.forEach(function (r) {
+    if (!live[Number(r.transaction_id)]) return
+    const k = Number(r.tag_id)
+    agg[k] = (agg[k] || 0) + 1
+  })
+  return Object.keys(agg).map(function (k) { return { tag_id: Number(k), c: agg[k] } })
+}
+
 /** 覆写一笔流水的标签集合（先清后插，包在同一事务里） */
 export async function txTagSetForTx(txId, tagIds) {
   const id = Number(txId)

@@ -9,6 +9,7 @@
     { "path": "pages/me/me", "style": { "navigationStyle": "custom" } },
     { "path": "pages/budget/budget", "style": { "navigationStyle": "custom" } },
     { "path": "pages/category/category", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/tag/tag", "style": { "navigationStyle": "custom" } },
     { "path": "pages/fixed/fixed", "style": { "navigationStyle": "custom" } }
   ],
   "globalStyle": {

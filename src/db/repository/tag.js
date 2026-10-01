@@ -57,6 +57,16 @@ export async function refCount(tagId) {
   return getStorage().tagRefCount(Number(tagId))
 }
 
+/** 一次拿到本账本每个标签的引用笔数：{ [tagId]: count }（标签管理页用，避免逐个查） */
+export async function usageCounts(accountId) {
+  const rows = await getStorage().tagUsageCounts(aid(accountId))
+  const map = {}
+  ;(rows || []).forEach(function (r) {
+    map[Number(r.tag_id)] = Number(r.c) || 0
+  })
+  return map
+}
+
 /** 覆写一笔流水的标签集合 */
 export async function setTagsForTx(txId, tagIds) {
   return getStorage().txTagSetForTx(Number(txId), tagIds)
