@@ -1,6 +1,6 @@
 {
   "name": "cash-diary",
-  "version": "0.1.0",
+  "version": "2.2.4",
   "private": true,
   "description": "现金日记 - 3秒记一笔的个人记账App（MVP）",
   "scripts": {

@@ -276,9 +276,3 @@ export function compareTimestamps(remoteTs, localTs) {
   return 'same'
 }
 
-/** 同步结果文案（上传/下载成功都走它，避免各处自己拼） */
-export function syncResultMessage(counts) {
-  const c = counts || {}
-  const n = Number(c.transaction_record) || 0
-  return '已同步 ' + n + ' 笔流水'
-}

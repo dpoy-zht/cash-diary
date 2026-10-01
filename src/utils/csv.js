@@ -144,7 +144,8 @@ export function buildTxCsvRows(tables) {
   return rows
 }
 
-/** 整库表 → 可直接落盘的 CSV 文本（二维数组 + BOM） */
+
+/** 整库表 → 可直接落盘的 CSV 文本（二维数组 + BOM）。方便一次性导出的调用方；services 走的是分步版 */
 export function buildTxCsv(tables) {
   return withBom(toCsv(buildTxCsvRows(tables)))
 }
