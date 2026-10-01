@@ -16,6 +16,36 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { getStorage, resetStorageForTest } from '../src/db/index.js'
+import * as sqliteAdapter from '../src/db/sqlite.js'
+import * as memoryAdapter from '../src/db/memory.js'
+
+/**
+ * 方法集合守卫：**sqlite 暴露的方法必须都能在 memory 里找到同名实现**。
+ * 加新表/新方法时最容易漏掉另一侧，漏了就是"App 端能跑、H5 预览报 undefined"。
+ * memory 允许比 sqlite 多（flush / reset / setPersistErrorHandler 是它独有的测试设施）。
+ */
+describe('适配器方法集合守卫', () => {
+  it('sqlite 的每个导出方法在 memory 里都有同名实现', () => {
+    const sqliteNames = Object.keys(sqliteAdapter).filter(function (k) {
+      return typeof sqliteAdapter[k] === 'function'
+    })
+    const missing = sqliteNames.filter(function (k) {
+      return typeof memoryAdapter[k] !== 'function'
+    })
+    expect(missing).toEqual([])
+  })
+
+  it('两个适配器的表清单一致（dumpAll 的键集合相同）', async () => {
+    resetStorageForTest()
+    const mem = memoryAdapter
+    await mem.init()
+    const dump = await mem.dumpAll()
+    // sqlite 侧由 TABLE_COLS 驱动；这里锁住 memory 的表集合，防"只加了 sqlite"
+    expect(Object.keys(dump).sort()).toEqual([
+      'account', 'budget', 'category', 'fixed_expense', 'tag', 'transaction_record', 'transaction_tag'
+    ])
+  })
+})
 
 describe('适配器契约 —— memory 侧（T2.4）', () => {
   let s

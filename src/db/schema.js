@@ -110,6 +110,39 @@ CREATE INDEX IF NOT EXISTS idx_fixed_acc ON fixed_expense(account_id);
 `
 
 /**
+ * v6：标签维度（T5.1）。
+ *
+ * 设计要点（与分类刻意保持的差异）：
+ * - **标签是多对多**：一笔流水可挂多个标签，所以拆成 `tag` + `transaction_tag` 两张表。
+ *   junction 用 (transaction_id, tag_id) 复合主键 —— 天然挡住重复打标。
+ * - **tag 不做软删除**（与 category 一致），配套规则是"被任何流水引用过的标签不许删"，
+ *   由 services/tag.js 先查引用数再决定，避免留下指向不存在标签的脏关联。
+ * - **transaction_tag 不存 deleted_at**：流水本身软删除后，其标签关联随之被忽略
+ *   （查询一律先按 tx 过滤 deleted_at IS NULL），无需重复维护删除态。
+ * - color 存**色 key**（c1..c8）而不是色值：换配色时只改映射表，历史数据不用迁移。
+ */
+export const TAG_SQL = `
+CREATE TABLE IF NOT EXISTS tag (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL DEFAULT 1,
+  name       TEXT    NOT NULL,
+  color      TEXT    NOT NULL DEFAULT '',
+  sort       INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS transaction_tag (
+  transaction_id INTEGER NOT NULL,
+  tag_id         INTEGER NOT NULL,
+  PRIMARY KEY (transaction_id, tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tag_account ON tag(account_id);
+CREATE INDEX IF NOT EXISTS idx_tx_tag_tag  ON transaction_tag(tag_id);
+`
+
+/**
  * 迁移登记：按版本号顺序执行。新增结构变更 → 追加一项，禁止修改已发布的版本。
  *
  * T2.6：每个迁移新增 `statements` 数组 —— **每条 SQL 一个元素**，执行时不再按
@@ -199,6 +232,29 @@ export const MIGRATIONS = [
   updated_at     INTEGER NOT NULL
 )`,
       'CREATE INDEX IF NOT EXISTS idx_fixed_acc ON fixed_expense(account_id)'
+    ]
+  },
+  {
+    version: 6,
+    name: 'v6_tag',
+    sql: TAG_SQL,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS tag (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL DEFAULT 1,
+  name       TEXT    NOT NULL,
+  color      TEXT    NOT NULL DEFAULT '',
+  sort       INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+)`,
+      `CREATE TABLE IF NOT EXISTS transaction_tag (
+  transaction_id INTEGER NOT NULL,
+  tag_id         INTEGER NOT NULL,
+  PRIMARY KEY (transaction_id, tag_id)
+)`,
+      'CREATE INDEX IF NOT EXISTS idx_tag_account ON tag(account_id)',
+      'CREATE INDEX IF NOT EXISTS idx_tx_tag_tag  ON transaction_tag(tag_id)'
     ]
   }
 ]

@@ -369,10 +369,14 @@ describe('备份 v2 —— fixed_expense 表', () => {
     }
     expect(validateBackup(v1).ok).toBe(true)
 
+    // 构造一份**真正的 v2 格式**备份：buildBackup 现在产出 v3，
+    // 所以要显式改回 version 2 并去掉 v3 才有的 tag / transaction_tag 两张表。
     const v2 = Object.assign({}, buildBackup({
       account: v1.account, category: v1.category, transaction_record: [], budget: [],
       fixed_expense: [{ id: 1, account_id: 1, category_id: 1, amount_cents: 150000, note: '房租', day_of_month: 5, last_posted_ym: '2026-09', enabled: 1, created_at: 1, updated_at: 1 }]
-    }), { exportedAt: 1700000000000 })
+    }), { exportedAt: 1700000000000, version: 2 })
+    delete v2.tag
+    delete v2.transaction_tag
     expect(v2.version).toBe(2)
     expect(v2.fixed_expense.length).toBe(1)
     expect(validateBackup(v2).ok).toBe(true)

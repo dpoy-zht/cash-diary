@@ -9,13 +9,19 @@
  *   否则恢复后另一端又会把已删数据同步回来（数据铁律 3）
  */
 
-export const BACKUP_VERSION = 2
+/**
+ * 备份格式版本。
+ * v1 → v2：新增 fixed_expense
+ * v2 → v3：新增 tag + transaction_tag（T5.1 标签维度）
+ * **老版本备份必须仍能恢复**：v1/v2 缺的表按空数组处理，恢复后只是没有标签。
+ */
+export const BACKUP_VERSION = 3
 /** 备份文件里的身份标记，用来挡掉"随便一个 json" */
 export const BACKUP_APP = 'cash-diary'
 
 /**
  * 打包成可序列化的备份对象。
- * @param {{account:Array, category:Array, transaction_record:Array, budget:Array, fixed_expense?:Array}} tables
+ * @param {{account:Array, category:Array, transaction_record:Array, budget:Array, fixed_expense?:Array, tag?:Array, transaction_tag?:Array}} tables
  * @param {number} exportedAt 导出时间（毫秒时间戳）
  */
 export function buildBackup(tables, exportedAt) {
@@ -28,7 +34,9 @@ export function buildBackup(tables, exportedAt) {
     category: Array.isArray(t.category) ? t.category : [],
     transaction_record: Array.isArray(t.transaction_record) ? t.transaction_record : [],
     budget: Array.isArray(t.budget) ? t.budget : [],
-    fixed_expense: Array.isArray(t.fixed_expense) ? t.fixed_expense : []
+    fixed_expense: Array.isArray(t.fixed_expense) ? t.fixed_expense : [],
+    tag: Array.isArray(t.tag) ? t.tag : [],
+    transaction_tag: Array.isArray(t.transaction_tag) ? t.transaction_tag : []
   }
 }
 
@@ -125,6 +133,12 @@ export function validateBackup(obj) {
   if (version >= 2 && !Array.isArray(obj.fixed_expense)) {
     return { ok: false, error: '备份内容不完整（缺少 fixed_expense）' }
   }
+  // v3 起标签是必备的；v1/v2 的老备份没有它们，按空数组处理（恢复后只是没有标签）
+  if (version >= 3 && (!Array.isArray(obj.tag) || !Array.isArray(obj.transaction_tag))) {
+    return { ok: false, error: '备份内容不完整（缺少 tag / transaction_tag）' }
+  }
+  const tags = Array.isArray(obj.tag) ? obj.tag : []
+  const txTags = Array.isArray(obj.transaction_tag) ? obj.transaction_tag : []
   const accounts = obj.account
   if (!accounts.length) return { ok: false, error: '备份里没有任何账本，无法恢复' }
 
@@ -152,6 +166,16 @@ export function validateBackup(obj) {
       return { ok: false, error: '备份里的固定支出配置不合法' }
     }
   }
+  for (const g of tags) {
+    if (!g || typeof g.name !== 'string' || !g.name) {
+      return { ok: false, error: '备份里的标签数据不合法' }
+    }
+  }
+  for (const r of txTags) {
+    if (!r || !isPositiveInt(r.transaction_id) || !isPositiveInt(r.tag_id)) {
+      return { ok: false, error: '备份里的流水标签关联不合法' }
+    }
+  }
 
   return {
     ok: true,
@@ -160,7 +184,9 @@ export function validateBackup(obj) {
       category: obj.category.length,
       transaction_record: obj.transaction_record.length,
       budget: budgets.length,
-      fixed_expense: fixedExpenses.length
+      fixed_expense: fixedExpenses.length,
+      tag: tags.length,
+      transaction_tag: txTags.length
     }
   }
 }

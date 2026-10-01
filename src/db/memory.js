@@ -12,7 +12,16 @@ let data = null
 let memBackend = null
 
 function blank() {
-  return { nextId: 1, category: [], transaction_record: [], account: [], budget: [], fixed_expense: [] }
+  return {
+    nextId: 1,
+    category: [],
+    transaction_record: [],
+    account: [],
+    budget: [],
+    fixed_expense: [],
+    tag: [],
+    transaction_tag: []
+  }
 }
 
 function backend() {
@@ -466,6 +475,77 @@ export async function fixedExpenseRemove(id) {
 }
 
 /** 清空全部业务数据（流水 + 分类 + 账本 + 预算），表结构保留 —— 供「重置数据」用 */
+/* ---------- 标签 CRUD（T5.1）：与 sqlite.js 方法签名逐一对齐 ---------- */
+
+export async function tagList(accountId) {
+  const acc = Number(accountId)
+  return data.tag
+    .filter(function (t) { return Number(t.account_id) === acc })
+    .slice()
+    .sort(function (a, b) { return a.sort - b.sort || a.id - b.id })
+    .map(function (t) { return Object.assign({}, t) })
+}
+
+export async function tagInsert(row) {
+  const id = nid()
+  data.tag.push(Object.assign({ id: id }, row))
+  persist()
+  return id
+}
+
+export async function tagUpdate(id, patch) {
+  const row = data.tag.find(function (t) { return t.id === id })
+  if (!row) return
+  Object.keys(patch).forEach(function (k) { row[k] = patch[k] })
+  persist()
+}
+
+/** 删标签：连同它的关联一起删（调用方必须先确认没有流水在引用） */
+export async function tagDelete(id) {
+  return transaction(async function () {
+    data.transaction_tag = data.transaction_tag.filter(function (r) { return Number(r.tag_id) !== Number(id) })
+    data.tag = data.tag.filter(function (t) { return t.id !== id })
+  })
+}
+
+/** 这个标签被多少笔**未删除**的流水引用（删除前的安全检查） */
+export async function tagRefCount(tagId) {
+  const live = {}
+  data.transaction_record.forEach(function (r) {
+    if (r.deleted_at == null) live[r.id] = 1
+  })
+  let n = 0
+  data.transaction_tag.forEach(function (r) {
+    if (Number(r.tag_id) === Number(tagId) && live[r.transaction_id]) n += 1
+  })
+  return n
+}
+
+/** 覆写一笔流水的标签集合（先清后插，包在同一事务里） */
+export async function txTagSetForTx(txId, tagIds) {
+  const id = Number(txId)
+  const ids = (Array.isArray(tagIds) ? tagIds : [])
+    .map(Number)
+    .filter(function (n) { return Number.isInteger(n) && n > 0 })
+  return transaction(async function () {
+    data.transaction_tag = data.transaction_tag.filter(function (r) { return Number(r.transaction_id) !== id })
+    ids.forEach(function (t) { data.transaction_tag.push({ transaction_id: id, tag_id: t }) })
+  })
+}
+
+/** 一批流水各自的标签关联（按 tx id 批量取，避免 N+1） */
+export async function txTagRowsByTxs(txIds) {
+  const want = {}
+  ;(Array.isArray(txIds) ? txIds : []).forEach(function (v) {
+    const n = Number(v)
+    if (Number.isInteger(n) && n > 0) want[n] = 1
+  })
+  return data.transaction_tag
+    .filter(function (r) { return want[Number(r.transaction_id)] })
+    .map(function (r) { return { transaction_id: Number(r.transaction_id), tag_id: Number(r.tag_id) } })
+}
+
+/** 清空全部业务数据（含标签），表结构不动 */
 export async function clearAll() {
   data = blank()
   flush()
@@ -473,7 +553,7 @@ export async function clearAll() {
 
 /* ---------- 备份：整库导出 / 整库恢复 ---------- */
 
-const TABLES = ['account', 'category', 'transaction_record', 'budget', 'fixed_expense']
+const TABLES = ['account', 'category', 'transaction_record', 'budget', 'fixed_expense', 'tag', 'transaction_tag']
 
 /** 导出用：原样返回四张表（**含软删除记录**，否则恢复后已删数据会"复活"） */
 export async function dumpAll() {

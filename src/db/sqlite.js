@@ -354,6 +354,69 @@ export async function fixedExpenseRemove(id) {
   await executeBatch(['DELETE FROM fixed_expense WHERE id = ' + Number(id)])
 }
 
+/* ---------- 标签 CRUD（T5.1） ---------- */
+
+export async function tagList(accountId) {
+  return select('SELECT * FROM tag WHERE account_id = ' + Number(accountId) + ' ORDER BY sort ASC, id ASC')
+}
+
+export async function tagInsert(row) {
+  const cols = ['account_id', 'name', 'color', 'sort', 'created_at', 'updated_at']
+  const vals = cols.map(function (c) { return sqlValue(row[c]) }).join(', ')
+  await executeBatch(['INSERT INTO tag (' + cols.join(',') + ') VALUES (' + vals + ')'])
+  const rows = await select('SELECT last_insert_rowid() AS id')
+  return Number(rows[0] && rows[0].id)
+}
+
+export async function tagUpdate(id, patch) {
+  const sets = Object.keys(patch).map(function (k) { return k + ' = ' + sqlValue(patch[k]) }).join(', ')
+  if (!sets) return
+  await executeBatch(['UPDATE tag SET ' + sets + ' WHERE id = ' + Number(id)])
+}
+
+/** 删标签：连同它的关联一起删（调用方必须先确认没有流水在引用） */
+export async function tagDelete(id) {
+  const tid = Number(id)
+  await transaction(async function () {
+    await executeBatch(['DELETE FROM transaction_tag WHERE tag_id = ' + tid])
+    await executeBatch(['DELETE FROM tag WHERE id = ' + tid])
+  })
+}
+
+/** 这个标签被多少笔**未删除**的流水引用（删除前的安全检查） */
+export async function tagRefCount(tagId) {
+  const rows = await select(
+    'SELECT COUNT(*) AS c FROM transaction_tag tt ' +
+    'JOIN transaction_record t ON t.id = tt.transaction_id ' +
+    'WHERE tt.tag_id = ' + Number(tagId) + ' AND t.deleted_at IS NULL'
+  )
+  return Number(rows[0] && rows[0].c)
+}
+
+/** 覆写一笔流水的标签集合（先清后插，包在同一事务里，避免中途失败留下半套标签） */
+export async function txTagSetForTx(txId, tagIds) {
+  const id = Number(txId)
+  const ids = (Array.isArray(tagIds) ? tagIds : []).map(Number).filter(function (n) {
+    return Number.isInteger(n) && n > 0
+  })
+  await transaction(async function () {
+    await executeBatch(['DELETE FROM transaction_tag WHERE transaction_id = ' + id])
+    if (!ids.length) return
+    await executeBatch(ids.map(function (t) {
+      return 'INSERT INTO transaction_tag (transaction_id, tag_id) VALUES (' + id + ', ' + t + ')'
+    }))
+  })
+}
+
+/** 一批流水各自的标签关联（按 tx id 批量取，避免 N+1） */
+export async function txTagRowsByTxs(txIds) {
+  const ids = (Array.isArray(txIds) ? txIds : []).map(Number).filter(function (n) {
+    return Number.isInteger(n) && n > 0
+  })
+  if (!ids.length) return []
+  return select('SELECT transaction_id, tag_id FROM transaction_tag WHERE transaction_id IN (' + ids.join(',') + ')')
+}
+
 /** 清空全部业务数据（流水 + 分类 + 账本），表结构不动 —— 供「重置数据」用
     sqlite_sequence 也要清，否则自增 id 会接着往下涨 */
 export async function clearAll() {
@@ -363,7 +426,9 @@ export async function clearAll() {
     'DELETE FROM account',
     'DELETE FROM budget',
     'DELETE FROM fixed_expense',
-    "DELETE FROM sqlite_sequence WHERE name IN ('transaction_record','category','account','budget','fixed_expense')"
+    'DELETE FROM transaction_tag',
+    'DELETE FROM tag',
+    "DELETE FROM sqlite_sequence WHERE name IN ('transaction_record','category','account','budget','fixed_expense','tag')"
   ])
 }
 
@@ -381,7 +446,9 @@ const TABLE_COLS = {
   fixed_expense: [
     'id', 'account_id', 'category_id', 'amount_cents', 'note',
     'day_of_month', 'last_posted_ym', 'enabled', 'created_at', 'updated_at'
-  ]
+  ],
+  tag: ['id', 'account_id', 'name', 'color', 'sort', 'created_at', 'updated_at'],
+  transaction_tag: ['transaction_id', 'tag_id']
 }
 
 function insertRow(table, row) {

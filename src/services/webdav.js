@@ -126,7 +126,9 @@ function countsOf(backup) {
     category: (b.category || []).length,
     transaction_record: (b.transaction_record || []).length,
     budget: (b.budget || []).length,
-    fixed_expense: (b.fixed_expense || []).length
+    fixed_expense: (b.fixed_expense || []).length,
+    tag: (b.tag || []).length,
+    transaction_tag: (b.transaction_tag || []).length
   }
 }
 

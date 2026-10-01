@@ -4,7 +4,7 @@ import { MIGRATIONS, SCHEMA_SQL, INDEX_SQL } from '../src/db/schema.js'
 describe('MIGRATIONS —— 迁移登记表', () => {
   it('版本号严格递增且唯一（云打包升级按序补跑）', () => {
     const versions = MIGRATIONS.map(function (m) { return m.version })
-    expect(versions).toEqual([1, 2, 3, 4, 5])
+    expect(versions).toEqual([1, 2, 3, 4, 5, 6])
   })
 
   it('v4：为 (account_id, occurred_at) 建复合索引，IF NOT EXISTS 幂等', () => {
