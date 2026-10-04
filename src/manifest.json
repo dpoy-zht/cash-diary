@@ -20,11 +20,7 @@
             "SQLite" : {}
         },
         "distribute" : {
-            "android" : {
-                "permissions" : [
-                    "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>"
-                ]
-            },
+            "android" : {},
             "icons" : {
                 "android" : {
                     "hdpi" : "resources/icons/72x72.png",
@@ -37,6 +33,13 @@
                 "dSYMs" : false
             },
             "sdkConfigs" : {}
+        }
+    },
+    "app-android" : {
+        "distribute" : {
+            "permissions" : [
+                "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>"
+            ]
         }
     },
     "h5" : {
