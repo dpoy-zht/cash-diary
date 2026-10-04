@@ -551,6 +551,14 @@ onShow(async function () {
   font-size: 16px;
   font-weight: 700;
   color: var(--cd-ink);
+  /* 日期是一整个语义单元，不允许从中间断行：系统字体放大到 2× 时
+     否则会裂成「2026年10月 / 4日」两行。实测 320px 视口 + 2× 字体
+     仍不溢出（需 318px / 有 320px），所以直接禁止换行即可。 */
+  white-space: nowrap;
+}
+/* 箭头不参与 flex 压缩：宁可日期被挤，也要把 28px 的点击区保住（可点比好看重要） */
+.arr {
+  flex-shrink: 0;
 }
 .month-sub {
   text-align: center;
