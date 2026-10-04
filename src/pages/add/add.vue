@@ -20,7 +20,7 @@
         <text class="yen">¥</text>
         <text>{{ amountText }}</text>
       </view>
-      <view class="amount-hint">输入金额</view>
+      <view class="amount-hint">{{ amountHint }}</view>
     </view>
 
     <!-- 备注 + 日期 -->
@@ -42,8 +42,15 @@
     <!-- 标签（可多选，可现场新建） -->
     <tag-chips v-model="tagIds" :tags="tagStore.list" @create="tagCreateShow = true" />
 
-    <!-- 数字键盘 -->
-    <money-keyboard @key="onKey" @confirm="save" />
+    <!-- 计算器键盘：支持 + − × ÷ 与等号，"完成"= 先结算再保存 -->
+    <money-keyboard
+      :can-equals="calcEqualsOn"
+      :can-clear="calcClearOn"
+      @key="onKey"
+      @equals="onEquals"
+      @clear="onClear"
+      @confirm="onConfirm"
+    />
 
     <tag-create-sheet
       v-if="tagCreateShow"
@@ -76,7 +83,11 @@ import TagCreateSheet from '../../components/tag-create-sheet/tag-create-sheet.v
 import { MAX_TAGS_PER_TX } from '../../utils/tag.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { buildAddInput } from '../../services/tx.js'
-import { keypadInput, parseAmountToCents, displayAmount, formatCents } from '../../utils/money.js'
+import { parseAmountToCents, formatCents } from '../../utils/money.js'
+import {
+  initialCalcState, calcKey, calcEquals, calcAmountText, calcDisplay,
+  calcErrorText, canEquals, canClear
+} from '../../utils/calc.js'
 import { toDateStr, tsFromDateStr } from '../../utils/date.js'
 import { formAfterSaved, clampFutureDate, minSelectableDate } from '../../utils/entry.js'
 import { haptic } from '../../utils/notify.js'
@@ -102,6 +113,8 @@ const types = [
 
 const type = ref('expense')
 const current = ref('')
+/** 计算器状态（算式 + 上一次运算信息）；所有运算规则都在 utils/calc.js 里，这里只存状态 */
+const calc = ref(initialCalcState())
 const categoryId = ref(null)
 const note = ref('')
 const dateStr = ref(toDateStr(Date.now()))
@@ -116,8 +129,18 @@ const saving = ref(false)
 const cats = computed(function () {
   return type.value === 'expense' ? categoryStore.expenseCats : categoryStore.incomeCats
 })
+const calcEqualsOn = computed(function () {
+  return canEquals(calc.value)
+})
+const calcClearOn = computed(function () {
+  return canClear(calc.value)
+})
+/** 顶部金额展示：空 → 0.00、算式中 → 表达式、结果 → 千分位金额（千分位手写，不依赖 Intl） */
 const amountText = computed(function () {
-  return displayAmount(current.value)
+  return calcDisplay(calc.value)
+})
+const amountHint = computed(function () {
+  return calcEqualsOn.value ? '点 = 算出结果，再点完成保存' : '输入金额'
 })
 const lastSavedText = computed(function () {
   const s = lastSaved.value
@@ -133,9 +156,49 @@ function switchType(t) {
     categoryId.value = list.length ? list[0].id : null
   }
 }
+/**
+ * 键盘按键。运算规则全在 utils/calc.js（纯函数），页面只存状态、
+ * 并把"当前可提交的金额"同步到 current —— 保存流程照旧用 current，不受影响。
+ */
 function onKey(k) {
   haptic(10) // 按键轻振：形成"输入生效了"的手感（不支持振动的环境静默）
-  current.value = keypadInput(current.value, k)
+  const r = calcKey(calc.value, k)
+  if (r.error) { uni.showToast({ title: calcErrorText(r.error), icon: 'none' }); return }
+  calc.value = r.state
+  current.value = calcAmountText(r.state)
+}
+
+function onEquals() {
+  haptic(10)
+  const r = calcEquals(calc.value)
+  if (r.error) { uni.showToast({ title: calcErrorText(r.error), icon: 'none' }); return }
+  calc.value = r.state
+  current.value = calcAmountText(r.state)
+}
+
+function onClear() {
+  haptic(20)
+  calc.value = initialCalcState()
+  current.value = ''
+}
+
+/**
+ * 「完成」= 先结算（等同自动按一次 =）再走原保存流程。
+ * 这样用户可以直接输 12.5×3 然后点完成，不必先按 =。
+ */
+function onConfirm() {
+  if (!settle()) return
+  save()
+}
+
+/** 结算：算式完整就等于一下。返回 false 表示算不出来（已给过提示） */
+function settle() {
+  if (!canEquals(calc.value)) return true
+  const r = calcEquals(calc.value)
+  if (r.error) { uni.showToast({ title: calcErrorText(r.error), icon: 'none' }); return false }
+  calc.value = r.state
+  current.value = calcAmountText(r.state)
+  return true
 }
 function onDateChange(e) {
   // picker 的 start/end 各端支持度不完全一致，返回值再钳一次兜底
@@ -185,6 +248,7 @@ async function onTagCreate(names) {
 
 async function save() {
   if (saving.value) return // 防连点：写库期间再点不重复提交
+  if (!settle()) return // 算式没算完/算不出来：先提示，不进保存
   const cents = parseAmountToCents(current.value)
   if (!cents) {
     uni.showToast({ title: '先输个金额嘛~', icon: 'none' })
@@ -237,6 +301,7 @@ function resetFormAfterSaved() {
   categoryId.value = next.categoryId
   dateStr.value = next.dateStr
   current.value = next.amount
+  calc.value = initialCalcState()
   note.value = next.note
 }
 

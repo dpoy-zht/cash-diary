@@ -59,19 +59,6 @@ export function formatSigned(cents, type) {
   return sign + '¥' + formatCents(cents)
 }
 
-/** 键盘输入状态机（纯函数）：返回新字符串，非法输入返回原值 */
-export function keypadInput(current, key) {
-  if (key === 'del') return current.slice(0, -1)
-  if (key === '.') {
-    if (current.indexOf('.') !== -1) return current
-    return current ? current + '.' : '0.'
-  }
-  const parts = current.split('.')
-  if (parts.length === 2 && parts[1].length >= 2) return current // 小数最多 2 位
-  if (parts[0].replace(/^0+/, '').length >= 9) return current // 整数最多 9 位
-  return current + key
-}
-
 /** 记账页大数字展示：'1990' → '1,990'；'19.9' → '19.9'（千分位同样手写，理由见 groupThousands） */
 export function displayAmount(str) {
   if (!str) return '0.00'

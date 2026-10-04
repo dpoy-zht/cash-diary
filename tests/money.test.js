@@ -4,7 +4,6 @@ import {
   formatCents,
   formatSigned,
   groupThousands,
-  keypadInput,
   displayAmount
 } from '../src/utils/money.js'
 
@@ -94,32 +93,6 @@ describe('金额展示不得依赖 Intl —— 真机上 App 的 JS 引擎没有
     expect(formatCents(null)).toBe('0.00')
     expect(formatCents('abc')).toBe('0.00')
     expect(formatCents(Infinity)).toBe('0.00')
-  })
-})
-
-describe('keypadInput —— 键盘输入状态机', () => {
-  it('普通数字追加', () => {
-    expect(keypadInput('', '1')).toBe('1')
-    expect(keypadInput('1', '9')).toBe('19')
-    expect(keypadInput('0', '5')).toBe('05')
-  })
-
-  it('小数点规则：首个自动补 0，重复无效，最多两位小数', () => {
-    expect(keypadInput('', '.')).toBe('0.')
-    expect(keypadInput('1', '.')).toBe('1.')
-    expect(keypadInput('1.5', '.')).toBe('1.5')
-    expect(keypadInput('1.5', '5')).toBe('1.55')
-    expect(keypadInput('1.55', '5')).toBe('1.55') // 第 3 位小数被拒
-  })
-
-  it('退格', () => {
-    expect(keypadInput('19', 'del')).toBe('1')
-    expect(keypadInput('', 'del')).toBe('')
-  })
-
-  it('整数位上限 9 位', () => {
-    expect(keypadInput('123456789', '9')).toBe('123456789')
-    expect(keypadInput('12345678', '9')).toBe('123456789')
   })
 })
 
