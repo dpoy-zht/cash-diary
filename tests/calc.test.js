@@ -7,6 +7,8 @@ import {
   calcDisplay,
   calcErrorText,
   canEquals,
+  canEvaluate,
+  canRepeatEquals,
   canClear,
   evalExpression,
   centsToDisplay
@@ -257,5 +259,91 @@ describe('页面展示与可提交金额', () => {
   it('canClear 有内容才为真', () => {
     expect(canClear(initialCalcState())).toBe(false)
     expect(canClear(press(['1']))).toBe(true)
+  })
+})
+
+describe('键盘门控契约（集成 bug 回归）—— 键盘会按 canEquals 置灰，键必须真的能按到', () => {
+  /**
+   * 模拟 money-keyboard 的行为：等号键不可用就直接丢事件。
+   * 这条测试的价值在于：单元测试直接调 calcEquals 会绕过键盘这道门，
+   * 于是「重复按等号」在 UI 上按不到的问题就漏过去了（实际发生过）。
+   */
+  function pressViaKeyboard(keys, from) {
+    let st = from || initialCalcState()
+    keys.forEach(function (k) {
+      if (k === '=') {
+        if (!canEquals(st)) return // ← 键盘的置灰逻辑
+        const r = calcEquals(st)
+        if (!r.error) st = r.state
+        return
+      }
+      const r = calcKey(st, k)
+      if (!r.error) st = r.state
+    })
+    return st
+  }
+
+  it('算出结果后等号**仍然可点**（否则重复等号功能按不到）', () => {
+    const done = calcEquals(press(['3', '+', '5'])).state
+    expect(done.justEvaluated).toBe(true)
+    expect(canEquals(done)).toBe(true)
+    expect(canRepeatEquals(done)).toBe(true)
+  })
+
+  it('走键盘门控，3+5= 连按三次得到 8 → 13 → 18', () => {
+    let st = pressViaKeyboard(['3', '+', '5', '=', '=', '='])
+    expect(calcAmountText(st)).toBe('18.00')
+    // 分步核对，确认每一步都真的被键盘放行
+    st = pressViaKeyboard(['3', '+', '5', '='])
+    expect(calcAmountText(st)).toBe('8.00')
+    st = pressViaKeyboard(['='], st)
+    expect(calcAmountText(st)).toBe('13.00')
+    st = pressViaKeyboard(['='], st)
+    expect(calcAmountText(st)).toBe('18.00')
+  })
+
+  it('canEvaluate 在结果态为 false —— 这正是「完成」不能重复上一步的原因', () => {
+    const done = calcEquals(press(['3', '+', '5'])).state
+    expect(canEvaluate(done)).toBe(false)
+    // 完成键的结算判据若误用 canEquals，会把 8 变成 13；用 canEvaluate 则保持 8
+    expect(calcAmountText(done)).toBe('8.00')
+  })
+
+  it('纯数字输入时等号仍不可点（没有可算的算式，也没有可重复的上一步）', () => {
+    const st = press(['7'])
+    expect(canEquals(st)).toBe(false)
+    expect(canRepeatEquals(st)).toBe(false)
+  })
+
+  it('清空后等号不可点（重复等号的状态被一起清掉）', () => {
+    const done = calcEquals(press(['3', '+', '5'])).state
+    const cleared = calcKey(done, 'clear').state
+    expect(canEquals(cleared)).toBe(false)
+    expect(canRepeatEquals(cleared)).toBe(false)
+  })
+
+  it('除法结果同样可重复：10÷4= → 2.50，再 = → 0.63（重放 2.5÷4）', () => {
+    let st = pressViaKeyboard(['1', '0', '÷', '4', '='])
+    expect(calcAmountText(st)).toBe('2.50')
+    st = pressViaKeyboard(['='], st)
+    expect(calcAmountText(st)).toBe('0.63') // 2.50 ÷ 4 = 0.625 → 四舍五入到分
+  })
+})
+
+describe('算式未写完时的显示（回归：不要回退成 0.00）', () => {
+  it('输入 7+ 时显示表达式本身，而不是 0.00', () => {
+    expect(calcDisplay(press(['7', '+']))).toBe('7+')
+  })
+
+  it('输入 3+5× 也保持原样显示', () => {
+    expect(calcDisplay(press(['3', '+', '5', '×']))).toBe('3+5×')
+  })
+
+  it('纯数字仍走金额展示（千分位），不含运算符', () => {
+    expect(calcDisplay(press(['1', '9', '9', '0']))).toBe('1,990')
+  })
+
+  it('空输入仍是 0.00', () => {
+    expect(calcDisplay(initialCalcState())).toBe('0.00')
   })
 })

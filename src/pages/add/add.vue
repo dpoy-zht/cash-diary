@@ -86,7 +86,7 @@ import { buildAddInput } from '../../services/tx.js'
 import { parseAmountToCents, formatCents } from '../../utils/money.js'
 import {
   initialCalcState, calcKey, calcEquals, calcAmountText, calcDisplay,
-  calcErrorText, canEquals, canClear
+  calcErrorText, canEquals, canEvaluate, canClear
 } from '../../utils/calc.js'
 import { toDateStr, tsFromDateStr } from '../../utils/date.js'
 import { formAfterSaved, clampFutureDate, minSelectableDate } from '../../utils/entry.js'
@@ -191,9 +191,13 @@ function onConfirm() {
   save()
 }
 
-/** 结算：算式完整就等于一下。返回 false 表示算不出来（已给过提示） */
+/**
+ * 结算：算式完整就等于一下。返回 false 表示算不出来（已给过提示）。
+ * 判据必须用 canEvaluate 而不是 canEquals —— 后者在「刚算完」时也为真，
+ * 拿它当判据会让「完成」把上一步运算再重放一次（算完 8，点完成却存成 13）。
+ */
 function settle() {
-  if (!canEquals(calc.value)) return true
+  if (!canEvaluate(calc.value)) return true
   const r = calcEquals(calc.value)
   if (r.error) { uni.showToast({ title: calcErrorText(r.error), icon: 'none' }); return false }
   calc.value = r.state

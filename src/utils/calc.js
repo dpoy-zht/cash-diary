@@ -102,6 +102,14 @@ function currentOperand(expr) {
   return m ? m[1] : ''
 }
 
+/** 表达式里是否含运算符 */
+function containsOperator(expr) {
+  for (let i = 0; i < expr.length; i += 1) {
+    if (OPS.indexOf(expr.charAt(i)) !== -1) return true
+  }
+  return false
+}
+
 /** 表达式末尾是否是运算符（= 未完成的标志） */
 function endsWithOperator(expr) {
   const c = expr.charAt(expr.length - 1)
@@ -191,14 +199,37 @@ export function evalExpression(expr) {
   return { ok: true, cents: values[0] }
 }
 
-/** 等号是否可用：有运算符、不以运算符结尾、不是刚算完（刚算完再按 = 才有重复运算的意义） */
-export function canEquals(state) {
+/**
+ * 表达式是否「完整可算」：含运算符、且不以运算符结尾。
+ * 这是**结算**的判据（保存前结算、算不完整就别算），不等同于「等号键可不可点」。
+ */
+export function canEvaluate(state) {
   const s = state && state.expr ? state.expr : ''
   if (!s || endsWithOperator(s)) return false
   for (let i = 0; i < s.length; i += 1) {
     if (OPS.indexOf(s.charAt(i)) !== -1) return true
   }
   return false
+}
+
+/**
+ * 刚算出结果且记录了上一步运算 → 可以**重复按等号**重放（3+5= → 8 → 13 → 18）。
+ * 单独拎出来是因为它与 canEvaluate 是两回事：结果态下 expr 是 '8'（不含运算符），
+ * canEvaluate 判 false，但等号键**必须仍然可点**，否则「重复等号」根本按不到
+ * （这正是集成测试抓到的 bug：单元测试直接调 calcEquals 绕过了键盘这道门）。
+ */
+export function canRepeatEquals(state) {
+  if (!state || !state.justEvaluated || !state.lastOp) return false
+  return state.lastOperand !== null && state.lastOperand !== undefined
+}
+
+/**
+ * 等号键是否可点：能算 或 能重复上一步。
+ * 注意：**不能拿它当「能不能结算」的判据**（那要用 canEvaluate），
+ * 否则「完成」会把上一步运算再重放一次（算完 8，点完成却存成 13）。
+ */
+export function canEquals(state) {
+  return canEvaluate(state) || canRepeatEquals(state)
 }
 
 /** 是否可清空（有内容才可点，避免无意义操作） */
@@ -210,7 +241,7 @@ export function canClear(state) {
 export function calcAmountText(state) {
   if (!state || !state.expr) return ''
   if (state.justEvaluated) return centsToNumberString(state.lastResultCents) || ''
-  if (canEquals(state)) return '' // 算式还没算完，不能拿去保存
+  if (canEvaluate(state)) return '' // 算式还没算完，不能拿去保存
   return normalizeOperand(currentOperand(state.expr)) || ''
 }
 
@@ -350,7 +381,9 @@ export function calcDisplay(state) {
   const expr = st.expr || ''
   if (!expr) return '0.00'
   if (st.justEvaluated) return centsToDisplay(st.lastResultCents) || '0.00'
-  if (canEquals(st)) return expr
+  // 只要表达式里有运算符就原样显示（含末尾是运算符的未完成态）：
+  // 早先用 canEquals 判断，输入 '7+' 时会掉进数字分支显示成 0.00 —— 用户刚按的 7 和 + 凭空消失
+  if (containsOperator(expr)) return expr
   const cur = currentOperand(expr)
   if (!cur) return '0.00'
   const s = normalizeOperand(cur)
