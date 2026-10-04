@@ -155,7 +155,7 @@ import { useTagStore } from '../../stores/tag.js'
 import * as backupService from '../../services/backup.js'
 import * as fixedService from '../../services/fixed.js'
 import { buildEditInput } from '../../services/tx.js'
-import { groupByDay, dayLabel, ymOf } from '../../utils/date.js'
+import { groupByDay, dayLabel, ymOf, homeDateLabel } from '../../utils/date.js'
 import { formatCents } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
 import { requestNotifyPermission, notifyLocal, REMIND_PREF_KEY, normalizeRemindEnabled } from '../../utils/notify.js'
@@ -218,9 +218,14 @@ function onClearSearch() {
   txStore.clearSearch()
 }
 
+/**
+ * 顶部日期：看当月时显示到日（"2026年10月4日"），看别的月只显示年月。
+ * nowTs 存的是"现在"，onShow 时刷新 —— 页面可能长时间挂在后台（晚上打开、第二天接着看），
+ * 日期必须跟着现实走，不能是打开那一刻算完就冻住的旧值。
+ */
+const nowTs = ref(Date.now())
 const ymText = computed(function () {
-  const parts = metaStore.ym.split('-')
-  return parts[0] + '年' + Number(parts[1]) + '月'
+  return homeDateLabel(metaStore.ym, nowTs.value)
 })
 /* ---- 预算：月份下面那行 + 超支提醒 ---- */
 const totalBudget = computed(function () {
@@ -457,6 +462,9 @@ const iconBell = svgMaskStyle('M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-
 const iconHeart = svgMaskStyle('M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z')
 
 onShow(async function () {
+  // 让顶部日期跟着现实走（跨零点/跨天回来都要是新的）
+  nowTs.value = Date.now()
+
   // 固定支出自动补记：当月还没记的先补上，下面的刷新就会把新流水带出来
   let autoPosted = 0
   try {

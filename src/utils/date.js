@@ -107,6 +107,27 @@ export function ymLabelFull(ym) {
 }
 
 /**
+ * 首页顶部日期文案：**看的是当月就显示到日，看的是别的月就只显示年月**。
+ *
+ * - 当月：'2026-10' + 今天 → '2026年10月4日'（日期动态取自"今天"，不是硬编码）
+ * - 别的月：'2026-09' → '2026年9月'
+ *
+ * 为什么不每个月都补一个"日"：这个位置本质是**月份导航**（左右箭头切月），
+ * 切到 9 月却写着"9月4日"，等于替用户编了一个不存在的日期。补日只在"看当月"时成立。
+ *
+ * @param {string} ym 当前查看的月份 'YYYY-MM'
+ * @param {number} [nowTs] "现在"的时间戳（测试可注入；不传取 Date.now()）
+ */
+export function homeDateLabel(ym, nowTs) {
+  if (!ym) return ''
+  const today = toDateStr(nowTs === undefined || nowTs === null ? Date.now() : nowTs)
+  if (String(ym) === today.slice(0, 7)) {
+    return Number(today.slice(0, 4)) + '年' + Number(today.slice(5, 7)) + '月' + Number(today.slice(8, 10)) + '日'
+  }
+  return ymLabelFull(ym)
+}
+
+/**
  * 某月有多少天（本地时区）：'2026-02' → 28。
  * 用 `new Date(y, m, 0)` 取"下个月的第 0 天"= 本月最后一天，闰年由 Date 自己算。
  * 非法输入返回 0（调用方据此跳过依赖天数的计算，而不是算出 NaN）。
