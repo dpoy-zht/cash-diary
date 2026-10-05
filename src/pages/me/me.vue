@@ -142,7 +142,12 @@ import {
 } from '../../utils/notify.js'
 import { getDailyConfig, saveDailyConfig, refreshReminders } from '../../services/reminder.js'
 import { DEFAULT_DAILY_HM } from '../../utils/reminder.js'
-import { checkForUpdate, currentAppVersion, updateNow } from '../../services/update.js'
+import {
+  checkForUpdate, currentAppVersion, updateNow, openReleasePage
+} from '../../services/update.js'
+
+/** 检查更新失败时兜底打开的下载页（Apk 与 wgt 都在这一个 Release 上） */
+const RELEASE_PAGE_FALLBACK = 'https://github.com/dpoy-zht/cash-diary/releases/latest'
 import * as webdavService from '../../services/webdav.js'
 import WebdavSheet from '../../components/webdav-sheet/webdav-sheet.vue'
 import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
@@ -308,10 +313,18 @@ function checkUpdateManual() {
     .then(function (r) {
       uni.hideLoading()
       if (r.hasUpdate) {
+        /**
+         * 文案按实际更新方式分流 —— 别再对所有情况都写「覆盖安装」。
+         * 亲友看到"覆盖安装"会以为要自己去浏览器下 APK，
+         * 实际 wgt 热更是点一下就自动装好、只需重启，说清楚才能让人敢点。
+         */
+        const isHot = !!r.wgtUrl
         uni.showModal({
           title: '发现新版本 ' + r.tag,
-          content: r.notes + '\n\n覆盖安装即可升级，账目数据都在。',
-          confirmText: '立即更新',
+          content: r.notes + '\n\n' + (isHot
+            ? '点「立即更新」自动下载安装，装好后重启一次即可，账目数据都在。'
+            : '需要下载完整安装包覆盖安装，账目数据都在。'),
+          confirmText: isHot ? '立即更新' : '下载安装包',
           cancelText: '下次再说',
           success: function (res) {
             if (res.confirm) updateNow(r)
@@ -320,7 +333,20 @@ function checkUpdateManual() {
         return
       }
       if (r.reason === 'offline') {
-        uni.showToast({ title: '网络不可用，稍后再试', icon: 'none' })
+        /**
+         * 更新走 GitHub Releases，国内网络可能访问不畅。
+         * 只说「网络不可用」亲友会反复点、永远失败；这里给一条明确的退路 ——
+         * 一键打开 Releases 页，在浏览器里下载同样能装。
+         */
+        uni.showModal({
+          title: '暂时连不上更新服务器',
+          content: '检查更新需要访问 GitHub，当前网络可能不畅。也可以直接在浏览器里打开下载页手动获取。',
+          confirmText: '打开下载页',
+          cancelText: '知道了',
+          success: function (res) {
+            if (res.confirm) openReleasePage(RELEASE_PAGE_FALLBACK)
+          }
+        })
         return
       }
       if (r.reason === 'not-app') {

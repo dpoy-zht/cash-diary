@@ -67,7 +67,12 @@ export async function checkForUpdate(opts) {
       uni.request({
         url: RELEASE_API,
         method: 'GET',
-        timeout: 10000,
+        /**
+         * 超时给 30s 而不是 10s：GitHub API 在国内访问延迟波动大，
+         * 10s 经常在慢网下直接超时 —— 那样亲友点「检查更新」永远只会看到
+         * 「网络不可用」，功能等于没有。宁可多等一会儿也要拿到结果。
+         */
+        timeout: 30000,
         header: { 'User-Agent': 'cash-diary-app', 'Accept': 'application/vnd.github+json' },
         success: function (r) {
           if (r.statusCode !== 200) { reject(new Error('HTTP ' + r.statusCode)); return }
