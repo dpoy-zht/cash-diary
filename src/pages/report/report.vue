@@ -2,7 +2,6 @@
   <view class="page">
     <!-- 顶部导航 -->
     <view class="navbar">
-      <mascot-deco class="nav-milo" slot-id="deco.nav.report" />
       <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">月度报告</text>
       <picker mode="month" :value="ym" @change="onPickMonth">
@@ -257,7 +256,6 @@ onShow(function () {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px 4px;
-  position: relative;
 }
 .nav-title {
   font-size: 20px;
@@ -551,14 +549,6 @@ onShow(function () {
 }
 
 
-/* ---- 奶龙 IP 边角装饰 ----
-   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
-   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
-   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
-.nav-milo {
-  top: -6px;
-  right: -4px;
-}
 
 /* 财神奶龙探出卡片右上角。报告是"回顾"性质的页面，用财神图比默认表情更贴题；
    金额 34px 是全页最大字号，装饰件压到 58px 且绝对定位，不会盖住数字。 */

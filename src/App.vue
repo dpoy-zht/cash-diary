@@ -7,6 +7,7 @@ import { listenPushClick, pushRouteFor } from './utils/notify.js'
 import { checkForUpdate, updateNow } from './services/update.js'
 import { startReminders, refreshReminders } from './services/reminder.js'
 import { checkRemoteOnStart, uploadBackup, reasonText } from './services/webdav.js'
+import { pack, verifyActivePack } from './utils/asset-packs.js'
 // #ifdef H5
 import { setPersistErrorHandler, flush as flushMemory } from './db/memory.js'
 // #endif
@@ -14,6 +15,17 @@ import { setPersistErrorHandler, flush as flushMemory } from './db/memory.js'
 onLaunch(() => {
   const categoryStore = useCategoryStore()
   const accountStore = useAccountStore()
+
+  /**
+   * 素材包启动自检：缺图在 H5 上可能只是空白框、在真机上要等用户滚到那一页才发现，
+   * 反馈链路太长。这里启动就探一次，缺了立刻打 console 报警（不打扰用户）。
+   */
+  verifyActivePack().then(function (r) {
+    if (r.skipped) return
+    if (!r.ok) console.error('[cash-diary] 素材包「' + r.pack + '」缺图：', r.missing)
+    else console.log('[cash-diary] 素材包「' + r.pack + '」就绪：' + pack().label)
+  })
+
   // 账本要先就绪：流水查询都带"当前账本"过滤，账本没初始化好会查错账本
   initDB()
     .then(() => Promise.all([categoryStore.init(), accountStore.init()]))

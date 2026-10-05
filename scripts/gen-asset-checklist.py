@@ -37,11 +37,14 @@ def main():
     L = []
     L.append('# 素材清单 · 按此上传即可\n')
     L.append('> 本清单由 `scripts/gen-asset-checklist.py` 从 `src/utils/asset-slots.js` 自动生成，**与代码永远一致**。\n')
-    L.append('> 上传位置：把文件放进 `src/static/milo/`，文件名与下表一致即可。\n')
+    L.append('> **两套素材包共存**，用 `src/utils/asset-packs.js` 的 `ACTIVE_PACK` 切换：\n')
+    L.append('> - `milo`（**默认**）= `src/static/milo/milo-*.webp` —— 原图，一个字节都没动\n')
+    L.append('> - `meme` = `src/static/meme/meme-milo-*.webp` —— 2026-10-05 新增的自制 meme\n')
+    L.append('> 新增素材放哪：按上表文件名放进对应包目录，或新建一个包并在 `PACK_INFO` 登记。\n')
     L.append('> 替换生效：把组件的 `placeholder` 改 false，或直接改登记表里的 `file` 字段。\n')
     L.append('\n---\n')
     L.append(f'## 一、共需 {len(U)} 个文件，覆盖 {len(S)} 个位置\n')
-    L.append('| 文件名 | 建议像素 | 格式 | 引用处 | 抠透明 |')
+    L.append('| 文件名（不含包前缀） | 建议像素 | 格式 | 引用处 | 抠透明 |')
     L.append('|---|---|---|---|---|')
     for f in U:
         ss = [s for s in S if s['file'] == f['file']]

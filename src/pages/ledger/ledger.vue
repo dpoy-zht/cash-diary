@@ -2,7 +2,6 @@
   <view class="page">
     <!-- navbar：菜单 / 我的账本 / 新建 -->
     <view class="navbar">
-      <mascot-deco class="nav-milo" slot-id="deco.nav.ledger" />
       <view class="icon-btn" hover-class="ib-hover" @click="toast('菜单功能规划中')">
         <view class="ib" :style="iconMenu" />
       </view>
@@ -241,7 +240,6 @@ onShow(function () {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px 4px;
-  position: relative;
 }
 .nav-title {
   font-size: 20px;
@@ -428,12 +426,4 @@ onShow(function () {
 }
 
 
-/* ---- 奶龙 IP 边角装饰 ----
-   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
-   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
-   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
-.nav-milo {
-  top: -6px;
-  right: -4px;
-}
 </style>

@@ -50,6 +50,32 @@ export const USAGE_TONE = Object.freeze({
 })
 
 /**
+ * 素材语义对照（**原图 src/static/milo/ · 9 张**，另有新增一套 src/static/meme/）：
+ *
+ *   milo.webp          歪头站立   → 基础主视觉，余额卡右上 / 环形图中心
+ *   milo-waving.webp   白底招手   → 我的页头部 88px / 问候横幅
+ *   milo-happy.webp    开心举爪   → 记账成功弹窗
+ *   milo-sad.webp      委屈臭脸   → 超支弹窗
+ *   milo-innocent.webp 无辜大眼   → 空状态 / 加载态
+ *   milo-jump.webp     戴围巾蹦跳 → 工资到账横幅
+ *   milo-caishen.webp  财神红袍   → 账本卡（圆形裁切）
+ *   milo-gold.webp     端金条盘子 → 账本页"新建账本"旁
+ *   milo-rich.webp     拿算盘暴富 → 我的页攒钱目标卡
+ *
+ * ⚠️ 本表 `file` 字段存的是**不带分组前缀**的文件名（上面的 `milo-xxx.webp`）。
+ *    运行时路径由 `utils/asset-packs.js` 的 `packSrc(file → mood)` 按当前
+ *    `ACTIVE_PACK` 补目录与前缀，所以换素材包不用改这张表。
+ *
+ * ⚠️ 两套素材的底色不同，用错会出现白边或矩形边：
+ *    - `milo`（原图）：7 张自带场景底、2 张抠透明 → 适合彩色卡片
+ *    - `meme`（新增）：9 张全部抠透明 → 贴任意背景无白边
+ *
+ * ⚠️ 命名不齐是历史事实：基础形象叫 `milo.webp`（没有连字符前缀），
+ *    其余 8 张才是 `milo-<表情>.webp`。这与现有 home/stats 的写死引用一致，
+ *    别"顺手统一"——一改就和已入库的 9 个文件对不上，且只有真机看得到空白图。
+ */
+
+/**
  * 全部图片插槽。**顺序按页面分组**，便于对着界面从上往下核对。
  * w/h 必须与页面 CSS 里原有的盒子一致 —— 原来是 72×90 就别改成 96×96，
  * 否则占位阶段就会看到位移。
@@ -171,69 +197,13 @@ export const SLOTS = Object.freeze([
     note: '与 home.empty 同一文件'
   },
 
-  // ── 边角装饰（10 页 navbar 右上 + me 页头部右上）──
-  // 统一 44×44 / opacity .5 / 绝对定位，装饰性点缀，不承载信息。
-  // mood 逐页不同是为了"每页气质不一样"，但**尺寸规格刻意保持一致**（统一视觉节奏）。
-  {
-    id: 'deco.nav.home', usage: 'deco', where: '首页 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo.webp', mood: 'milo',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.add', usage: 'deco', where: '记一笔 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo-happy.webp', mood: 'happy',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.stats', usage: 'deco', where: '统计 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo.webp', mood: 'milo',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.ledger', usage: 'deco', where: '账本 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo-caishen.webp', mood: 'caishen',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.report', usage: 'deco', where: '报告 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo-gold.webp', mood: 'gold',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.health', usage: 'deco', where: '体检 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo-innocent.webp', mood: 'innocent',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.budget', usage: 'deco', where: '预算 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo-sad.webp', mood: 'sad',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.category', usage: 'deco', where: '分类 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo-waving.webp', mood: 'waving',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.tag', usage: 'deco', where: '标签 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo-waving.webp', mood: 'waving',
-    note: 'decorative，opacity .5'
-  },
-  {
-    id: 'deco.nav.fixed', usage: 'deco', where: '固定支出 navbar 右上角',
-    w: 44, h: 44, ratio: '1:1', size: '180×180',
-    crop: 'fit', lazy: false, file: 'milo-rich.webp', mood: 'rich',
-    note: 'decorative，opacity .5'
-  },
+  // ── 边角装饰 ──
+  // ⚠️ 原来给 10 页 navbar 右上各放了一个 44×44 装饰，**真机验证后已全部撤掉**：
+  //   navbar 没有状态栏留白（padding-top 只有 10px），负偏移直接顶出屏幕外；
+  //   改正偏移后又与状态栏图标区、右侧功能按钮重叠，半透明下几乎不可辨。
+  //   结论：navbar 右侧不是放 IP 装饰的位置。素材用在能看清的地方 ——
+  //   卡片主视觉、空状态插画、圆形头像、结论横幅。
+  // 现仅保留 me 页一处（挂在有状态栏留白的渐变头部上，实测可见）。
   {
     id: 'deco.me.head', usage: 'deco', where: '我的页渐变头部右上角',
     w: 44, h: 44, ratio: '1:1', size: '180×180',
@@ -246,19 +216,19 @@ export const SLOTS = Object.freeze([
     id: 'deco.budget.card', usage: 'deco', where: '总预算卡右上角',
     w: 56, h: 56, ratio: '1:1', size: '240×240',
     crop: 'fit', lazy: false, file: 'milo-sad.webp', mood: 'sad',
-    note: '未设预算=innocent / warn|over=sad / 其余=milo（动态切换）'
+    note: '未设预算=innocent / warn|over=sad / 其余=milo（动态切换，沿用原表情语义）'
   },
   {
     id: 'deco.report.hero', usage: 'deco', where: '报告概览卡右上角',
     w: 58, h: 58, ratio: '1:1', size: '240×240',
     crop: 'fit', lazy: false, file: 'milo-caishen.webp', mood: 'caishen',
-    note: '0笔=innocent / 环比down=caishen / flat=milo / up=sad'
+    note: '0笔=innocent / 环比down=caishen(财神=我省了) / flat=milo / up=sad'
   },
   {
     id: 'deco.health.summary', usage: 'deco', where: '体检结论卡右上角',
     w: 52, h: 52, ratio: '1:1', size: '240×240',
     crop: 'fit', lazy: false, file: 'milo-sad.webp', mood: 'sad',
-    note: 'healthy=gold / 其他=sad'
+    note: 'healthy=gold(端金条=有成就感) / 其他=sad'
   },
   {
     id: 'deco.health.ok', usage: 'deco', where: '体检「一切正常」卡左侧',

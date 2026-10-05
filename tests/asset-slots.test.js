@@ -14,14 +14,14 @@ import { DECO_MOODS, decoSrc } from '../src/components/mascot-deco/spec.js'
  * 1. **占位与真图共用同一个盒子** → 尺寸写在 slots.js 一处，占位框从那里算，
  *    页面与组件都不许自己写死宽高。否则替换素材必然位移。
  * 2. **每处素材都有用途与位置标注** → 缺 usage / where 的插槽让上传者无从下手。
- * 3. **素材可去重** → 31 个插槽只对应 9 个文件，用户不必备 31 张图。
+ * 3. **素材可去重** → 21 个插槽只对应 9 个文件，用户不必备 21 张图。
  *
  * 这份测试的价值在于：它跑在 Node 里，不需要构建、不需要真机，
  * 属于"素材还没到位就能发现问题"的那一层防线。
  */
 describe('素材插槽登记表', () => {
   describe('结构完整性', () => {
-    it('31 个插槽全部有 id / usage / where / 尺寸 / 文件名', () => {
+    it('21 个插槽全部有 id / usage / where / 尺寸 / 文件名', () => {
       const bad = []
       SLOTS.forEach(function (s) {
         ;['id', 'usage', 'where', 'w', 'h', 'ratio', 'size', 'crop', 'file'].forEach(function (k) {
@@ -61,11 +61,11 @@ describe('素材插槽登记表', () => {
     })
   })
 
-  describe('素材去重：用户不必备 31 张图', () => {
-    it('去重后 9 个文件，覆盖 31 个插槽', () => {
+  describe('素材去重：用户不必备 21 张图', () => {
+    it('去重后 9 个文件，覆盖 21 个插槽', () => {
       const u = uniqueFiles()
       expect(u.length).toBe(9)
-      expect(SLOTS.length).toBe(31)
+      expect(SLOTS.length).toBe(21)
     })
 
     it('每个文件都被至少一个插槽用到（登记表不能有孤儿素材）', () => {
@@ -82,7 +82,7 @@ describe('素材插槽登记表', () => {
   })
 
   describe('加载方式：装饰件一律不 lazy', () => {
-    it('全站 31 处都是 lazy=false', () => {
+    it('全站 21 处都是 lazy=false', () => {
       // 这些图都是首屏必见的主视觉/装饰/空态，lazy 只会在真机上造成晚一拍闪烁
       const lazyOnes = SLOTS.filter(function (s) { return s.lazy === true })
         .map(function (s) { return s.id })

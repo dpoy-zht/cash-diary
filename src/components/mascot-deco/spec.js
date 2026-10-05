@@ -11,6 +11,8 @@
  * - 尺寸分三档：主插画 88~96 / 行内 40~44 / 边角 44（半透明）
  */
 
+import { packSrc } from '../../utils/asset-packs.js'
+
 /** 尺寸档 → 边长（px）。刻意收窄成三档，避免页面随手写任意尺寸破坏节奏。 */
 export const DECO_SIZE_TIERS = Object.freeze({
   /** 行内点缀：横幅、标题左侧、结论行 */
@@ -35,19 +37,22 @@ export const DECO_MOODS = Object.freeze([
 ])
 
 /**
- * 解析 mood → 包内素材绝对路径。
- * 素材全部已随包入库（src/static/milo/*.webp），不新增文件、不增加包体积。
+ * 解析 mood → 素材运行时路径。
  *
- * ⚠️ 命名不齐是历史事实：基础形象叫 `milo.webp`（没有连字符前缀），
- * 其余 8 张才是 `milo-<表情>.webp`。这与现有页面引用一致
- * （home/stats 都写死 `/static/milo/milo.webp`），别"顺手统一"——
- * 一改就会和已入库的 9 个文件对不上，且只有真机看得到空白图。
+ * 路径**不在这里写死**，而是走 `utils/asset-packs.js` 的分组清单（`packSrc(mood)`）。
+ * 这样新增/切换素材包只改 `ACTIVE_PACK` 一个常量，页面与组件都不用动 ——
+ * 也让「原图零改动」这条约束能长期成立（新增素材只是多一个目录 + 一条清单）。
+ *
+ * ⚠️ 命名不齐是**两套素材共有的历史事实**：基础形象叫 `milo.webp`（没有连字符前缀），
+ * 其余 8 张才是 `milo-<表情>.webp`。这与现有页面引用一致（home/stats 都写死
+ * `/static/milo/milo.webp`），别"顺手统一"——一改就会和已入库文件对不上，
+ * 且只有真机看得到空白图。`packSrc()` 内部已处理这个特例。
  */
 export function decoSrc(mood) {
   if (DECO_MOODS.indexOf(mood) === -1) {
     throw new Error('未知奶龙形象：' + mood + '（可选：' + DECO_MOODS.join(' / ') + '）')
   }
-  return '/static/milo/' + (mood === 'milo' ? 'milo' : 'milo-' + mood) + '.webp'
+  return packSrc(mood)
 }
 
 /**

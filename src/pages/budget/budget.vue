@@ -1,7 +1,6 @@
 <template>
   <view class="page">
     <view class="navbar">
-      <mascot-deco class="nav-milo" slot-id="deco.nav.budget" />
       <view class="icon-btn" hover-class="ib-hover" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">预算设置</text>
       <view class="icon-btn" style="visibility:hidden"><view class="ib" /></view>
@@ -112,8 +111,8 @@ const totalTip = computed(function () {
 })
 /**
  * 预算卡右上角的表情，跟着水位走：
- * 没设预算 → innocent（等用户来设）；宽裕 → milo（默认歪头）；
- * 接近上限或已超 → sad（同一张最贴切，不额外引入新素材）。
+ * 没设预算 → innocent（等用户来设）；宽裕 → milo（歪头站立）；
+ * 接近上限或已超 → sad（委屈）。
  * 判断复用 totalStatus 的 level，不另立标准，避免与下方文案口径不一致。
  */
 const totalMood = computed(function () {
@@ -211,7 +210,6 @@ onShow(function () {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px 4px;
-  position: relative;
 }
 .nav-title {
   font-size: 20px;
@@ -407,14 +405,6 @@ onShow(function () {
 }
 
 
-/* ---- 奶龙 IP 边角装饰 ----
-   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
-   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
-   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
-.nav-milo {
-  top: -6px;
-  right: -4px;
-}
 
 /* ---- 奶龙 IP 装饰 ----
    .tc-num 是 30px 大字、进度条满宽，装饰件绝对定位 + 右上下沉后

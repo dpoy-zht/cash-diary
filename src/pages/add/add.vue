@@ -3,7 +3,6 @@
     <!-- 奶黄渐变头部 -->
     <view class="add-head">
       <view class="navbar">
-        <mascot-deco class="nav-milo" slot-id="deco.nav.add" />
         <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
         <text class="nav-title">记一笔</text>
         <view class="icon-btn" @click="save"><view class="ib" :style="iconCheck" /></view>
@@ -370,7 +369,6 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: relative;
 }
 .nav-title {
   font-size: 18px;
@@ -526,12 +524,4 @@ watch(
 }
 
 
-/* ---- 奶龙 IP 边角装饰 ----
-   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
-   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
-   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
-.nav-milo {
-  top: -6px;
-  right: -4px;
-}
 </style>

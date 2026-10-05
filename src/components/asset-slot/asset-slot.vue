@@ -23,7 +23,18 @@
 <script setup>
 import { computed } from 'vue'
 import { hasSlot, slot as slotOf } from '../../utils/asset-slots.js'
+import { pack, packSrc } from '../../utils/asset-packs.js'
 import { placeholderStyle, placeholderLabel, showHint, cropToMode, cropToRadius } from './ph.js'
+
+/**
+ * 登记表的 file 字段存的是「不带分组前缀」的文件名（如 `milo-waving.webp`）。
+ * 这里把它反查成表情 key，好让 `packSrc()` 按当前包加对应前缀。
+ */
+function fileNameOf(file) {
+  // 'milo' → 'milo'；'milo-waving' → 'waving'（去掉 'milo' 与 'milo-' 两种前缀）
+  if (file === 'milo.webp') return 'milo'
+  return file.replace(/^milo-/, '').replace(/\.webp$/, '')
+}
 
 /**
  * 通用图片插槽 —— 覆盖 12 处内容图 + 4 处圆形/圆角裁切位。
@@ -42,8 +53,12 @@ import { placeholderStyle, placeholderLabel, showHint, cropToMode, cropToRadius 
 const props = defineProps({
   /** 插槽 id（见 utils/asset-slots.js），尺寸与用途以登记表为准 */
   slotId: { type: String, required: true },
-  /** true=只画占位框；false=加载真图（当前默认 true） */
-  placeholder: { type: Boolean, default: true },
+  /**
+   * true=只画占位框；false=加载真图。
+   * 默认 false：素材已到位（见 src/static/milo/），走真图。
+   * 需要重新对位时临时改 true，占位框与真图共用同一个盒子，排版不会动。
+   */
+  placeholder: { type: Boolean, default: false },
   /** 真图模式下的 class（仅真图生效，用于 margin/flex 等布局声明） */
   imgClass: { type: String, default: '' },
   /** 占位框内是否显示建议素材尺寸（框太小会自动隐藏） */
@@ -92,8 +107,14 @@ const hintVisible = computed(function () {
   return props.withHint && showHint({ w: data.value.w, size: data.value.size })
 })
 
+/**
+ * 真图路径。走分组清单拼，不写死目录：
+ * - 给了 file（插槽自定义，可带分组前缀）→ 直接用
+ * - 否则由登记表的文件名（不含前缀）反查当前包
+ */
 const src = computed(function () {
-  return '/static/milo/' + (props.file || data.value.file)
+  if (props.file) return pack().dir + props.file
+  return packSrc(fileNameOf(data.value.file))
 })
 
 const mode = computed(function () {

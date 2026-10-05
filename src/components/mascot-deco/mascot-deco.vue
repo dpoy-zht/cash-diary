@@ -55,8 +55,12 @@ const props = defineProps({
    * 占位框尺寸、用途文字、建议素材规格都从那里读，页面不用重复写。
    */
   slotId: { type: String, default: '' },
-  /** true=只画占位框；false=加载真图。默认占位，等用户上传素材后再切。 */
-  placeholder: { type: Boolean, default: true },
+  /**
+   * true=只画占位框；false=加载真图。
+   * 默认 false：素材已到位（见 src/static/milo/），走真图。
+   * 需要重新对位时临时改 true，占位框与真图共用同一个盒子，排版不会动。
+   */
+  placeholder: { type: Boolean, default: false },
   /** 是否在占位框里显示建议素材尺寸（框太小会自动隐藏） */
   withHint: { type: Boolean, default: false }
 })

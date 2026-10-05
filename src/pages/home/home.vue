@@ -2,7 +2,6 @@
   <view class="page">
     <!-- 顶部导航：左侧标题，右侧两个有真实行为的小按钮 -->
     <view class="navbar">
-      <mascot-deco class="nav-milo" slot-id="deco.nav.home" />
       <text class="nav-title">奶龙记账</text>
       <view class="nav-right">
         <view class="icon-btn" @click="showSalary"><view class="ib" :style="iconCoin" /></view>
@@ -503,7 +502,6 @@ onShow(async function () {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px 4px;
-  position: relative;
 }
 .nav-title {
   font-size: 20px;
@@ -930,12 +928,4 @@ onShow(async function () {
 }
 
 
-/* ---- 奶龙 IP 边角装饰 ----
-   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
-   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
-   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
-.nav-milo {
-  top: -6px;
-  right: -4px;
-}
 </style>
