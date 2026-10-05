@@ -83,6 +83,27 @@
     <!-- 6. 版权说明（素材为第三方 IP，必须常驻） -->
     <text class="copyright">奶龙形象版权归第七印象所有，本页面仅个人学习使用</text>
 
+    <!-- 6.1 素材包一览：两套并存，用 ACTIVE_PACK 切换（见 utils/asset-packs.js） -->
+    <view class="pack-card">
+      <text class="pack-title">形象素材包</text>
+      <view class="pack-row">
+        <view class="pack-item">
+          <image class="pack-img" src="/static/milo/milo.webp" mode="aspectFit" />
+          <view class="pack-txt">
+            <text class="pack-name">奶龙（原有）</text>
+            <text class="pack-note">默认启用 · 版权归第七印象</text>
+          </view>
+        </view>
+        <view class="pack-item">
+          <image class="pack-img" src="/static/meme/meme-milo.webp" mode="aspectFit" />
+          <view class="pack-txt">
+            <text class="pack-name">自制 meme（新增）</text>
+            <text class="pack-note">备用 · 自有版权</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- 7. 开发期工具：重置数据（仅开发构建可见，发行打包 import.meta.env.DEV=false 自动消失） -->
     <view v-if="isDev" class="dev-card">
       <view class="dev-row" hover-class="fn-hover" @click="confirmReset">
@@ -1030,6 +1051,57 @@ onShow(function () {
   text-align: center;
   font-size: 11px;
   color: var(--cd-icon-3);
+}
+
+/* ---- 6.1 素材包一览 ----
+   两套素材并存的直观说明：左边默认启用的原图，右边新增的自制 meme。
+   图片尺寸写死 44×44（= --cd-r-sm 档），小图不占空间、也不影响性能；
+   用 aspectFit 保持角色原比例，不裁切。 */
+.pack-card {
+  margin: 0 16px 8px;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-card);
+  padding: 12px 14px;
+  box-shadow: var(--cd-sh-card);
+}
+.pack-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cd-ink-2);
+  margin-bottom: 10px;
+}
+.pack-row {
+  display: flex;
+  gap: 10px;
+}
+.pack-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pack-img {
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+.pack-txt {
+  flex: 1;
+  min-width: 0;
+}
+.pack-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cd-ink);
+}
+.pack-note {
+  display: block;
+  font-size: 10px;
+  color: var(--cd-ink-3);
+  margin-top: 2px;
 }
 
 /* ---- 7. 开发期工具 ---- */

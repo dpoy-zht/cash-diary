@@ -14,14 +14,14 @@ import { DECO_MOODS, decoSrc } from '../src/components/mascot-deco/spec.js'
  * 1. **占位与真图共用同一个盒子** → 尺寸写在 slots.js 一处，占位框从那里算，
  *    页面与组件都不许自己写死宽高。否则替换素材必然位移。
  * 2. **每处素材都有用途与位置标注** → 缺 usage / where 的插槽让上传者无从下手。
- * 3. **素材可去重** → 21 个插槽只对应 9 个文件，用户不必备 21 张图。
+ * 3. **素材可去重** → 24 个插槽只对应 12 个文件（原图 9 + 新增 meme 3），不必备 24 张图。
  *
  * 这份测试的价值在于：它跑在 Node 里，不需要构建、不需要真机，
  * 属于"素材还没到位就能发现问题"的那一层防线。
  */
 describe('素材插槽登记表', () => {
   describe('结构完整性', () => {
-    it('21 个插槽全部有 id / usage / where / 尺寸 / 文件名', () => {
+    it('24 个插槽全部有 id / usage / where / 尺寸 / 文件名', () => {
       const bad = []
       SLOTS.forEach(function (s) {
         ;['id', 'usage', 'where', 'w', 'h', 'ratio', 'size', 'crop', 'file'].forEach(function (k) {
@@ -61,11 +61,11 @@ describe('素材插槽登记表', () => {
     })
   })
 
-  describe('素材去重：用户不必备 21 张图', () => {
-    it('去重后 9 个文件，覆盖 21 个插槽', () => {
+  describe('素材去重：用户不必备 24 张图', () => {
+    it('去重后 12 个文件，覆盖 24 个插槽', () => {
       const u = uniqueFiles()
-      expect(u.length).toBe(9)
-      expect(SLOTS.length).toBe(21)
+      expect(u.length).toBe(12)
+      expect(SLOTS.length).toBe(24)
     })
 
     it('每个文件都被至少一个插槽用到（登记表不能有孤儿素材）', () => {
@@ -73,16 +73,32 @@ describe('素材插槽登记表', () => {
       expect(unused).toEqual([])
     })
 
-    it('登记表里的文件都在 9 张已入库素材之内（不新增素材文件）', () => {
+    it('登记表里的文件都在已入库素材之内（不引用不存在的文件）', () => {
+      // 两套素材包：milo 包 9 张 + meme 包 9 张，登记表只允许引用这两者
       const known = DECO_MOODS.map(function (m) { return decoSrc(m).split('/').pop() })
+        .concat(DECO_MOODS.map(function (m) { return 'meme-' + decoSrc(m).split('/').pop() }))
       const bad = uniqueFiles().map(function (f) { return f.file })
         .filter(function (file) { return known.indexOf(file) === -1 })
       expect(bad).toEqual([])
     })
+
+    it('带 meme- 前缀的插槽都锁定 pack=meme（原图零改动的前提）', () => {
+      const memes = SLOTS.filter(function (s) { return s.file.indexOf('meme-') === 0 })
+      expect(memes.length).toBe(3)
+      const bad = memes.filter(function (s) { return s.pack !== 'meme' })
+        .map(function (s) { return s.id })
+      expect(bad).toEqual([])
+    })
+
+    it('两套素材的引用数：milo 21 处 + meme 3 处 = 24', () => {
+      const memes = SLOTS.filter(function (s) { return s.file.indexOf('meme-') === 0 }).length
+      expect(memes).toBe(3)
+      expect(SLOTS.length - memes).toBe(21)
+    })
   })
 
   describe('加载方式：装饰件一律不 lazy', () => {
-    it('全站 21 处都是 lazy=false', () => {
+    it('全站 24 处都是 lazy=false', () => {
       // 这些图都是首屏必见的主视觉/装饰/空态，lazy 只会在真机上造成晚一拍闪烁
       const lazyOnes = SLOTS.filter(function (s) { return s.lazy === true })
         .map(function (s) { return s.id })

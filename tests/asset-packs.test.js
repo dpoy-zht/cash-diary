@@ -6,6 +6,7 @@ import {
   PACKS, ACTIVE_PACK, MOODS, pack, packSrc, packFiles
 } from '../src/utils/asset-packs.js'
 import { DECO_MOODS, decoSrc } from '../src/components/mascot-deco/spec.js'
+import { hasSlot, slot as slotOf } from '../src/utils/asset-slots.js'
 
 /**
  * 素材包（分组）契约。
@@ -176,6 +177,57 @@ describe('素材包 · 分组结构', () => {
     it('两套素材目录名不同（避免同名文件互相覆盖）', () => {
       expect(pack('milo').dir).not.toBe(pack('meme').dir)
       expect(pack('milo').base).not.toBe(pack('meme').base)
+    })
+  })
+})
+
+/**
+ * 新增插槽（meme 包）专项。
+ *
+ * 这批插槽是 2026-10-05 新加的「空数据占位插画」，
+ * 关键约束是**不覆盖任何原有元素** —— 全部是原本就无图的空态位置。
+ */
+describe('新增 meme 插槽', () => {
+  const NEW = ['meme.ledger.empty', 'meme.report.top', 'meme.me.empty']
+
+  it('3 个新插槽都已登记', () => {
+    NEW.forEach(function (id) {
+      expect(hasSlot(id), '未登记：' + id).toBe(true)
+    })
+  })
+
+  it('新插槽都锁定 meme 包（不受 ACTIVE_PACK 影响，原图零改动的前提）', () => {
+    NEW.forEach(function (id) {
+      const s = slotOf(id)
+      expect(s.pack, id + ' 应锁定 meme 包').toBe('meme')
+      // file 字段带 meme- 前缀 → 运行时不会被解析成当前包
+      expect(s.file.startsWith('meme-milo'), id + ' 文件名应带 meme- 前缀').toBe(true)
+    })
+  })
+
+  it('新插槽的素材文件真实存在', () => {
+    NEW.forEach(function (id) {
+      const s = slotOf(id)
+      const name = s.file
+      const f = path.join(process.cwd(), 'src/static/meme', name)
+      expect(fs.existsSync(f), '缺文件：' + f).toBe(true)
+    })
+  })
+
+  it('新插槽尺寸都是正数且有明确用途标注（便于对照界面排查）', () => {
+    NEW.forEach(function (id) {
+      const s = slotOf(id)
+      expect(s.w).toBeGreaterThan(0)
+      expect(s.h).toBeGreaterThan(0)
+      expect(!!s.where).toBe(true)
+      expect(!!s.note).toBe(true)
+    })
+  })
+
+  it('新插槽都是小尺寸（不挤压版面、兼顾性能）', () => {
+    NEW.forEach(function (id) {
+      const s = slotOf(id)
+      expect(Math.max(s.w, s.h), id + ' 边长应 ≤96').toBeLessThanOrEqual(96)
     })
   })
 })

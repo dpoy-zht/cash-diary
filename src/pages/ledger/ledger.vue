@@ -27,8 +27,12 @@
     <text class="section-label">其他账本（{{ others.length }}）</text>
     <view class="list-card">
       <view v-if="!others.length" class="empty-row">
-        <text class="empty-t">还没有其他账本</text>
-        <text class="empty-s">新建后可以把「日常」「旅行基金」这类钱分开记</text>
+        <!-- 空态插画（meme 包）：横向排布，不占用过多纵向空间 -->
+        <asset-slot slot-id="meme.ledger.empty" class="empty-milo" />
+        <view class="empty-main">
+          <text class="empty-t">还没有其他账本</text>
+          <text class="empty-s">新建后可以把「日常」「旅行基金」这类钱分开记</text>
+        </view>
       </view>
       <view
         v-for="l in others"
@@ -330,18 +334,36 @@ onShow(function () {
   border-radius: 20px;
   padding: 4px 16px;
 }
+/* 空态行：插画在左、文案在右，横向排布省纵向空间 */
 .empty-row {
   padding: 18px 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
 }
+.empty-milo {
+  /* 装饰件自身是 absolute（组件内写死），这里改回 normal 让它参与横向 flex。
+     规格（96×96）仍由 asset-slots.js 提供，这里只管位置与不缩放。 */
+  position: relative;
+  flex: none;
+  align-self: center;
+}
+.empty-main {
+  flex: 1;
+  min-width: 0;
+}
+/* ⚠️ 这两条必须显式 display:block。
+   原来 .empty-row 是 flex-direction:column，<text> 隐式成为块级；
+   改成 row 横向排布后，若不给 block，标题与副标题会挤在同一行（真机/浏览器实测）。 */
 .empty-t {
+  display: block;
   font-size: 14px;
   font-weight: 700;
   color: var(--cd-ink);
 }
 .empty-s {
+  display: block;
   font-size: 11px;
   color: var(--cd-ink-2);
   line-height: 1.6;

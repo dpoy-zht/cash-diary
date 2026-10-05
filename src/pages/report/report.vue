@@ -53,6 +53,11 @@
       <!-- 分类 TOP5 -->
       <view class="card">
         <text class="card-title">{{ topTitle }}</text>
+        <!-- 一条支出都没有时才出现插画；topCategories 非空时这段 v-if 不渲染，排版零变化 -->
+        <view v-if="!report.topCategories.length" class="top-empty">
+          <asset-slot slot-id="meme.report.top" class="top-empty-milo" />
+          <text class="top-empty-t">这个月还没有支出记录</text>
+        </view>
         <view v-for="c in report.topCategories" :key="c.category_id" class="rank-row">
           <text class="rank-no" :class="{ top: c.rank === 1 }">{{ c.rank }}</text>
           <cat-icon :category="c" :size="32" />
@@ -369,6 +374,26 @@ onShow(function () {
   font-weight: 800;
   color: var(--cd-ink);
   margin-bottom: 10px;
+}
+
+/* TOP 卡无数据时的插画块：横向居中，只在 v-if 成立时出现 */
+.top-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0 4px;
+}
+.top-empty-milo {
+  /* 组件根节点默认 absolute，这里改回 relative 参与 flex（规格仍由登记表给） */
+  position: relative;
+  flex: none;
+}
+/* display:block 必须显式写：<text> 在 flex row 里会退化为行内元素，
+   与插画并排时文字会绕排（ledger 页实测踩过同类问题）。 */
+.top-empty-t {
+  display: block;
+  font-size: 13px;
+  color: var(--cd-ink-2);
 }
 .card-foot {
   display: block;

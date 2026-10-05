@@ -197,6 +197,29 @@ export const SLOTS = Object.freeze([
     note: '与 home.empty 同一文件'
   },
 
+  // ── 空数据占位插画（meme 包，2026-10-05 新增）──
+  // 这三处都是**当前完全没有图**的位置，加图不覆盖任何原有元素：
+  // 账本空列表、报告 TOP 无数据、我的页空数据区。
+  // 用 meme 包是因为它 9 张全抠透明，贴奶油底/白卡无白边与矩形边。
+  {
+    id: 'meme.ledger.empty', usage: 'empty', where: '账本页「其他账本」空态行',
+    w: 96, h: 96, ratio: '1:1', size: '320×320',
+    crop: 'fit', lazy: false, file: 'meme-milo.webp', pack: 'meme', mood: 'milo',
+    note: '空态行内居中，横向排布（不占过多纵向空间）'
+  },
+  {
+    id: 'meme.report.top', usage: 'empty', where: '月度报告「花得最多的是…」无数据时',
+    w: 72, h: 72, ratio: '1:1', size: '320×320',
+    crop: 'fit', lazy: false, file: 'meme-milo-sad.webp', pack: 'meme', mood: 'sad',
+    note: '只在 topCategories 为空时出现，不影响有数据时的排版'
+  },
+  {
+    id: 'meme.me.empty', usage: 'empty', where: '我的页无数据区块',
+    w: 88, h: 88, ratio: '1:1', size: '320×320',
+    crop: 'fit', lazy: false, file: 'meme-milo-caishen.webp', pack: 'meme', mood: 'caishen',
+    note: '圆形裁切，作为无数据时的头像位替代'
+  },
+
   // ── 边角装饰 ──
   // ⚠️ 原来给 10 页 navbar 右上各放了一个 44×44 装饰，**真机验证后已全部撤掉**：
   //   navbar 没有状态栏留白（padding-top 只有 10px），负偏移直接顶出屏幕外；

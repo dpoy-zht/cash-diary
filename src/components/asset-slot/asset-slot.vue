@@ -23,17 +23,24 @@
 <script setup>
 import { computed } from 'vue'
 import { hasSlot, slot as slotOf } from '../../utils/asset-slots.js'
-import { pack, packSrc } from '../../utils/asset-packs.js'
+import { packSrc } from '../../utils/asset-packs.js'
 import { placeholderStyle, placeholderLabel, showHint, cropToMode, cropToRadius } from './ph.js'
 
 /**
- * 登记表的 file 字段存的是「不带分组前缀」的文件名（如 `milo-waving.webp`）。
- * 这里把它反查成表情 key，好让 `packSrc()` 按当前包加对应前缀。
+ * 登记表的 file 字段有两种写法：
+ *   'milo-waving.webp'  → 不带分组前缀，按**当前包**（ACTIVE_PACK）解析
+ *   'meme-milo.webp'   → 带 `meme-` 前缀，锁定 meme 包（用于"原图零改动"的新增插槽）
+ * 这里反查成表情 key + 包 id，让 packSrc() 拼出正确路径。
  */
-function fileNameOf(file) {
-  // 'milo' → 'milo'；'milo-waving' → 'waving'（去掉 'milo' 与 'milo-' 两种前缀）
-  if (file === 'milo.webp') return 'milo'
-  return file.replace(/^milo-/, '').replace(/\.webp$/, '')
+function parseFile(file) {
+  // 带 meme- 前缀 → 锁定 meme 包（新增素材永远走自己的包，不受 ACTIVE_PACK 影响）
+  const m = /^meme-(milo)(?:-(.+))?\.webp$/.exec(file)
+  if (m) {
+    return { pack: 'meme', mood: m[2] || 'milo' }
+  }
+  // 不带前缀 → 用当前包。'milo.webp' 是基础形象（无 '-<mood>' 后缀）
+  const mood = file === 'milo.webp' ? 'milo' : file.replace(/^milo-/, '').replace(/\.webp$/, '')
+  return { pack: undefined, mood: mood }
 }
 
 /**
@@ -113,8 +120,14 @@ const hintVisible = computed(function () {
  * - 否则由登记表的文件名（不含前缀）反查当前包
  */
 const src = computed(function () {
-  if (props.file) return pack().dir + props.file
-  return packSrc(fileNameOf(data.value.file))
+  // 调用处显式给了 file 就用它（可带包前缀）
+  if (props.file) {
+    const p = parseFile(props.file)
+    return packSrc(p.mood, p.pack)
+  }
+  // 否则按登记表解析：带 meme- 前缀的锁定 meme 包，其余跟当前包
+  const p = parseFile(data.value.file)
+  return packSrc(p.mood, p.pack || (data.value.pack === undefined ? undefined : data.value.pack))
 })
 
 const mode = computed(function () {
