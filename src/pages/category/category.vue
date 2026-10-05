@@ -1,6 +1,7 @@
 <template>
   <view class="page">
     <view class="navbar">
+      <mascot-deco class="nav-milo" mood="waving" tier="corner" />
       <view class="icon-btn" hover-class="ib-hover" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">分类管理</text>
       <view class="icon-btn" style="visibility:hidden"><view class="ib" /></view>
@@ -34,6 +35,7 @@
         <text class="row-arrow">›</text>
       </view>
       <view v-if="!rows.length" class="row-empty">
+        <mascot-deco class="empty-milo" mood="gold" tier="hero" />
         <text class="row-hint">这一类还没有分类，点下面新建一个</text>
       </view>
     </view>
@@ -263,6 +265,7 @@ onShow(function () {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px 4px;
+  position: relative;
 }
 .nav-title {
   font-size: 20px;
@@ -475,4 +478,25 @@ onShow(function () {
   opacity: 0.9;
   transform: scale(0.98);
 }
+
+
+/* ---- 奶龙 IP 边角装饰 ----
+   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
+   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
+   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
+.nav-milo {
+  top: -6px;
+  right: -4px;
+}
+
+/* 空状态插画：奶龙端金条（"还没分类"是中性状态，gold 比 innocent 更有生气） */
+.row-empty {
+  position: relative;
+}
+.empty-milo {
+  position: relative;
+  display: block;
+  margin: 4px auto 10px;
+}
+
 </style>

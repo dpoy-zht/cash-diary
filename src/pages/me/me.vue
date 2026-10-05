@@ -2,6 +2,7 @@
   <view class="page">
     <!-- 1. 渐变头部：挥手奶龙 + 昵称 + 等级 + 连续记账胶囊 -->
     <view class="profile-head">
+      <mascot-deco class="head-deco" mood="gold" tier="corner" />
       <image class="head-milo" src="/static/milo/milo-waving.webp" mode="aspectFit" />
       <view class="head-main">
         <text class="head-name">奶龙本龙</text>
@@ -763,6 +764,15 @@ onShow(function () {
   display: flex;
   align-items: center;
   gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+/* my 页没有 navbar，装饰件改挂在 profile-head 右上角：与左侧 88px 挥手奶龙呼应。
+   head-main 是 flex:1，装饰件绝对定位后退出流，昵称/等级/胶囊的排布完全不变。 */
+.head-deco {
+  top: 8px;
+  right: 10px;
+  opacity: 0.55;
 }
 .head-milo {
   width: 88px;

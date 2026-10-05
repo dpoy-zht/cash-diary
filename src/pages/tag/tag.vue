@@ -1,6 +1,7 @@
 <template>
   <view class="page">
     <view class="navbar">
+      <mascot-deco class="nav-milo" mood="waving" tier="corner" />
       <view class="icon-btn" hover-class="ib-hover" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">标签管理</text>
       <view class="icon-btn" style="visibility:hidden"><view class="ib" /></view>
@@ -25,6 +26,7 @@
         <text class="row-arrow">›</text>
       </view>
       <view v-if="!list.length" class="row-empty">
+        <mascot-deco class="empty-milo" mood="innocent" tier="hero" />
         <text class="row-hint">还没有标签，点下面新建一个</text>
       </view>
     </view>
@@ -216,6 +218,7 @@ function confirmRemove(t) {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px 4px;
+  position: relative;
 }
 .nav-title {
   font-size: 17px;
@@ -383,4 +386,26 @@ function confirmRemove(t) {
   height: 24px;
   border-radius: 50%;
 }
+
+
+/* ---- 奶龙 IP 边角装饰 ----
+   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
+   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
+   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
+.nav-milo {
+  top: -6px;
+  right: -4px;
+}
+
+/* 空状态插画：奶龙站在文案上方。组件根节点是 absolute，这里改 relative
+   让它"占位参与排版"，用 auto margin 水平居中，文案位置不会被挤动。 */
+.row-empty {
+  position: relative;
+}
+.empty-milo {
+  position: relative;
+  display: block;
+  margin: 4px auto 10px;
+}
+
 </style>

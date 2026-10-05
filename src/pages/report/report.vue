@@ -2,6 +2,7 @@
   <view class="page">
     <!-- 顶部导航 -->
     <view class="navbar">
+      <mascot-deco class="nav-milo" mood="gold" tier="corner" />
       <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">月度报告</text>
       <picker mode="month" :value="ym" @change="onPickMonth">
@@ -12,6 +13,7 @@
     <block v-if="report">
       <!-- 概览：本月支出 + 环比 -->
       <view class="hero">
+        <mascot-deco class="hero-milo" :mood="heroMood" tier="corner" :size="58" />
         <text class="hero-label">{{ report.label }} · 一共花了</text>
         <text class="hero-num">¥{{ fmt(report.expenseCents) }}</text>
         <view class="mom" :class="report.mom.expense.dir">
@@ -219,6 +221,22 @@ const topTitle = computed(function () {
   return n ? '花得最多的 ' + n + ' 类' : '花得最多的是…'
 })
 
+/**
+ * 头卡右上角的表情，跟着支出环比走：
+ * 一笔没记 → innocent；比上月少花 → caishen 财神（"我省了"）；
+ * 持平 → milo；比上月多花 → sad。
+ * 直接读 report.mom.expense.dir，与下方环比文案同源，不另立判断标准。
+ */
+const heroMood = computed(function () {
+  const r = report.value
+  if (!r) return 'milo'
+  if (!r.count) return 'innocent'
+  const dir = r.mom.expense.dir
+  if (dir === 'down') return 'caishen'
+  if (dir === 'up') return 'sad'
+  return 'milo'
+})
+
 const iconBack = svgMaskStyle('M15.4 7.4L14 6l-6 6 6 6 1.4-1.4L10.8 12z')
 
 onShow(function () {
@@ -239,6 +257,7 @@ onShow(function () {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px 4px;
+  position: relative;
 }
 .nav-title {
   font-size: 20px;
@@ -276,6 +295,8 @@ onShow(function () {
   padding: 22px 20px;
   background: var(--cd-grad-brand);
   box-shadow: 0 10px 24px rgba(255, 217, 61, 0.35);
+  overflow: hidden;
+  position: relative;
 }
 .hero-label {
   display: block;
@@ -528,4 +549,23 @@ onShow(function () {
   font-size: 13px;
   color: var(--cd-ink-2);
 }
+
+
+/* ---- 奶龙 IP 边角装饰 ----
+   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
+   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
+   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
+.nav-milo {
+  top: -6px;
+  right: -4px;
+}
+
+/* 财神奶龙探出卡片右上角。报告是"回顾"性质的页面，用财神图比默认表情更贴题；
+   金额 34px 是全页最大字号，装饰件压到 58px 且绝对定位，不会盖住数字。 */
+.hero-milo {
+  top: 8px;
+  right: 12px;
+  opacity: 0.95;
+}
+
 </style>

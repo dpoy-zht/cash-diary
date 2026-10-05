@@ -1,14 +1,16 @@
 <template>
   <view class="page">
     <view class="navbar">
+      <mascot-deco class="nav-milo" mood="innocent" tier="corner" />
       <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">数据体检</text>
       <view class="nav-spacer" />
     </view>
 
     <block v-if="scan">
-      <!-- 结论 -->
+      <!-- 结论：右上角趴一只奶龙，表情跟着结论好坏走（不挤左侧标题） -->
       <view class="summary" :class="summaryClass">
+        <mascot-deco class="summary-milo" :mood="summaryMood" tier="corner" :size="52" />
         <text class="sm-title">{{ summaryTitle }}</text>
         <text class="sm-sub">{{ summarySub }}</text>
       </view>
@@ -29,8 +31,11 @@
 
       <!-- 一切正常 -->
       <view v-if="scan.healthy" class="card ok-card">
-        <text class="ok-txt">没有孤儿记录、异常金额，备份也是新的。</text>
-        <text class="ok-sub">继续好好记账吧~</text>
+        <mascot-deco class="ok-milo" mood="gold" tier="inline" circle />
+        <view class="ok-main">
+          <text class="ok-txt">没有孤儿记录、异常金额，备份也是新的。</text>
+          <text class="ok-sub">继续好好记账吧~</text>
+        </view>
       </view>
 
       <view v-if="scan.fixableCount" class="fix-bar">
@@ -46,6 +51,7 @@
     </block>
 
     <view v-else class="loading">
+      <mascot-deco class="loading-milo" mood="innocent" tier="hero" />
       <text class="loading-txt">正在翻账本…</text>
     </view>
   </view>
@@ -99,6 +105,15 @@ const summarySub = computed(function () {
   return scan.value.fixableCount
     ? '其中 ' + scan.value.fixableCount + ' 项可以一键修复'
     : '剩下这些需要你自己确认，体检不会替你动数据'
+})
+
+/**
+ * 结论表情：全绿 → 端金条的 gold（有成就感）；发现问题 → sad（委屈但能解决）。
+ * 判据直接复用 summaryClass 的同一套 healthy/fixableCount，不另立标准。
+ */
+const summaryMood = computed(function () {
+  if (!scan.value) return 'innocent'
+  return scan.value.healthy ? 'gold' : 'sad'
 })
 
 /** 修复前把"将要对数据做什么"一条条摆出来确认 —— 不能只写"一键修复"就动手 */
@@ -163,6 +178,7 @@ onShow(function () {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px 4px;
+  position: relative;
 }
 .nav-title {
   font-size: 20px;
@@ -196,6 +212,8 @@ onShow(function () {
   background: var(--cd-surface);
   box-shadow: var(--cd-sh-card);
   border-left: 6px solid var(--cd-icon-3);
+  position: relative;
+  overflow: hidden;
 }
 .summary.ok {
   border-left-color: var(--cd-income);
@@ -290,9 +308,10 @@ onShow(function () {
 /* ---- 一切正常 ---- */
 .ok-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  padding: 26px 16px;
+  gap: 14px;
+  padding: 18px 20px;
 }
 .ok-txt {
   font-size: 14px;
@@ -348,9 +367,46 @@ onShow(function () {
 .loading {
   padding: 60px 16px;
   text-align: center;
+  position: relative;
 }
 .loading-txt {
   font-size: 13px;
   color: var(--cd-ink-2);
+}
+
+/* ---- 奶龙 IP 装饰 ----
+   组件根节点是 position:absolute；这里负责把它放到该在的位置并预留留白。
+   .ok-card / .loading 改成 flex 容器，装饰件写成 flex 子项后
+   position:relative 让它"占位参与排版"，滚动时不会盖住下方正文。 */
+.summary-milo {
+  top: -8px;
+  right: 10px;
+  opacity: 0.9;
+}
+.summary.ok .summary-milo {
+  opacity: 1;
+}
+.ok-milo {
+  position: relative;
+  flex: none;
+}
+.ok-main {
+  flex: 1;
+  min-width: 0;
+}
+.loading-milo {
+  position: relative;
+  display: block;
+  margin: 0 auto 12px;
+}
+
+
+/* ---- 奶龙 IP 边角装饰 ----
+   navbar 是 flex + space-between，装饰件绝对定位后自动退出 flex 流，
+   因此右侧按钮排布完全不变（不遮不挤）。top 偏移让它从导航条上缘探出一点，
+   与页面主插画呼应。pointer-events:none 由组件保证，压到按钮上也不抢点击。 */
+.nav-milo {
+  top: -6px;
+  right: -4px;
 }
 </style>
