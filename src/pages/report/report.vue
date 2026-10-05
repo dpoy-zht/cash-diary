@@ -2,7 +2,7 @@
   <view class="page">
     <!-- 顶部导航 -->
     <view class="navbar">
-      <mascot-deco class="nav-milo" mood="gold" tier="corner" />
+      <mascot-deco class="nav-milo" slot-id="deco.nav.report" />
       <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">月度报告</text>
       <picker mode="month" :value="ym" @change="onPickMonth">
@@ -13,7 +13,7 @@
     <block v-if="report">
       <!-- 概览：本月支出 + 环比 -->
       <view class="hero">
-        <mascot-deco class="hero-milo" :mood="heroMood" tier="corner" :size="58" />
+        <mascot-deco class="hero-milo" :mood="heroMood" slot-id="deco.report.hero" />
         <text class="hero-label">{{ report.label }} · 一共花了</text>
         <text class="hero-num">¥{{ fmt(report.expenseCents) }}</text>
         <view class="mom" :class="report.mom.expense.dir">

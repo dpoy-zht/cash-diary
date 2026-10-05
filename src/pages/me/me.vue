@@ -2,8 +2,8 @@
   <view class="page">
     <!-- 1. 渐变头部：挥手奶龙 + 昵称 + 等级 + 连续记账胶囊 -->
     <view class="profile-head">
-      <mascot-deco class="head-deco" mood="gold" tier="corner" />
-      <image class="head-milo" src="/static/milo/milo-waving.webp" mode="aspectFit" />
+      <mascot-deco class="head-deco" slot-id="deco.me.head" />
+      <asset-slot slot-id="me.avatar" img-class="head-milo" />
       <view class="head-main">
         <text class="head-name">奶龙本龙</text>
         <text class="head-level">Lv.{{ lv.level }} {{ lv.title }}</text>
@@ -29,7 +29,7 @@
 
     <!-- 3. 累计攒钱目标（点一下可设置目标金额；进度按累计口径，按月口径见 T3.8） -->
     <view class="goal-card" hover-class="goal-hover" @click="editGoal">
-      <image class="goal-img" src="/static/milo/milo-rich.webp" mode="aspectFit" />
+      <asset-slot slot-id="me.goal" img-class="goal-img" />
       <view class="goal-main">
         <text class="goal-title">累计攒钱目标</text>
         <text class="goal-sub">{{ goalText }}</text>
@@ -73,7 +73,7 @@
 
     <!-- 5. 底部问候 -->
     <view class="greet-card">
-      <image class="greet-img" src="/static/milo/milo-waving.webp" mode="aspectFit" />
+      <asset-slot slot-id="me.greet" img-class="greet-img" />
       <view class="greet-main">
         <text class="greet-t">今天也要好好记账哦</text>
         <text class="greet-s">奶龙会一直陪着你攒钱~</text>

@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="navbar">
-      <mascot-deco class="nav-milo" mood="waving" tier="corner" />
+      <mascot-deco class="nav-milo" slot-id="deco.nav.tag" />
       <view class="icon-btn" hover-class="ib-hover" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">标签管理</text>
       <view class="icon-btn" style="visibility:hidden"><view class="ib" /></view>
@@ -26,7 +26,7 @@
         <text class="row-arrow">›</text>
       </view>
       <view v-if="!list.length" class="row-empty">
-        <mascot-deco class="empty-milo" mood="innocent" tier="hero" />
+        <mascot-deco class="empty-milo" slot-id="deco.tag.empty" />
         <text class="row-hint">还没有标签，点下面新建一个</text>
       </view>
     </view>

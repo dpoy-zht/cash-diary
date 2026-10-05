@@ -2,7 +2,7 @@
   <view class="page">
     <!-- 顶部导航 -->
     <view class="navbar">
-      <mascot-deco class="nav-milo" mood="milo" tier="corner" />
+      <mascot-deco class="nav-milo" slot-id="deco.nav.stats" />
       <view class="icon-btn" @click="goHome"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">奶龙算账</text>
       <!-- 期间选择器：fields 随期间切换（日/周选日期、月选月、年选年） -->
@@ -34,7 +34,7 @@
       <block v-if="segments.length">
         <view class="donut" :style="{ background: donutBg }">
           <view class="donut-center">
-            <image class="donut-milo" src="/static/milo/milo.webp" mode="aspectFit" />
+            <asset-slot slot-id="stats.donut" img-class="donut-milo" />
           </view>
         </view>
         <text v-if="!conicOk" class="donut-tip">这台设备画不出圆环图，往下看「花得最多的是…」里的占比条，一样准</text>
@@ -47,7 +47,7 @@
         </view>
       </block>
       <view v-else class="empty">
-        <image class="empty-img" src="/static/milo/milo-innocent.webp" mode="aspectFit" />
+        <asset-slot slot-id="stats.empty" img-class="empty-img" />
         <text class="empty-title">{{ emptyTitle }}</text>
         <text class="empty-sub">记几笔，奶龙帮你看看钱花哪了</text>
       </view>

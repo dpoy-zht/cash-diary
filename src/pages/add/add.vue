@@ -3,7 +3,7 @@
     <!-- 奶黄渐变头部 -->
     <view class="add-head">
       <view class="navbar">
-        <mascot-deco class="nav-milo" mood="happy" tier="corner" />
+        <mascot-deco class="nav-milo" slot-id="deco.nav.add" />
         <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
         <text class="nav-title">记一笔</text>
         <view class="icon-btn" @click="save"><view class="ib" :style="iconCheck" /></view>
@@ -62,7 +62,7 @@
     <!-- 记好啦成功弹窗 -->
     <view v-if="successShow" class="mask">
       <view class="modal">
-        <image class="modal-img" src="/static/milo/milo-happy.webp" mode="aspectFit" />
+        <asset-slot slot-id="add.success" img-class="modal-img" />
         <text class="modal-title">记好啦！</text>
         <text class="modal-sub">{{ lastSavedText }}</text>
         <text class="modal-tip">这笔账已经帮你存好啦~</text>

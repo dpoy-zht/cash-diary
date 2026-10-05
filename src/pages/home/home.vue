@@ -2,7 +2,7 @@
   <view class="page">
     <!-- 顶部导航：左侧标题，右侧两个有真实行为的小按钮 -->
     <view class="navbar">
-      <mascot-deco class="nav-milo" mood="milo" tier="corner" />
+      <mascot-deco class="nav-milo" slot-id="deco.nav.home" />
       <text class="nav-title">奶龙记账</text>
       <view class="nav-right">
         <view class="icon-btn" @click="showSalary"><view class="ib" :style="iconCoin" /></view>
@@ -20,7 +20,7 @@
 
     <!-- 余额卡 -->
     <view class="balance-card">
-      <image class="milo" src="/static/milo/milo.webp" mode="aspectFit" />
+      <mascot-deco class="milo" slot-id="home.balance" />
       <!-- 只显示两个独立数值，不显示合计余额（合计容易被误当成"我能花多少"） -->
       <view class="bal-cols">
         <view class="bal-col">
@@ -37,7 +37,7 @@
 
     <!-- 工资到账横幅（默认隐藏，点金币弹出，3.5s 消失） -->
     <view v-if="salaryShow" class="salary-banner">
-      <image class="sb-img" src="/static/milo/milo-jump.webp" mode="aspectFit" />
+      <asset-slot slot-id="home.salary" img-class="sb-img" />
       <view class="sb-txt">
         <text class="sb-b">工资到账啦！</text>
         <text class="sb-s">+¥{{ incomeText }}，奶龙蹦起来了</text>
@@ -94,7 +94,7 @@
         </block>
       </block>
       <view v-else class="empty">
-        <image class="empty-img" src="/static/milo/milo-innocent.webp" mode="aspectFit" />
+        <asset-slot slot-id="home.empty" img-class="empty-img" />
         <text class="empty-title">{{ emptyTitle }}</text>
         <text class="empty-sub">{{ emptySub }}</text>
       </view>
@@ -106,7 +106,7 @@
     <!-- 超支弹窗（真实预算判断触发，见 maybeAlertOver） -->
     <view v-if="overShow" class="mask" @click="overShow = false">
       <view class="modal" @click.stop>
-        <image class="modal-img" src="/static/milo/milo-sad.webp" mode="aspectFit" />
+        <asset-slot slot-id="home.over" img-class="modal-img" />
         <text class="modal-title">哎呀，这个月要吃土咯…</text>
         <text class="modal-tip">{{ overDetail }}</text>
         <text class="modal-tip" style="margin-top:6px">要不咱省着点花？</text>

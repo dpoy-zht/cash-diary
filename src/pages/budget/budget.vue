@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="navbar">
-      <mascot-deco class="nav-milo" mood="sad" tier="corner" />
+      <mascot-deco class="nav-milo" slot-id="deco.nav.budget" />
       <view class="icon-btn" hover-class="ib-hover" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">预算设置</text>
       <view class="icon-btn" style="visibility:hidden"><view class="ib" /></view>
@@ -9,7 +9,7 @@
 
     <!-- 本月总预算卡：右上角趴一只奶龙，表情跟着预算水位走 -->
     <view class="total-card">
-      <mascot-deco class="tc-milo" :mood="totalMood" tier="corner" :size="56" />
+      <mascot-deco class="tc-milo" :mood="totalMood" slot-id="deco.budget.card" />
       <text class="tc-label">本月总预算</text>
       <text v-if="!budgetStore.hasTotal" class="tc-empty">还没设预算，点一下设置</text>
       <block v-else>

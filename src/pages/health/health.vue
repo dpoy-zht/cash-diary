@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="navbar">
-      <mascot-deco class="nav-milo" mood="innocent" tier="corner" />
+      <mascot-deco class="nav-milo" slot-id="deco.nav.health" />
       <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">数据体检</text>
       <view class="nav-spacer" />
@@ -10,7 +10,7 @@
     <block v-if="scan">
       <!-- 结论：右上角趴一只奶龙，表情跟着结论好坏走（不挤左侧标题） -->
       <view class="summary" :class="summaryClass">
-        <mascot-deco class="summary-milo" :mood="summaryMood" tier="corner" :size="52" />
+        <mascot-deco class="summary-milo" :mood="summaryMood" slot-id="deco.health.summary" />
         <text class="sm-title">{{ summaryTitle }}</text>
         <text class="sm-sub">{{ summarySub }}</text>
       </view>
@@ -31,7 +31,7 @@
 
       <!-- 一切正常 -->
       <view v-if="scan.healthy" class="card ok-card">
-        <mascot-deco class="ok-milo" mood="gold" tier="inline" circle />
+        <mascot-deco class="ok-milo" slot-id="deco.health.ok" />
         <view class="ok-main">
           <text class="ok-txt">没有孤儿记录、异常金额，备份也是新的。</text>
           <text class="ok-sub">继续好好记账吧~</text>
@@ -51,7 +51,7 @@
     </block>
 
     <view v-else class="loading">
-      <mascot-deco class="loading-milo" mood="innocent" tier="hero" />
+      <mascot-deco class="loading-milo" slot-id="deco.health.loading" />
       <text class="loading-txt">正在翻账本…</text>
     </view>
   </view>

@@ -2,7 +2,7 @@
   <view class="page">
     <!-- 顶部导航 -->
     <view class="navbar">
-      <mascot-deco class="nav-milo" mood="rich" tier="corner" />
+      <mascot-deco class="nav-milo" slot-id="deco.nav.fixed" />
       <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
       <text class="nav-title">固定支出</text>
       <view style="width: 36px" />
@@ -32,7 +32,7 @@
       </view>
     </view>
     <view v-else class="empty">
-      <image class="empty-img" src="/static/milo/milo-innocent.webp" mode="aspectFit" />
+      <asset-slot slot-id="fixed.empty" img-class="empty-img" />
       <text class="empty-t">还没有固定支出</text>
       <text class="empty-s">把每月都要花的那几笔交给奶龙，它替你记</text>
     </view>

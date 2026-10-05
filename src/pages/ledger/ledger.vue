@@ -2,7 +2,7 @@
   <view class="page">
     <!-- navbar：菜单 / 我的账本 / 新建 -->
     <view class="navbar">
-      <mascot-deco class="nav-milo" mood="caishen" tier="corner" />
+      <mascot-deco class="nav-milo" slot-id="deco.nav.ledger" />
       <view class="icon-btn" hover-class="ib-hover" @click="toast('菜单功能规划中')">
         <view class="ib" :style="iconMenu" />
       </view>
@@ -14,7 +14,7 @@
 
     <!-- 当前账本卡：财神奶龙圆形裁切后趴在右上角 -->
     <view class="ledger-card">
-      <image class="caishen" src="/static/milo/milo-caishen.webp" mode="aspectFill" />
+      <mascot-deco class="caishen" slot-id="ledger.current" />
       <text class="lc-label">当前账本</text>
       <text class="lc-name">{{ currentName }}</text>
       <text class="lc-num">¥{{ balanceText }}</text>
@@ -52,7 +52,7 @@
 
     <!-- 新建账本行：金条奶龙 + 黄色胶囊按钮 -->
     <view class="create-row">
-      <image class="gold-img" src="/static/milo/milo-gold.webp" mode="aspectFit" />
+      <asset-slot slot-id="ledger.create" img-class="gold-img" />
       <view class="create-btn" hover-class="create-hover" @click="onCreate">
         <text class="create-t">+ 新建账本</text>
       </view>
