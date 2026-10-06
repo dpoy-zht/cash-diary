@@ -1,5 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtVersionFromName, parseWgtSha256 } from '../src/utils/update.js'
+import {
+  parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets,
+  parseWgtVersionFromName, parseWgtSha256, buildWgtSources
+} from '../src/utils/update.js'
 import { currentAppVersion } from '../src/services/update.js'
 
 describe('应用内更新检查 —— 版本比较（纯函数）', () => {
@@ -162,5 +165,51 @@ describe('parseWgtSha256 —— 从 Release 说明解析 wgt 哈希（T2.5）', 
   it('非法 hex（长度/字符不符）不算命中', () => {
     expect(parseWgtSha256('wgt-sha256: abc123')).toBe('')
     expect(parseWgtSha256('wgt-sha256: ' + 'g'.repeat(64))).toBe('')
+  })
+})
+
+/**
+ * wgt 多源下载（2026-10-06 真机定位到 GitHub 直连时通时不通）。
+ *
+ * 实测证据：同一台手机同一网络，直连 GitHub 时出现
+ *   "Connected + SSL OK 但 0 bytes received" 卡到超时；
+ * 而 ghfast.top（3.4s）与 cdn.jsdelivr.net（6.6s）都能完整下到 572,774 B。
+ * 所以单一源不可靠，必须按顺序试多个。
+ */
+describe('buildWgtSources —— 生成多源下载地址', () => {
+  const url = 'https://github.com/dpoy-zht/cash-diary/releases/download/v2.3.3/nailong-ledger-v2.3.3.wgt'
+
+  it('生成 2 个源：原地址 + ghfast 加速', () => {
+    const list = buildWgtSources(url)
+    expect(list.length).toBe(2)
+    expect(list[0]).toBe(url)
+  })
+
+  it('ghfast 用通用加速形式（整条 URL 包进去）', () => {
+    // 实测 3.4s 完整下到 572,774 B，是真机上唯一可靠的一条
+    expect(buildWgtSources(url)[1]).toBe('https://ghfast.top/' + url)
+  })
+
+  it('所有源都非空、https、指向 .wgt', () => {
+    buildWgtSources(url).forEach(function (u) {
+      expect(u.startsWith('https://')).toBe(true)
+      expect(u.endsWith('.wgt')).toBe(true)
+    })
+  })
+
+  it('空输入返回空数组（不崩）', () => {
+    expect(buildWgtSources('')).toEqual([])
+    expect(buildWgtSources(null)).toEqual([])
+    expect(buildWgtSources(undefined)).toEqual([])
+  })
+
+  it('非 GitHub 链接只返回原地址（不乱加代理）', () => {
+    const other = 'https://example.com/a/b.wgt'
+    expect(buildWgtSources(other)).toEqual([other])
+  })
+
+  it('原地址排第一个：网络好时不必绕代理', () => {
+    // 代理不是免费的（多一跳、可能被缓存），只在直连失败时才用
+    expect(buildWgtSources(url)[0]).not.toMatch(/ghfast/)
   })
 })

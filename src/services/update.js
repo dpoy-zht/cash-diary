@@ -7,13 +7,17 @@
  * - 每 24h 最多自动检查一次（节流键存 uni storage）；也可从「关于」手动触发
  * - 无网络 / 超时 / H5 端全部静默失败——检查更新是锦上添花，绝不能打扰使用
  */
-import { isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtSha256, WGT_ASSET_PREFIX } from '../utils/update.js'
+import {
+  isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtSha256, buildWgtSources,
+  WGT_ASSET_PREFIX
+} from '../utils/update.js'
 import { sha256Hex, base64ToBytes } from '../utils/sha256.js'
 
 const UPDATE_LAST_KEY = 'cashDiary.updateCheck.lastAt'
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000
 const RELEASE_API = 'https://api.github.com/repos/dpoy-zht/cash-diary/releases/latest'
 const RELEASE_PAGE = 'https://github.com/dpoy-zht/cash-diary/releases/latest'
+
 
 /**
  * 当前 App 版本名。
@@ -138,7 +142,7 @@ export function openReleasePage(url) {
  */
 function downloadFile(url) {
   return new Promise(function (resolve, reject) {
-    const timeoutMs = 120000 // 大文件慢网兜底
+    const timeoutMs = 45000 // 单源超时：572KB 的包 45s 足够，三个源最坏也只要 135s
     const timer = setTimeout(function () {
       try { d.abort() } catch (e) { /* 忽略 */ }
       reject(new Error('下载超时'))
@@ -267,27 +271,33 @@ export async function applyUpdate(r) {
   if (typeof plus === 'undefined' || !plus.runtime) return { ok: false, reason: 'not-app' }
   if (!r || (!r.wgtUrl && !r.url)) return { ok: false, reason: 'no-target' }
 
-  // 1) 有 wgt：静默下载 → 哈希校验（Release 说明带 wgt-sha256 时）→ 安装；
-  //    下载/校验/安装失败 → 回退整包
+  // 1) 有 wgt：逐个源尝试下载 → 哈希校验（Release 说明带 wgt-sha256 时）→ 安装；
+  //    全部源都失败 → 回退整包
   if (r.wgtUrl) {
-    try {
-      const temp = await downloadFile(r.wgtUrl)
-      if (r.wgtSha256) {
-        const hashOk = await verifyWgtFileHash(temp, r.wgtSha256)
-        if (!hashOk) {
-          // 校验失败：中止热更（坏包/被劫持），引导走整包
-          const opened = openReleasePage(r.url)
-          return { ok: opened, type: 'apk', reason: opened ? 'hash-mismatch' : 'open-failed' }
+    // 每个源单独给一次机会（单源 45s 足够572KB 的包），全部失败才放弃
+    const sources = buildWgtSources(r.wgtUrl)
+    for (let i = 0; i < sources.length; i++) {
+      const url = sources[i]
+      const isLast = i === sources.length - 1
+      try {
+        const temp = await downloadFile(url)
+        if (r.wgtSha256) {
+          const hashOk = await verifyWgtFileHash(temp, r.wgtSha256)
+          if (!hashOk) {
+            // 校验失败说明这个源给的包不对（损坏/被劫持），换下一个源也没意义 → 直接中止
+            return { ok: false, type: 'wgt', reason: 'hash-mismatch' }
+          }
         }
+        const installed = await installWgt(temp)
+        if (installed) return { ok: true, type: 'wgt', source: url }
+        return { ok: false, type: 'wgt', reason: 'install-failed' }
+      } catch (e) {
+        console.error('[update] 源 ' + (i + 1) + '/' + sources.length + ' 失败：',
+          (e && e.message) || e)
+        // 还有下一个源就继续试，全挂了才落到整包回退
+        if (!isLast) continue
+        return { ok: false, type: 'wgt', reason: 'download-failed', error: (e && e.message) || '' }
       }
-      const installed = await installWgt(temp)
-      if (installed) return { ok: true, type: 'wgt' }
-      return { ok: false, type: 'wgt', reason: 'install-failed' }
-    } catch (e) {
-      // ⚠️ 别再把错误吞干净：热更失败后只能看到"跳浏览器"，
-      // 无从判断是下载、校验还是安装的问题，真机调试会变成猜谜。
-      console.error('[update] wgt 热更失败：', (e && e.message) || e)
-      return { ok: false, type: 'wgt', reason: 'download-failed', error: (e && e.message) || '' }
     }
   }
 

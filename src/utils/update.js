@@ -105,3 +105,32 @@ export function pickUpdateAssets(assets, prefix) {
   }
   return result
 }
+
+/**
+ * 由 GitHub 直链生成多个可用的下载源（**纯函数，可单测**）。
+ *
+ * 背景（2026-10-06 真机实测，小米 14 Pro，同一网络、同一时刻）：
+ * ```
+ * 直连 GitHub：Connected + SSL OK，但 "0 bytes received" 卡 25s 超时
+ *   → 应用层限流/干扰：TCP 通、证书握手也成功，但服务端不返回数据
+ * ghfast.top       ：HTTP 200 / 572,774 B / 3.4s ✓
+ * cdn.jsdelivr.net  ：HTTP 200 / 1,111 B（代理仓库文件）/ 6.6s
+ * ```
+ * 所以「GitHub 直连」不是可靠的下载源 —— 它时好时坏（v2.2.8 那次直连 7.3s 成功，
+ * v2.3.3 这次就超时）。**`dist/` 被 .gitignore，wgt 没进仓库**，
+ * 所以 jsDelivr 那条对 Release 资产无效（它只能代理仓库里的文件），
+ * 目前只有 `ghfast.top` 这条通用加速真的能拿到 wgt —— 它排在直连之后、原地址失败就顶上。
+ *
+ * @param {string} wgtUrl GitHub Release 资产直链
+ * @returns {string[]} 按优先级排列的候选 URL（第一个是原地址：网络好时它最快）
+ */
+export function buildWgtSources(wgtUrl) {
+  const raw = String(wgtUrl || '')
+  if (!raw) return []
+  // 只有 github.com 的链接才需要（也不应该）加代理
+  if (raw.indexOf('github.com') === -1) return [raw]
+  return [
+    raw,
+    'https://ghfast.top/' + raw
+  ]
+}
