@@ -1,6 +1,6 @@
 {
   "name": "cash-diary",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "private": true,
   "description": "奶蛙记账 - 离线优先的个人记账 App，3 秒记一笔",
   "scripts": {
