@@ -1,8 +1,8 @@
 <template>
   <view class="page">
-    <!-- navbar：菜单 / 我的账本 / 新建 -->
+    <!-- navbar：账本设置（重命名/删除当前账本） / 我的账本 / 新建 -->
     <view class="navbar">
-      <view class="icon-btn" hover-class="ib-hover" @click="toast('菜单功能规划中')">
+      <view class="icon-btn" hover-class="ib-hover" @click="onLedgerMenu">
         <view class="ib" :style="iconMenu" />
       </view>
       <text class="nav-title">我的账本</text>
@@ -160,6 +160,31 @@ function onCreate() {
   })
 }
 
+/**
+ * navbar 左侧「账本设置」：操作**当前**账本。
+ *
+ * 为什么需要它（2026-10-06 补的真实缺口）：长按改名/删除只绑在「其他账本」那一行上，
+ * 正在用的这个账本既没法改名也没法删除 —— 一个点了没反应的菜单按钮，
+ * 比没有更糟。
+ *
+ * 交互刻意与长按菜单保持一致（都用 ActionSheet），不引入新组件，
+ * 避免同一页两套交互范式。
+ */
+function onLedgerMenu() {
+  const c = accountStore.current
+  if (!c) {
+    toast('账本还没准备好，稍后再试')
+    return
+  }
+  uni.showActionSheet({
+    itemList: ['重命名当前账本', '删除当前账本'],
+    success: function (res) {
+      if (res.tapIndex === 0) renameLedger(c)
+      else if (res.tapIndex === 1) removeLedger(c)
+    }
+  })
+}
+
 function onLongPress(l) {
   uni.showActionSheet({
     itemList: ['改名', '删除'],
@@ -200,9 +225,18 @@ function removeLedger(l) {
     })
     return
   }
+  // 删当前账本与删其他账本的后果不同：删完会自动切到剩下的第一个账本。
+  // 这个必须提前说清楚，否则用户以为只是"删一个"，结果当前看的账本变了。
+  const isCurrent = accountStore.current && accountStore.current.id === l.id
+  const othersCount = accountStore.list.length - 1
+  const content = isCurrent
+    ? (othersCount > 0
+        ? '「' + l.name + '」是你现在正在用的账本，删除后会自动切到其他账本。确定删除吗？'
+        : '「' + l.name + '」是唯一的账本，删除后会自动新建一个「日常」账本。确定删除吗？')
+    : '确定删除「' + l.name + '」吗？'
   uni.showModal({
     title: '删除账本',
-    content: '确定删除「' + l.name + '」吗？',
+    content: content,
     confirmText: '删除',
     confirmColor: UI_DANGER,
     success: function (res) {

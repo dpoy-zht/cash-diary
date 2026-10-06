@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as accountService from '../services/account.js'
+import { DEFAULT_ACCOUNT_NAME } from '../services/account.js'
 import { refreshReminders } from '../services/reminder.js'
+import { DEFAULT_ACCOUNT_ID } from '../utils/constant.js'
 
 /** 上次选中的账本 id，切 App 回来还在同一个账本 */
 const CUR_KEY = 'cashDiary.currentAccountId'
@@ -92,9 +94,18 @@ export const useAccountStore = defineStore('account', function () {
   async function remove(id) {
     await accountService.removeIfEmpty(id)
     await refresh()
-    if (!list.value.some(function (a) { return a.id === currentId.value }) && list.value.length) {
+    // 当前账本还在就不动（删的是别的账本）
+    if (list.value.some(function (a) { return a.id === currentId.value })) return
+    // 当前账本被删了：切到剩下的第一个。
+    // ⚠️ 若一个都不剩（只会发生在"把唯一的默认账本也删了"），
+    // 不能让 currentId 悬空指向已删账本 —— 下面 loadMonth 会查不到任何数据、
+    // 页面空白且无处可去。此时补建默认账本并切过去，保证 App 始终可用。
+    if (list.value.length) {
       setCurrent(list.value[0].id)
+      return
     }
+    const recreated = await create(DEFAULT_ACCOUNT_NAME)
+    setCurrent(recreated.id || DEFAULT_ACCOUNT_ID)
   }
 
   return { list, currentId, current, others, init, reload, refresh, setCurrent, create, rename, remove }
