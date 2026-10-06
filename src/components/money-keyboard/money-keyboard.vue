@@ -10,8 +10,7 @@
       :hover-stay-time="60"
       @click="tap(k)"
       @longpress="longpress(k)"
-    >
-      <text v-if="k.key !== 'del'" class="key-text">{{ k.label }}</text>
+    >      <text v-if="k.key !== 'del'" class="key-text">{{ k.label }}</text>
       <view v-else class="key-del" :style="delIcon" />
     </button>
   </view>
@@ -136,6 +135,15 @@ function longpress(k) {
 }
 .key-hover {
   background: var(--cd-primary-lt);
+  /* 按压时叠一点缩放（批次1）。只动 transform → 走 GPU 合成层，不触发重排。
+     比通用 .pressable 的 0.96 更轻（这里用 0.97）：记账键一天要按几百次，
+     缩得太明显会让人觉得"点坏了"，轻点一下有反馈就够。 */
+  transform: scale(0.97);
+}
+/* 只给 transform 挂 transition —— 若把 background 也写进来，
+   背景变色会跟着变慢 180ms，按键"变亮"就变得黏黏的，手感变差。 */
+.key {
+  transition: transform var(--cd-dur) var(--cd-ease);
 }
 /* 运算符列：与数字键同底色，靠字重与字号区分（不做成另一套颜色，免得键盘花掉） */
 .key.op .key-text {

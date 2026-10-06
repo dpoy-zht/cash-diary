@@ -3,16 +3,17 @@
     <!-- 奶黄渐变头部 -->
     <view class="add-head">
       <view class="navbar">
-        <view class="icon-btn" @click="goBack"><view class="ib" :style="iconBack" /></view>
+        <view class="icon-btn pressable" hover-class="pressable-hover" hover-stay-time="80" @click="goBack"><view class="ib" :style="iconBack" /></view>
         <text class="nav-title">记一笔</text>
-        <view class="icon-btn" @click="save"><view class="ib" :style="iconCheck" /></view>
+        <view class="icon-btn pressable" hover-class="pressable-hover" hover-stay-time="80" @click="save"><view class="ib" :style="iconCheck" /></view>
       </view>
       <view class="type-switch">
         <view
           v-for="t in types"
           :key="t.key"
-          class="type-item"
+          class="type-item pressable"
           :class="{ on: type === t.key }"
+          hover-class="pressable-hover"
           @click="switchType(t.key)"
         >{{ t.name }}</view>
       </view>
@@ -65,8 +66,8 @@
         <text class="modal-title">记好啦！</text>
         <text class="modal-sub">{{ lastSavedText }}</text>
         <text class="modal-tip">这笔账已经帮你存好啦~</text>
-        <view class="btn-y" @click="continueAdd">再记一笔</view>
-        <view class="btn-ghost" @click="successOK">开心回家</view>
+        <view class="btn-y pressable" hover-class="pressable-hover" @click="continueAdd">再记一笔</view>
+        <view class="btn-ghost pressable" hover-class="pressable-hover" @click="successOK">开心回家</view>
       </view>
     </view>
   </view>

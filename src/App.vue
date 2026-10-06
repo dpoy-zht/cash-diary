@@ -276,6 +276,21 @@ page {
   }
 }
 
+/* ---- 按压反馈（批次1，2026-10-06）----
+   全站统一的「按下去」手感：hover-class 命中时缩到 0.96 并回弹。
+   只动 transform（GPU 合成层，不触发重排）→ 低端机不掉帧、不影响布局。
+   时长用 --cd-dur(180ms)，不拖沓。
+
+   为什么放在全局：uni-app 的 scoped 样式在组件间不互通，
+   页面的 hover-class 值是字符串（写死在模板里），没法用 :deep 命中，
+   所以只能定义成全局类，各页按名字引用。 */
+.pressable {
+  transition: transform var(--cd-dur) var(--cd-ease);
+}
+.pressable-hover {
+  transform: scale(0.96);
+}
+
 /* 无障碍：尊重系统的"减弱动态效果"设置 */
 @media (prefers-reduced-motion: reduce) {
   page * {

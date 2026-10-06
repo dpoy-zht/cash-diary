@@ -3,12 +3,18 @@
     <view
       v-for="t in tabs"
       :key="t.key"
-      class="tab"
+      class="tab pressable"
       :class="{ on: t.key === current }"
+      hover-class="pressable-hover"
+      hover-stay-time="80"
       @click="go(t)"
     >
       <template v-if="t.key === 'add'">
-        <view class="plus"><text class="plus-i">+</text></view>
+        <view
+          class="plus pressable"
+          hover-class="pressable-hover"
+          hover-stay-time="80"
+        ><text class="plus-i">+</text></view>
       </template>
       <template v-else>
         <view class="t-ic" :style="iconStyle(t.icon)" />
@@ -100,6 +106,12 @@ function go(t) {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* 凸起圆钮自己也要有回弹：外层 .tab 缩放是整体变小，
+     这里再叠一点「按下去更深」，让最大的可点区域手感最明确。 */
+  transition: transform var(--cd-dur) var(--cd-ease);
+}
+.plus.pressable-hover {
+  transform: scale(0.9);
 }
 .plus-i {
   color: var(--cd-btn-ink);
