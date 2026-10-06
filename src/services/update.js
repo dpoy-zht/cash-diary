@@ -146,13 +146,36 @@ function downloadFile(url) {
 
     const d = plus.downloader.createDownload(
       url, // 跨域重定向由原生层处理
-      { filename: '_doc/://update.wgt', timeout: timeoutMs }, // '_doc:' 前缀 = 私有文档目录
+      // ⚠️ 路径写法必须是 `_doc/update.wgt`（**单斜杠**），不能写 `_doc://update.wgt`。
+      // 2026-10-06 真机踩过：双斜杠会被 plus 解析成 `_doc:` 这个"目录名"，
+      // 结果落到磁盘上一个名为 `:` 的畸形目录里（真机证据：doc/:/update.wgt），
+      // 下载其实成功了（572,659 B 与线上一致），但后续 install 找不到文件 →
+      // 表现为"一直加载中然后更新失败"。
+      { filename: '_doc/update.wgt', timeout: timeoutMs },
       function (download, status) {
         clearTimeout(timer)
         // status: 0=待开始 1=下载中 2=完成 3=失败 4=取消
         if (status === 2) {
-          // plus.downloader 返回的 filename 是相对路径，要拼成绝对路径才能 install
-          const abs = plus.io.convertLocalFileSystemURL(download.filename)
+          // plus.downloader 返回的 filename 可能是相对路径（如 "_doc/update.wgt"），
+          // 必须转成绝对路径才能交给 install。转换失败再走一次 resolve 兜底 ——
+          // 这两步任何一步出错，用户看到的就是"更新失败"，所以都要有退路。
+          let abs
+          try {
+            abs = plus.io.convertLocalFileSystemURL(download.filename)
+          } catch (e) { abs = '' }
+          if (!abs) {
+            try {
+              plus.io.resolveLocalFileSystemURL(
+                download.filename,
+                function (entry) { resolve(entry.fullPath) },
+                function () { reject(new Error('下载完成但找不到文件')) }
+              )
+              return
+            } catch (e2) {
+              reject(new Error('下载完成但路径解析失败'))
+              return
+            }
+          }
           resolve(abs)
         } else if (status === 3) {
           reject(new Error('下载失败（HTTP ' + download.statusCode + '）'))
@@ -211,7 +234,12 @@ function installWgt(tempFilePath) {
       tempFilePath,
       { force: false },
       function () { resolve(true) },
-      function () { resolve(false) }
+      function (err) {
+        // 把失败原因打出来：install 失败可能是版本没变、文件损坏、路径不对，
+        // 不打日志就只能靠猜（2026-10-06 就在这上面绕了很久）
+        console.error('[update] install 失败：', (err && err.message) || err)
+        resolve(false)
+      }
     )
   })
 }
