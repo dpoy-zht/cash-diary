@@ -179,15 +179,14 @@ describe('parseWgtSha256 —— 从 Release 说明解析 wgt 哈希（T2.5）', 
 describe('buildWgtSources —— 生成多源下载地址', () => {
   const url = 'https://github.com/dpoy-zht/cash-diary/releases/download/v2.3.3/nailong-ledger-v2.3.3.wgt'
 
-  it('生成 2 个源：原地址 + ghfast 加速', () => {
+  it('生成 2 个源：ghfast 加速 + 原地址兜底', () => {
     const list = buildWgtSources(url)
     expect(list.length).toBe(2)
-    expect(list[0]).toBe(url)
+    expect(list[1]).toBe(url)
   })
 
   it('ghfast 用通用加速形式（整条 URL 包进去）', () => {
-    // 实测 3.4s 完整下到 572,774 B，是真机上唯一可靠的一条
-    expect(buildWgtSources(url)[1]).toBe('https://ghfast.top/' + url)
+    expect(buildWgtSources(url)[0]).toBe('https://ghfast.top/' + url)
   })
 
   it('所有源都非空、https、指向 .wgt', () => {
@@ -208,8 +207,11 @@ describe('buildWgtSources —— 生成多源下载地址', () => {
     expect(buildWgtSources(other)).toEqual([other])
   })
 
-  it('原地址排第一个：网络好时不必绕代理', () => {
-    // 代理不是免费的（多一跳、可能被缓存），只在直连失败时才用
-    expect(buildWgtSources(url)[0]).not.toMatch(/ghfast/)
+  it('代理排第一、直连排最后（直连会随机断流，实测 4 次全部残包）', () => {
+    // 这条顺序是性能契约：直连每次都在随机位置断流（310,556 / 516,672 /
+    // 262,144 B），前置它只会让用户干等超时。代理稳定 4~6 秒完整下到。
+    const list = buildWgtSources(url)
+    expect(list[0]).toBe('https://ghfast.top/' + url)
+    expect(list[1]).toBe(url)
   })
 })

@@ -142,7 +142,9 @@ export function openReleasePage(url) {
  */
 function downloadFile(url) {
   return new Promise(function (resolve, reject) {
-    const timeoutMs = 45000 // 单源超时：572KB 的包 45s 足够，三个源最坏也只要 135s
+    // 单源 25s：代理实测 4~6 秒下完 572KB，25s 足够；两个源最坏 50s 就结束。
+    // 不能再长 —— 直连那种随机断流会让人干等，这就是'每次都要等很久'的由来。
+    const timeoutMs = 25000
     const timer = setTimeout(function () {
       try { d.abort() } catch (e) { /* 忽略 */ }
       reject(new Error('下载超时'))
