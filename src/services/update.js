@@ -122,22 +122,46 @@ export function openReleasePage(url) {
 
 /* ---------------- wgt 热更新执行引擎（App 端） ---------------- */
 
-/** uni.downloadFile 包装成 Promise，手动加 90s 超时（大文件慢网兜底） */
+/**
+ * 下载 wgt 到本地临时目录。
+ *
+ * 为什么用 `plus.downloader` 而不是 `uni.downloadFile`（2026-10-06 真机实测）：
+ * GitHub 的 Release 资产会 **302 重定向**到 `release-assets.githubusercontent.com`。
+ * 实测手机 curl 直连完全正常（HTTP 200 / 560 KB / 7.3s），但 `uni.downloadFile`
+ * 在 App 端对这种跨域重定向的表现不稳定，会直接 fail —— 于是热更永远失败，
+ * 表现成"点了没反应"。
+ * `plus.downloader` 是 DCloud 原生下载器，**跟随重定向、支持进度与取消**，
+ * 是官方推荐的热更下载方式。
+ *
+ * @param {string} url wgt 直链
+ * @returns {Promise<string>} 本地绝对路径
+ */
 function downloadFile(url) {
   return new Promise(function (resolve, reject) {
-    const timer = setTimeout(function () { reject(new Error('下载超时')) }, 90000)
-    uni.downloadFile({
-      url: url,
-      success: function (r) {
+    const timeoutMs = 120000 // 大文件慢网兜底
+    const timer = setTimeout(function () {
+      try { d.abort() } catch (e) { /* 忽略 */ }
+      reject(new Error('下载超时'))
+    }, timeoutMs)
+
+    const d = plus.downloader.createDownload(
+      url, // 跨域重定向由原生层处理
+      { filename: '_doc/://update.wgt', timeout: timeoutMs }, // '_doc:' 前缀 = 私有文档目录
+      function (download, status) {
         clearTimeout(timer)
-        if (r.statusCode === 200) resolve(r.tempFilePath)
-        else reject(new Error('下载失败 HTTP ' + r.statusCode))
-      },
-      fail: function () {
-        clearTimeout(timer)
-        reject(new Error('下载失败，请检查网络'))
+        // status: 0=待开始 1=下载中 2=完成 3=失败 4=取消
+        if (status === 2) {
+          // plus.downloader 返回的 filename 是相对路径，要拼成绝对路径才能 install
+          const abs = plus.io.convertLocalFileSystemURL(download.filename)
+          resolve(abs)
+        } else if (status === 3) {
+          reject(new Error('下载失败（HTTP ' + download.statusCode + '）'))
+        } else {
+          reject(new Error('下载未完成'))
+        }
       }
-    })
+    )
+    d.start()
   })
 }
 
@@ -230,8 +254,12 @@ export async function applyUpdate(r) {
       }
       const installed = await installWgt(temp)
       if (installed) return { ok: true, type: 'wgt' }
+      return { ok: false, type: 'wgt', reason: 'install-failed' }
     } catch (e) {
-      // 下载/安装失败，落到下面的整包回退
+      // ⚠️ 别再把错误吞干净：热更失败后只能看到"跳浏览器"，
+      // 无从判断是下载、校验还是安装的问题，真机调试会变成猜谜。
+      console.error('[update] wgt 热更失败：', (e && e.message) || e)
+      return { ok: false, type: 'wgt', reason: 'download-failed', error: (e && e.message) || '' }
     }
   }
 
