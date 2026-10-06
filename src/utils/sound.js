@@ -131,6 +131,18 @@ export function toggleSound() {
   return next
 }
 
+/**
+ * 强制置位 armed（不等真实交互）。
+ *
+ * 用在哪：「我的」页开启音效时立刻试听 —— 用户是从别的页进来的，
+ * 可能还没发生过任何 touch/click，门闩还是关的，开启就听不到声音，
+ * 会以为"开关没用"。这里在**用户主动点击开关**的前提下直接置位是安全的
+ * （这次点击本身就是用户手势，符合自动播放策略）。
+ */
+export function armSound() {
+  armed = true
+}
+
 /** 当前静音状态（供 UI 绑定） */
 export function soundEnabled() {
   return isSoundEnabled(readStorage)

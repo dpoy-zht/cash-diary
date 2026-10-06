@@ -291,6 +291,25 @@ page {
   transform: scale(0.96);
 }
 
+/* ---- 列表逐项进场（批次4，2026-10-06）----
+   配合 tx-item 的 riseDelay（组件内限流前 8 项）使用。
+   只动 opacity + transform → 不触发重排；位移 8px 足够察觉，
+   再大就会显得"内容在飞"。动画结束靠 both 保持终态，
+   避免最后一帧闪回未动画状态。 */
+@keyframes cd-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: cd-rise 240ms var(--cd-ease) both;
+}
+
 /* 无障碍：尊重系统的"减弱动态效果"设置 */
 @media (prefers-reduced-motion: reduce) {
   page * {

@@ -65,6 +65,13 @@
             <view class="fn-switch-dot" />
           </view>
         </view>
+        <!-- 记账音效：与超支提醒同款开关。点开关即切换，点整行也切（与 remind 一致的手感） -->
+        <view v-else-if="f.key === 'sound'" class="fn-right">
+          <text class="fn-switch-label">{{ soundOn ? '已开启' : '已关闭' }}</text>
+          <view class="fn-switch" :class="{ on: soundOn }" @click.stop="toggleSoundOn">
+            <view class="fn-switch-dot" />
+          </view>
+        </view>
         <!-- 云备份：右侧直接显示"配没配"，不用点进去才知道 -->
         <text v-else-if="f.key === 'webdav'" class="fn-arrow">{{ webdavRight }}</text>
         <text v-else class="fn-arrow">{{ f.right || '›' }}</text>
@@ -152,6 +159,7 @@ import * as webdavService from '../../services/webdav.js'
 import WebdavSheet from '../../components/webdav-sheet/webdav-sheet.vue'
 import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
+import { soundEnabled, toggleSound, playSfx, armSound, armOnFirstInteraction } from '../../utils/sound.js'
 
 /**
  * 我的（布局/组件/间距/配色逐项对齐 v2.0 参考包的 view-profile）：
@@ -241,6 +249,7 @@ const fns = [
   { key: 'update', name: '检查更新', color: '#7986cb', icon: 'M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z' },
   { key: 'remind', name: '超支提醒', color: '#4dd0e1', icon: 'M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z' },
   { key: 'daily', name: '每日记账提醒', color: '#64b5f6', icon: 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z' },
+  { key: 'sound', name: '记账音效', color: '#9575cd', icon: 'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z' },
   // 「皮肤」入口已移除（2026-10-01 定版决策：不做换肤）。设计令牌已全部收敛 --cd-*，
   // 将来若要做，补一组主题变量 + 在这里加回一行即可。
   { key: 'about', name: '关于', color: '#a1887f', right: aboutVersionText, icon: 'M11 7h2v2h-2V7zm0 4h2v6h-2v-6zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z' }
@@ -273,6 +282,10 @@ function tapFn(f) {
   }
   if (f.key === 'daily') {
     toggleDaily()
+    return
+  }
+  if (f.key === 'sound') {
+    toggleSoundOn()
     return
   }
   if (f.key === 'budget') {
@@ -425,6 +438,29 @@ function toggleDaily() {
     uni.showToast({ title: '每天 ' + saved.hm + ' 提醒你记账', icon: 'none' })
   } else {
     uni.showToast({ title: '已关闭每日提醒', icon: 'none' })
+  }
+}
+
+/* ---- 记账音效开关（批次4）----
+   与超支提醒/每日提醒同款：开关状态持久化到 storage，读不到就默认开。
+   开启时播一下「叮」当试听，否则用户不知道开了没声音。 */
+const soundOn = ref(true)
+
+function loadSoundPref() {
+  soundOn.value = soundEnabled()
+}
+
+function toggleSoundOn() {
+  const next = toggleSound()
+  soundOn.value = next
+  if (next) {
+    // 试听：刚开启时 armed 门闩可能还没置位（用户是从别的页进来的），
+    // 这里手动置位一次，保证"开启就能听到"
+    armSound()
+    playSfx('success')
+    uni.showToast({ title: '记账音效已开启', icon: 'none' })
+  } else {
+    uni.showToast({ title: '记账音效已关闭', icon: 'none' })
   }
 }
 
@@ -789,6 +825,8 @@ onShow(function () {
   } catch (e) {
     goalCents.value = 0
   }
+  armOnFirstInteraction()
+  loadSoundPref()
   loadRemindPref()
   loadDailyPref()
   refreshWebdavState()

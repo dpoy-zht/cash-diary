@@ -88,6 +88,7 @@
             :record="r"
             :category="catOf(r.category_id)"
             :tags="tagsOf(r.id)"
+            :index="indexOf(r.id)"
             @click="openEdit(r)"
           />
         </block>
@@ -297,6 +298,21 @@ const filtered = computed(function () {
 const emptyTitle = computed(function () {
   return searching.value ? '没找到相关记录' : '今天还没记账哦~'
 })
+
+/**
+ * 流水在当前筛选结果里的全局序号（给 tx-item 的逐项进场用）。
+ * 用 Map 而不是 indexOf：首页一次渲染几十条，indexOf 是 O(n²)；
+ * computed 只在 filtered 变化时算一次。查不到返回 -1（组件内会跳过动画）。
+ */
+const indexById = computed(function () {
+  const m = new Map()
+  filtered.value.forEach(function (r, i) { m.set(r.id, i) })
+  return m
+})
+function indexOf(id) {
+  const v = indexById.value.get(id)
+  return v === undefined ? -1 : v
+}
 const emptySub = computed(function () {
   return searching.value
     ? '换个关键词，或者放宽筛选条件试试'

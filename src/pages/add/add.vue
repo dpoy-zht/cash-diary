@@ -84,6 +84,7 @@ import TagCreateSheet from '../../components/tag-create-sheet/tag-create-sheet.v
 import { MAX_TAGS_PER_TX } from '../../utils/tag.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { buildAddInput } from '../../services/tx.js'
+import { playSfx, armOnFirstInteraction } from '../../utils/sound.js'
 import { parseAmountToCents, formatCents } from '../../utils/money.js'
 import {
   initialCalcState, calcKey, calcEquals, calcAmountText, calcDisplay,
@@ -215,6 +216,9 @@ function onDateChange(e) {
  * 只把"一直没动过日期"的用户带着前进；自己选过日期的（补记）保持不动。
  */
 onShow(function () {
+  // 音效门闩：挂首次交互监听（只挂一次）。用户点「+」进本页也算一次交互，
+  // 所以进页面时 armed 已经是 true，保存成功就能响。
+  armOnFirstInteraction()
   // 标签列表可能被「标签管理」页改过（改名/删除），每次进页面重取一次
   tagStore.load().catch(function () { /* 取不到不阻塞记账 */ })
   const t = toDateStr(Date.now())
@@ -284,6 +288,7 @@ async function save() {
     resetFormAfterSaved()
     successShow.value = true
     haptic(30) // 保存成功长振一下，跟按键的轻振区分开
+    playSfx('success') // 记账成功「叮」：与长振同时，构成"记上了"的确认感
   } catch (err) {
     // 关键：异常一定要变成用户看得见的提示，否则表现就是"点了没反应"
     uni.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })

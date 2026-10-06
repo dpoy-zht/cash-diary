@@ -122,3 +122,46 @@ describe('音效引擎', () => {
     })
   })
 })
+
+/**
+ * 列表进场限流规则（批次 4）。
+ *
+ * 这条规则是性能与体验的交界：流水可能上百条，若每条都参与级联，
+ * 最后一条要等好几秒才出现（用户以为卡死），低端机也会掉帧。
+ * 限流值写死在这里，改动必须同步改测试 —— 防止有人"顺手放开"到全量。
+ */
+describe('列表进场限流', () => {
+  const STEP = 24
+  const MAX = 8
+
+  // 与 tx-item.vue 的 riseDelay 计算保持同一套规则
+  function riseDelay(i) {
+    return i >= 0 && i < MAX ? i * STEP : -1
+  }
+
+  it('前 8 项按 24ms 阶梯延迟', () => {
+    expect(riseDelay(0)).toBe(0)
+    expect(riseDelay(1)).toBe(24)
+    expect(riseDelay(7)).toBe(168)
+  })
+
+  it('第 9 项及以后不做动画（-1）', () => {
+    expect(riseDelay(8)).toBe(-1)
+    expect(riseDelay(20)).toBe(-1)
+    expect(riseDelay(99)).toBe(-1)
+  })
+
+  it('未传 index（-1）不做动画', () => {
+    expect(riseDelay(-1)).toBe(-1)
+  })
+
+  it('最大总延迟不超过 200ms（逐条累加后不拖沓）', () => {
+    expect(riseDelay(MAX - 1) + 240).toBeLessThanOrEqual(200 + 240)
+  })
+
+  it('index 缺失或非法时不抛错（防御性：NaN/undefined）', () => {
+    ;[NaN, undefined, null, 'abc', {}].forEach(function (bad) {
+      expect(typeof riseDelay(bad) === 'number').toBe(true)
+    })
+  })
+})
