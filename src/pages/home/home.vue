@@ -2,7 +2,7 @@
   <view class="page">
     <!-- 顶部导航：左侧标题，右侧两个有真实行为的小按钮 -->
     <view class="navbar">
-      <text class="nav-title">奶龙记账</text>
+      <text class="nav-title">奶蛙记账</text>
       <view class="nav-right">
         <view class="icon-btn" @click="showSalary"><view class="ib" :style="iconCoin" /></view>
         <view class="icon-btn" @click="goBudget"><view class="ib" :style="iconBell" /></view>
@@ -39,7 +39,7 @@
       <asset-slot slot-id="home.salary" img-class="sb-img" />
       <view class="sb-txt">
         <text class="sb-b">工资到账啦！</text>
-        <text class="sb-s">+¥{{ incomeText }}，奶龙蹦起来了</text>
+        <text class="sb-s">+¥{{ incomeText }}，奶蛙蹦起来了</text>
       </view>
     </view>
 
@@ -99,9 +99,6 @@
         <text class="empty-sub">{{ emptySub }}</text>
       </view>
     </view>
-
-    <!-- 右下 FAB -->
-    <view class="fab" @click="goAdd"><text class="fab-i">+</text></view>
 
     <!-- 超支弹窗（真实预算判断触发，见 maybeAlertOver） -->
     <view v-if="overShow" class="mask" @click="overShow = false">
@@ -278,7 +275,7 @@ function maybeAlertOver() {
   if (remindEnabled()) {
     try {
       requestNotifyPermission()
-      notifyLocal('奶龙记账 · 超预算啦', '本月已花 ¥' + formatCents(s.spentCents) + '，' + budgetLine.value)
+      notifyLocal('奶蛙记账 · 超预算啦', '本月已花 ¥' + formatCents(s.spentCents) + '，' + budgetLine.value)
     } catch (e) { /* 通知失败不影响弹窗 */ }
   }
 }
@@ -388,11 +385,25 @@ function catOf(id) {
   return catMap.value.get(id) || { id: id, name: '其他', icon: '📦', type: 'expense' }
 }
 
-function shiftMonth(d) {
+/**
+ * 切换月份：改 metaStore.ym 并**立即重查该月数据**。
+ *
+ * 为什么必须在这里查：onShow 只在页面「显示」时触发，而切月份不改变可见性，
+ * 原来切月后列表还是上一个月的（数据要等点「+」进记一页再回来才刷新）。
+ * txStore.refresh 的缓存键里带 ym，所以切月后 key 天然不同 → 一定会真查，
+ * 不会命中上个月的缓存；反之重复点同一个月也走同一把保护，不会重复查库。
+ *
+ * @param {number} d -1 上个月 / +1 下个月
+ */
+async function shiftMonth(d) {
   metaStore.shift(d)
-}
-function goAdd() {
-  uni.navigateTo({ url: '/pages/add/add' })
+  try {
+    // 三者一起刷：余额/列表随流水变，预算水位是本月口径，标签要跟着分类
+    await Promise.all([budgetStore.load(), txStore.refresh(metaStore.ym), tagStore.load()])
+    maybeAlertOver()
+  } catch (e) {
+    // 静默失败：页面已有数据，不因切月失败而白屏或弹错
+  }
 }
 function goBudget() {
   overShow.value = false
@@ -606,7 +617,7 @@ onShow(async function () {
   height: 90px;
 }
 /* 两列并排：标签在上、数字在下（数字是主角，字号接近标签的 2.2 倍）。
-   右侧留出奶龙的位置，避免数字压到它身上。 */
+   右侧留出奶蛙的位置，避免数字压到它身上。 */
 .bal-cols {
   display: flex;
   gap: 12px;
@@ -848,29 +859,6 @@ onShow(async function () {
 .empty-sub {
   font-size: 13px;
   color: var(--cd-ink-2);
-}
-
-/* ---- FAB ---- */
-.fab {
-  position: fixed;
-  right: 20px;
-  bottom: 110px;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #ffe97a, var(--cd-primary-deep));
-  box-shadow: var(--cd-sh-pop);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 40;
-}
-.fab-i {
-  color: var(--cd-btn-ink);
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1;
-  margin-top: -2px;
 }
 
 /* ---- 超支弹窗 ---- */

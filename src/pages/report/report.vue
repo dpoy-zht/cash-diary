@@ -115,7 +115,7 @@
     </block>
 
     <view v-else class="loading">
-      <text class="loading-txt">奶龙正在翻账本…</text>
+      <text class="loading-txt">奶蛙正在翻账本…</text>
     </view>
   </view>
 </template>
@@ -575,7 +575,7 @@ onShow(function () {
 
 
 
-/* 财神奶龙探出卡片右上角。报告是"回顾"性质的页面，用财神图比默认表情更贴题；
+/* 财神奶蛙探出卡片右上角。报告是"回顾"性质的页面，用财神图比默认表情更贴题；
    金额 34px 是全页最大字号，装饰件压到 58px 且绝对定位，不会盖住数字。 */
 .hero-milo {
   top: 8px;

@@ -7,7 +7,7 @@
     </view>
 
     <block v-if="scan">
-      <!-- 结论：右上角趴一只奶龙，表情跟着结论好坏走（不挤左侧标题） -->
+      <!-- 结论：右上角趴一只奶蛙，表情跟着结论好坏走（不挤左侧标题） -->
       <view class="summary" :class="summaryClass">
         <mascot-deco class="summary-milo" :mood="summaryMood" slot-id="deco.health.summary" />
         <text class="sm-title">{{ summaryTitle }}</text>
@@ -372,7 +372,7 @@ onShow(function () {
   color: var(--cd-ink-2);
 }
 
-/* ---- 奶龙 IP 装饰 ----
+/* ---- 奶蛙 IP 装饰 ----
    组件根节点是 position:absolute；这里负责把它放到该在的位置并预留留白。
    .ok-card / .loading 改成 flex 容器，装饰件写成 flex 子项后
    position:relative 让它"占位参与排版"，滚动时不会盖住下方正文。 */

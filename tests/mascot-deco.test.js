@@ -8,7 +8,7 @@ import {
 } from '../src/components/mascot-deco/spec.js'
 
 /**
- * 奶龙 IP 装饰件的规格计算。
+ * 奶蛙 IP 装饰件的规格计算。
  *
  * 这条约束是硬需求，不是审美偏好：**IP 装饰只能"加氛围"，不能挡内容、不能抢点击、
  * 不能把版面挤变形**。所以尺寸/透明度/裁切方式必须由纯函数统一算出来，
@@ -38,7 +38,7 @@ describe('mascot-deco 规格', () => {
     })
 
     it('未知形象直接抛错，不能静默出一张裂图', () => {
-      expect(function () { decoSrc('not-exist') }).toThrow(/未知奶龙形象/)
+      expect(function () { decoSrc('not-exist') }).toThrow(/未知奶蛙形象/)
       expect(function () { decoSrc('') }).toThrow()
     })
   })

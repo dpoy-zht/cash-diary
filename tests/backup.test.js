@@ -36,7 +36,7 @@ describe('buildBackup / backupFileName（纯函数）', () => {
 
   it('文件名带日期时间戳', () => {
     const name = backupFileName(new Date(2026, 8, 27, 13, 5).getTime())
-    expect(name).toBe('奶龙记账-备份-2026-09-27-1305.json')
+    expect(name).toBe('奶蛙记账-备份-2026-09-27-1305.json')
   })
 })
 
@@ -64,7 +64,7 @@ describe('validateBackup —— 坏文件必须被挡住', () => {
     expect(validateBackup(null).ok).toBe(false)
     expect(validateBackup('{}').ok).toBe(false)
     expect(validateBackup([]).ok).toBe(false)
-    expect(validateBackup({ app: 'other-app' }).error).toContain('不是奶龙记账')
+    expect(validateBackup({ app: 'other-app' }).error).toContain('不是奶蛙记账')
     expect(validateBackup({ app: BACKUP_APP }).error).toContain('版本号')
     expect(validateBackup({ app: BACKUP_APP, version: 1, account: [], category: [], transaction_record: [] }).error)
       .toContain('没有任何账本')
@@ -326,29 +326,29 @@ describe('自动备份 —— 触发判断 / 文件名 / 清理计划', () => {
 
   it('autoBackupFileName：带自动前缀 + 日期时间戳 + .json', () => {
     const name = autoBackupFileName(new Date(2026, 8, 28, 0, 7).getTime())
-    expect(name).toBe('奶龙记账-自动备份-2026-09-28-0007.json')
+    expect(name).toBe('奶蛙记账-自动备份-2026-09-28-0007.json')
     expect(name.indexOf(AUTO_BACKUP_PREFIX)).toBe(0)
   })
 
   it('keepAutoBackupFiles：只清自动前缀，按时间保留最新 N 份', () => {
     const names = [
-      '奶龙记账-自动备份-2026-09-26-1200.json',
-      '奶龙记账-备份-2026-09-27-0900.json',      // 手动导出，绝不清理
-      '奶龙记账-自动备份-2026-09-27-0800.json',
+      '奶蛙记账-自动备份-2026-09-26-1200.json',
+      '奶蛙记账-备份-2026-09-27-0900.json',      // 手动导出，绝不清理
+      '奶蛙记账-自动备份-2026-09-27-0800.json',
       'cashDiary.memory.v1',                      // 无关键
-      '奶龙记账-自动备份-2026-09-28-0012.json',
-      '奶龙记账-自动备份-2026-09-27-2359.json'
+      '奶蛙记账-自动备份-2026-09-28-0012.json',
+      '奶蛙记账-自动备份-2026-09-27-2359.json'
     ]
     const plan = keepAutoBackupFiles(names, 3)
     expect(plan.keep).toEqual([
-      '奶龙记账-自动备份-2026-09-27-2359.json',
-      '奶龙记账-自动备份-2026-09-28-0012.json',
-      '奶龙记账-自动备份-2026-09-26-1200.json' === plan.keep[0] ? '' : '奶龙记账-自动备份-2026-09-27-0800.json'
+      '奶蛙记账-自动备份-2026-09-27-2359.json',
+      '奶蛙记账-自动备份-2026-09-28-0012.json',
+      '奶蛙记账-自动备份-2026-09-26-1200.json' === plan.keep[0] ? '' : '奶蛙记账-自动备份-2026-09-27-0800.json'
     ].filter(Boolean).sort())
   })
 
   it('keepAutoBackupFiles：不足 N 份全保留；非法入参不抛错', () => {
-    expect(keepAutoBackupFiles(['奶龙记账-自动备份-2026-09-28-0012.json'], 3).remove).toEqual([])
+    expect(keepAutoBackupFiles(['奶蛙记账-自动备份-2026-09-28-0012.json'], 3).remove).toEqual([])
     expect(keepAutoBackupFiles(null, 3)).toEqual({ keep: [], remove: [] })
     expect(keepAutoBackupFiles(['x'], 'abc').remove).toEqual([])
   })
@@ -400,12 +400,12 @@ describe('备份 v2 —— fixed_expense 表', () => {
 describe('sortedBackupNames —— 备份文件名筛选与时间倒序（T1.2）', () => {
   it('按文件名倒序排列（文件名定长时间戳，字典序=时间序，最新在最前）', () => {
     const names = [
-      '奶龙记账-自动备份-2026-09-28-0012.json',
-      '奶龙记账-自动备份-2026-09-29-0800.json',
-      '奶龙记账-自动备份-2026-09-27-2359.json'
+      '奶蛙记账-自动备份-2026-09-28-0012.json',
+      '奶蛙记账-自动备份-2026-09-29-0800.json',
+      '奶蛙记账-自动备份-2026-09-27-2359.json'
     ]
-    expect(sortedBackupNames(names)[0]).toBe('奶龙记账-自动备份-2026-09-29-0800.json')
-    expect(sortedBackupNames(names)[2]).toBe('奶龙记账-自动备份-2026-09-27-2359.json')
+    expect(sortedBackupNames(names)[0]).toBe('奶蛙记账-自动备份-2026-09-29-0800.json')
+    expect(sortedBackupNames(names)[2]).toBe('奶蛙记账-自动备份-2026-09-27-2359.json')
   })
 
   it('只保留 .json 结尾的文件，非字符串项被丢弃', () => {
@@ -415,14 +415,14 @@ describe('sortedBackupNames —— 备份文件名筛选与时间倒序（T1.2�
 
   it('月份/日期跨位仍正确（补零格式保证字典序与时间序一致）', () => {
     const names = [
-      '奶龙记账-自动备份-2026-10-01-0000.json',
-      '奶龙记账-自动备份-2026-09-30-2359.json',
-      '奶龙记账-自动备份-2025-12-31-1200.json'
+      '奶蛙记账-自动备份-2026-10-01-0000.json',
+      '奶蛙记账-自动备份-2026-09-30-2359.json',
+      '奶蛙记账-自动备份-2025-12-31-1200.json'
     ]
     expect(sortedBackupNames(names)).toEqual([
-      '奶龙记账-自动备份-2026-10-01-0000.json',
-      '奶龙记账-自动备份-2026-09-30-2359.json',
-      '奶龙记账-自动备份-2025-12-31-1200.json'
+      '奶蛙记账-自动备份-2026-10-01-0000.json',
+      '奶蛙记账-自动备份-2026-09-30-2359.json',
+      '奶蛙记账-自动备份-2025-12-31-1200.json'
     ])
   })
 
@@ -442,9 +442,9 @@ describe('exportResultMessage —— 导出去向的提示（T3.6）', () => {
   })
 
   it('App 复制成功：把真实路径原样回显，方便用户去取', () => {
-    const m = exportResultMessage({ outPath: '/storage/emulated/0/Download/奶龙记账-2026-09-29-0912.json' })
+    const m = exportResultMessage({ outPath: '/storage/emulated/0/Download/奶蛙记账-2026-09-29-0912.json' })
     expect(m.title).toContain('导出成功')
-    expect(m.content).toContain('/storage/emulated/0/Download/奶龙记账-2026-09-29-0912.json')
+    expect(m.content).toContain('/storage/emulated/0/Download/奶蛙记账-2026-09-29-0912.json')
     expect(m.fallbackClipboard).toBe(false)
   })
 
@@ -463,12 +463,65 @@ describe('exportResultMessage —— 导出去向的提示（T3.6）', () => {
   it('可以自定义名称：导出 CSV 时说「账单文件」，不说「备份文件」（T4.2）', () => {
     const cases = [
       exportResultMessage({ mode: 'browser-download' }, '账单文件'),
-      exportResultMessage({ outPath: '/storage/emulated/0/Download/奶龙记账-账单-2026-09-30-2210.csv' }, '账单文件'),
+      exportResultMessage({ outPath: '/storage/emulated/0/Download/奶蛙记账-账单-2026-09-30-2210.csv' }, '账单文件'),
       exportResultMessage({ outPath: '' }, '账单文件')
     ]
     cases.forEach(function (m) {
       expect(m.content).toContain('账单文件')
       expect(m.content).not.toContain('备份')
     })
+  })
+})
+
+/**
+ * 改名兼容（2026-10-06：奶龙记账 → 奶蛙记账）。
+ *
+ * 自动备份的文件名带 App 名，改名后如果只认新前缀：
+ *   ① 改名前写的自动备份在「数据体检」里查不到 → 用户以为备份丢了
+ *   ② 清理逻辑跳过旧文件 → 私有目录无限堆积
+ * 所以新旧前缀都必须认。这条断言就是防"顺手改成只认新的"。
+ */
+describe('改名兼容：自动备份新旧前缀都要认', () => {
+  const NEW = '奶蛙记账-自动备份-'
+  const OLD = '奶龙记账-自动备份-'
+
+  it('新前缀：备份文件名用它写', () => {
+    expect(backupFileName(Date.now())).toContain(NEW.replace('自动备份-', '备份-'))
+  })
+
+  it('旧前缀的自动备份仍被清理计划识别', () => {
+    const plan = keepAutoBackupFiles([
+      OLD + '2026-09-26-1200.json',
+      NEW + '2026-09-28-0012.json'
+    ], 3)
+    expect(plan.keep.length).toBe(2)
+    expect(plan.remove).toEqual([])
+  })
+
+  it('新旧混合 + 手动备份：手动备份绝不被清理', () => {
+    const plan = keepAutoBackupFiles([
+      OLD + '2026-09-26-1200.json',
+      '奶蛙记账-备份-2026-09-27-0900.json',      // 手动导出，绝不清理
+      NEW + '2026-09-28-0012.json',
+      OLD + '2026-09-27-0800.json'
+    ], 2)
+    expect(plan.keep).toEqual([OLD + '2026-09-27-0800.json', NEW + '2026-09-28-0012.json'])
+    expect(plan.remove).toEqual([OLD + '2026-09-26-1200.json'])
+    expect(plan.remove.indexOf('奶蛙记账-备份-2026-09-27-0900.json')).toBe(-1)
+  })
+
+  it('超量时旧的先删（改名前的备份不会永远占着）', () => {
+    const plan = keepAutoBackupFiles([
+      OLD + '2026-09-01-0000.json',
+      OLD + '2026-09-02-0000.json',
+      NEW + '2026-09-03-0000.json'
+    ], 1)
+    expect(plan.keep).toEqual([NEW + '2026-09-03-0000.json'])
+    expect(plan.remove).toEqual([OLD + '2026-09-01-0000.json', OLD + '2026-09-02-0000.json'])
+  })
+
+  it('备份内容标识仍是英文 cash-diary（改名不影响备份格式兼容）', () => {
+    // BACKUP_APP 是内容里的机器标识符，不随显示名变 —— 否则旧备份全都读不了
+    expect(BACKUP_APP).toBe('cash-diary')
   })
 })

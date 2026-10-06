@@ -15,7 +15,7 @@ const EXT = '.json'
  * 从一批文件名里筛出备份文件并倒序排列（纯函数，可单测）。
  *
  * App 端 FileEntry.file 是方法不是属性，`entry.file.lastModified` 恒为 undefined，
- * 拿不到真实修改时间；而备份文件名里带定长数字时间戳（如 奶龙记账-自动备份-2026-09-28-0012.json），
+ * 拿不到真实修改时间；而备份文件名里带定长数字时间戳（如 奶蛙记账-自动备份-2026-09-28-0012.json），
  * **字典序即时间序**——所以时间序靠文件名保证，这也是导出命名用定长格式的原因。
  */
 export function sortedBackupNames(names, ext) {
@@ -297,6 +297,12 @@ function readDocFile(name) {
 
 /* ---------------- 自动备份的清理（App 端私有目录；H5 无文件系统，全部空操作） ---------------- */
 
+// 自动备份文件名前缀。**新旧两个都要认**：只认新前缀会让改名前写的自动备份
+// 在「数据体检」里查不到、也永远不被清理，用户以为备份丢了。
+// 与 utils/backup.js 里的同名常量保持一致（那边负责写，这里负责读）。
+const AUTO_BACKUP_PREFIX = '奶蛙记账-自动备份-'
+const AUTO_BACKUP_PREFIX_LEGACY = '奶龙记账-自动备份-'
+
 /** 列出应用目录里的自动备份文件名（仅带自动前缀的；H5 返回空数组） */
 export async function listAutoBackupNames() {
   // #ifdef H5
@@ -307,9 +313,13 @@ export async function listAutoBackupNames() {
   try {
     if (typeof plus === 'undefined') return []
     const files = await listBackupFiles()
+    // ⚠️ 新旧前缀都要认：只认新的会让改名前写的自动备份"消失"（体检查不到、
+    // 清理也跳过），用户以为备份丢了。见 utils/backup.js 的前缀兼容说明。
     return files
       .map(function (f) { return f.name })
-      .filter(function (n) { return n.indexOf('奶龙记账-自动备份-') === 0 })
+      .filter(function (n) {
+        return n.indexOf(AUTO_BACKUP_PREFIX) === 0 || n.indexOf(AUTO_BACKUP_PREFIX_LEGACY) === 0
+      })
   } catch (e) {
     return []
   }

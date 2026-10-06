@@ -11,7 +11,7 @@
       </view>
     </view>
 
-    <!-- 当前账本卡：财神奶龙圆形裁切后趴在右上角 -->
+    <!-- 当前账本卡：财神奶蛙圆形裁切后趴在右上角 -->
     <view class="ledger-card">
       <mascot-deco class="caishen" slot-id="ledger.current" />
       <text class="lc-label">当前账本</text>
@@ -53,7 +53,7 @@
 
     <text v-if="others.length" class="hint">点一下切换账本，长按可改名或删除</text>
 
-    <!-- 新建账本行：金条奶龙 + 黄色胶囊按钮 -->
+    <!-- 新建账本行：金条奶蛙 + 黄色胶囊按钮 -->
     <view class="create-row">
       <asset-slot slot-id="ledger.create" img-class="gold-img" />
       <view class="create-btn" hover-class="create-hover" @click="onCreate">
@@ -78,7 +78,7 @@ import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
  * 账本页（布局/组件/间距/配色逐项对齐 v2.0 参考包的 view-ledger）：
- * navbar（菜单/标题/新建）→ 当前账本卡（财神奶龙趴右上角）→ 其他账本（N）→ 新建账本行。
+ * navbar（菜单/标题/新建）→ 当前账本卡（财神奶蛙趴右上角）→ 其他账本（N）→ 新建账本行。
  *
  * 多账本已接真实数据：点行切换、长按改名/删除、底部按钮新建。
  * 删除只允许删「没有记录的账本」，避免误删流水。

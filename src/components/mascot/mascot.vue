@@ -46,7 +46,7 @@ const boxStyle = computed(function () {
   flex: none;
 }
 
-/* 头顶呆毛（奶龙无耳朵，改用一撮呆毛，避免与真实 IP 形象混淆） */
+/* 头顶呆毛（奶蛙无耳朵，改用一撮呆毛，避免与真实 IP 形象混淆） */
 .m-tuft {
   position: absolute;
   left: 40%;

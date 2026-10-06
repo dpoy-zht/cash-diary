@@ -1,11 +1,11 @@
 <template>
   <view class="page">
-    <!-- 1. 渐变头部：挥手奶龙 + 昵称 + 等级 + 连续记账胶囊 -->
+    <!-- 1. 渐变头部：挥手奶蛙 + 昵称 + 等级 + 连续记账胶囊 -->
     <view class="profile-head">
       <mascot-deco class="head-deco" slot-id="deco.me.head" />
       <asset-slot slot-id="me.avatar" img-class="head-milo" />
       <view class="head-main">
-        <text class="head-name">奶龙本龙</text>
+        <text class="head-name">奶蛙本龙</text>
         <text class="head-level">Lv.{{ lv.level }} {{ lv.title }}</text>
         <view class="head-chip"><text class="head-chip-t">已坚持记账 {{ streak }} 天</text></view>
       </view>
@@ -83,12 +83,12 @@
       <asset-slot slot-id="me.greet" img-class="greet-img" />
       <view class="greet-main">
         <text class="greet-t">今天也要好好记账哦</text>
-        <text class="greet-s">奶龙会一直陪着你攒钱~</text>
+        <text class="greet-s">奶蛙会一直陪着你攒钱~</text>
       </view>
     </view>
 
     <!-- 6. 版权说明（素材为第三方 IP，必须常驻） -->
-    <text class="copyright">奶龙形象版权归第七印象所有，本页面仅个人学习使用</text>
+    <text class="copyright">奶蛙形象版权归第七印象所有，本页面仅个人学习使用</text>
 
     <!-- 6.1 素材包一览：两套并存，用 ACTIVE_PACK 切换（见 utils/asset-packs.js） -->
     <view class="pack-card">
@@ -97,7 +97,7 @@
         <view class="pack-item">
           <image class="pack-img" src="/static/milo/milo.webp" mode="aspectFit" />
           <view class="pack-txt">
-            <text class="pack-name">奶龙（原有）</text>
+            <text class="pack-name">奶蛙（原有）</text>
             <text class="pack-note">默认启用 · 版权归第七印象</text>
           </view>
         </view>
@@ -208,8 +208,8 @@ const goalPct = computed(function () {
 const goalTip = computed(function () {
   if (!goalCents.value) return '设定目标后开始攒钱进度'
   const rest = goalCents.value - savedCents.value
-  if (rest <= 0) return '目标达成！暴富奶龙皮肤已解锁'
-  return '再攒 ¥' + formatCents(rest) + ' 就能解锁暴富奶龙皮肤'
+  if (rest <= 0) return '目标达成！暴富奶蛙皮肤已解锁'
+  return '再攒 ¥' + formatCents(rest) + ' 就能解锁暴富奶蛙皮肤'
 })
 
 function editGoal() {
@@ -262,7 +262,7 @@ function maskOf(f) {
 function tapFn(f) {
   if (f.key === 'about') {
     uni.showModal({
-      title: '奶龙记账' + (aboutVersionText ? ' v' + aboutVersionText : ''),
+      title: '奶蛙记账' + (aboutVersionText ? ' v' + aboutVersionText : ''),
       content: '个人自用记账 App，离线优先，数据只存在本机。',
       confirmText: '检查更新',
       cancelText: '知道啦',
@@ -852,7 +852,7 @@ onShow(function () {
   position: relative;
   overflow: hidden;
 }
-/* my 页没有 navbar，装饰件改挂在 profile-head 右上角：与左侧 88px 挥手奶龙呼应。
+/* my 页没有 navbar，装饰件改挂在 profile-head 右上角：与左侧 88px 挥手奶蛙呼应。
    head-main 是 flex:1，装饰件绝对定位后退出流，昵称/等级/胶囊的排布完全不变。 */
 .head-deco {
   top: 8px;

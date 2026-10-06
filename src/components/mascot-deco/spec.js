@@ -1,5 +1,5 @@
 /**
- * 奶龙 IP 装饰件的**规格计算**（纯函数，无副作用、无 DOM）。
+ * 奶蛙 IP 装饰件的**规格计算**（纯函数，无副作用、无 DOM）。
  *
  * 为什么单独抽出来：`mascot-deco.vue` 里的样式绑定逻辑必须能在 Node 单测里逐字断言
  * （vitest 跑不了 .vue 的 scoped 样式，但能跑纯函数）。项目里已有同构先例：
@@ -50,7 +50,7 @@ export const DECO_MOODS = Object.freeze([
  */
 export function decoSrc(mood) {
   if (DECO_MOODS.indexOf(mood) === -1) {
-    throw new Error('未知奶龙形象：' + mood + '（可选：' + DECO_MOODS.join(' / ') + '）')
+    throw new Error('未知奶蛙形象：' + mood + '（可选：' + DECO_MOODS.join(' / ') + '）')
   }
   return packSrc(mood)
 }

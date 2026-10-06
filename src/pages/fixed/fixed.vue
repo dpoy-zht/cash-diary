@@ -33,7 +33,7 @@
     <view v-else class="empty">
       <asset-slot slot-id="fixed.empty" img-class="empty-img" />
       <text class="empty-t">还没有固定支出</text>
-      <text class="empty-s">把每月都要花的那几笔交给奶龙，它替你记</text>
+      <text class="empty-s">把每月都要花的那几笔交给奶蛙，它替你记</text>
     </view>
 
     <!-- 添加按钮 -->

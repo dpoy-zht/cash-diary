@@ -2,7 +2,7 @@
   "name": "cash-diary",
   "version": "2.2.9",
   "private": true,
-  "description": "现金日记 - 3秒记一笔的个人记账App（MVP）",
+  "description": "奶蛙记账 - 离线优先的个人记账 App，3 秒记一笔",
   "scripts": {
     "dev:h5": "uni",
     "dev:app": "uni -p app",

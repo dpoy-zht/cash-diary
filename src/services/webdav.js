@@ -112,7 +112,7 @@ export function reasonText(reason) {
   const r = String(reason || '')
   if (r === 'not-configured') return '还没配置 WebDAV'
   if (r === 'empty') return '云端还没有备份文件'
-  if (r === 'not-backup') return '云端那个文件不是奶龙记账的备份'
+  if (r === 'not-backup') return '云端那个文件不是奶蛙记账的备份'
   if (r === 'network') return '网络连不上，稍后再试'
   if (r === 'throttled') return '刚刚已经检查过了'
   if (r.indexOf('http-') === 0) return '云端返回 ' + r.slice(5) + '，请检查地址或账号'

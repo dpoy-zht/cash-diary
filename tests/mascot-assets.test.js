@@ -6,7 +6,7 @@ import { DECO_MOODS, decoSrc } from '../src/components/mascot-deco/spec.js'
 /**
  * 素材契约：装饰件声明的每个 mood 都必须真有对应文件。
  *
- * 背景：src/static/milo/*.webp 是**已随包入库**的第三方 IP 素材（奶龙=第七印象），
+ * 背景：src/static/milo/*.webp 是**已随包入库**的第三方 IP 素材（奶蛙=第七印象），
  * 换机器/重新 clone 后如果漏拷，图片会静默变空白 —— 编译不报错、单测也发现不了，
  * 只有真机看得到空白框。这条测试把"素材缺失"提前到 CI 阶段暴露。
  */
@@ -22,7 +22,7 @@ function assetFile(mood) {
   return path.join(SRC_DIR, decoSrc(mood).slice(1))
 }
 
-describe('奶龙素材契约', () => {
+describe('奶蛙素材契约', () => {
   it('src/static/milo 目录存在', () => {
     expect(fs.existsSync(MILO_DIR)).toBe(true)
   })

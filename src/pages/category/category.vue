@@ -479,7 +479,7 @@ onShow(function () {
 
 
 
-/* 空状态插画：奶龙端金条（"还没分类"是中性状态，gold 比 innocent 更有生气） */
+/* 空状态插画：奶蛙端金条（"还没分类"是中性状态，gold 比 innocent 更有生气） */
 .row-empty {
   position: relative;
 }

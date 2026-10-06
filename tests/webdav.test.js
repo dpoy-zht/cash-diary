@@ -76,7 +76,7 @@ describe('T4.5 —— joinUrl 拼接', () => {
 
 describe('T4.5 —— UTF-8 / base64（中文与 emoji 都要能过）', () => {
   it('utf8Bytes / bytesToUtf8 互逆', () => {
-    const cases = ['', 'abc', '奶龙记账', 'pass-word_123', '🐉🥛', '混合 mix 中文 🐲']
+    const cases = ['', 'abc', '奶蛙记账', 'pass-word_123', '🐉🥛', '混合 mix 中文 🐲']
     cases.forEach(function (s) {
       expect(bytesToUtf8(utf8Bytes(s))).toBe(s)
     })
@@ -89,14 +89,14 @@ describe('T4.5 —— UTF-8 / base64（中文与 emoji 都要能过）', () => {
   })
 
   it('base64 结果与 Node Buffer 完全一致（含补位）', () => {
-    const cases = ['a', 'ab', 'abc', 'abcd', '奶龙', '奶龙记账', '🐉', 'p@ss:w/rd+=']
+    const cases = ['a', 'ab', 'abc', 'abcd', '奶蛙', '奶蛙记账', '🐉', 'p@ss:w/rd+=']
     cases.forEach(function (s) {
       expect(utf8ToBase64(s)).toBe(nodeB64(s))
     })
   })
 
   it('base64 能解回原串（含中文密码）', () => {
-    expect(base64ToUtf8(nodeB64('奶龙记账'))).toBe('奶龙记账')
+    expect(base64ToUtf8(nodeB64('奶蛙记账'))).toBe('奶蛙记账')
     expect(base64ToUtf8(utf8ToBase64(''))).toBe('')
   })
 
@@ -148,7 +148,7 @@ describe('T4.5 —— 密码混淆（不是加密，但它得能还原）', () =
 describe('T4.5 —— 认证头与请求参数', () => {
   it('Basic 头 = Base64(user:pass)，UTF-8 安全', () => {
     expect(basicAuthHeader('user', 'pass')).toBe('Basic ' + nodeB64('user:pass'))
-    expect(basicAuthHeader('奶龙', '密码')).toBe('Basic ' + nodeB64('奶龙:密码'))
+    expect(basicAuthHeader('奶蛙', '密码')).toBe('Basic ' + nodeB64('奶蛙:密码'))
   })
 
   it('PUT：地址、方法、认证、octet-stream 与请求体', () => {
@@ -294,7 +294,7 @@ describe('T4.5 —— 配置读写（services 层）', () => {
   it('reasonText：每种失败都给人话', () => {
     expect(webdav.reasonText('not-configured')).toContain('还没配置')
     expect(webdav.reasonText('empty')).toContain('还没有备份')
-    expect(webdav.reasonText('not-backup')).toContain('不是奶龙记账')
+    expect(webdav.reasonText('not-backup')).toContain('不是奶蛙记账')
     expect(webdav.reasonText('network')).toContain('网络')
     expect(webdav.reasonText('http-401')).toContain('401')
     expect(webdav.reasonText('')).toContain('稍后')

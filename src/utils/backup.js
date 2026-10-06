@@ -40,7 +40,7 @@ export function buildBackup(tables, exportedAt) {
   }
 }
 
-/** 备份文件名：奶龙记账-备份-2026-09-27-1320.json */
+/** 备份文件名：奶蛙记账-备份-2026-09-27-1320.json */
 export function backupFileName(nowTs) {
   const d = new Date(nowTs == null ? Date.now() : nowTs)
   function p(n) {
@@ -48,21 +48,29 @@ export function backupFileName(nowTs) {
   }
   const stamp =
     d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes())
-  return '奶龙记账-备份-' + stamp + '.json'
+  return '奶蛙记账-备份-' + stamp + '.json'
 }
 
 /* ---------------- 自动备份（打开 App 时静默写入私有目录） ---------------- */
 
 /** 自动备份间隔：24 小时 */
 export const AUTO_BACKUP_INTERVAL = 24 * 60 * 60 * 1000
-/** 自动备份文件名前缀：清理旧文件时只动带此前缀的，用户手动导出的备份绝不碰 */
-export const AUTO_BACKUP_PREFIX = '奶龙记账-自动备份-'
+/**
+ * 自动备份文件名前缀：清理旧文件时只动带此前缀的，用户手动导出的备份绝不碰
+ *
+ * ⚠️ 前缀历史上有两个（改名前「奶龙记账-自动备份-」）。**两个都要认** ——
+ * 只认新前缀会让改名之前写的自动备份在「数据体检」里查不到、也永远不被清理，
+ * 看起来像"备份丢了"。新写的文件用新前缀，旧的照常列出来与清理。
+ */
+export const AUTO_BACKUP_PREFIX = '奶蛙记账-自动备份-'
+/** 旧前缀（2026-10-06 改名前）：仅用于**读取兼容**，不再用来写新文件 */
+export const AUTO_BACKUP_PREFIX_LEGACY = '奶龙记账-自动备份-'
 /** 上次自动备份时间戳的存储键（services/backup.js 写入，数据体检读来判断"备份过旧"） */
 export const AUTO_BACKUP_LAST_KEY = 'cashDiary.autoBackup.lastAt'
 /** 自动备份保留份数（清理时只留最新 N 份） */
 export const AUTO_KEEP_COUNT = 3
 
-/** 自动备份文件名：奶龙记账-自动备份-2026-09-28-0012.json（前缀定长，字典序=时间序） */
+/** 自动备份文件名：奶蛙记账-自动备份-2026-09-28-0012.json（前缀定长，字典序=时间序） */
 export function autoBackupFileName(nowTs) {
   const d = new Date(nowTs == null ? Date.now() : nowTs)
   function p(n) {
@@ -86,14 +94,38 @@ export function shouldAutoBackup(lastAt, nowTs, interval) {
 }
 
 /**
+ * 从自动备份文件名里取出时间戳（YYYY-MM-DD-HHmm），用于**按时间**排序。
+ *
+ * 为什么不能用字典序：新旧前缀的「奶龙/奶蛙」汉字码位不同，
+ * 字典序会把「奶蛙」整体排到「奶龙」之后 —— 于是**改名后写的最新备份
+ * 反而被当成最旧的先删掉**（实测踩过）。文件名里的数字时间戳与前缀无关，
+ * 按它排序才是真正的时间序。
+ */
+function autoBackupStamp(name) {
+  const m = /(\d{4}-\d{2}-\d{2}-\d{4})\.json$/.exec(String(name || ''))
+  return m ? m[1] : ''
+}
+
+/**
  * 清理计划：从一批文件名里挑出该保留和该删除的自动备份。
- * 只处理带 AUTO_BACKUP_PREFIX 的文件，按字典序（=时间序）保留最新 keep 份。
+ * 只处理带自动备份前缀的文件（新旧前缀都认，见 AUTO_BACKUP_PREFIX_LEGACY），
+ * **按文件名里的时间戳**保留最新 keep 份（不能靠字典序，理由见 autoBackupStamp）。
  * @returns {{keep:string[], remove:string[]}}
  */
 export function keepAutoBackupFiles(names, keep) {
   const list = (Array.isArray(names) ? names : [])
-    .filter(function (n) { return typeof n === 'string' && n.indexOf(AUTO_BACKUP_PREFIX) === 0 })
-    .sort()
+    .filter(function (n) {
+      return typeof n === 'string' &&
+        (n.indexOf(AUTO_BACKUP_PREFIX) === 0 || n.indexOf(AUTO_BACKUP_PREFIX_LEGACY) === 0)
+    })
+    .sort(function (a, b) {
+      const sa = autoBackupStamp(a)
+      const sb = autoBackupStamp(b)
+      if (sa && sb && sa !== sb) return sa < sb ? -1 : 1
+      // 拿不到时间戳的排最后（别让它挤掉正常的），再退回字典序保证稳定
+      if (sa !== sb) return sa ? -1 : 1
+      return a < b ? -1 : a > b ? 1 : 0
+    })
   const n = Math.max(1, Math.floor(Number(keep) || 3))
   return { keep: list.slice(-n), remove: list.slice(0, Math.max(0, list.length - n)) }
 }
@@ -115,7 +147,7 @@ export function validateBackup(obj) {
     return { ok: false, error: '文件内容不是有效的备份' }
   }
   if (obj.app !== BACKUP_APP) {
-    return { ok: false, error: '这不是奶龙记账的备份文件' }
+    return { ok: false, error: '这不是奶蛙记账的备份文件' }
   }
   const version = Number(obj.version)
   if (!Number.isInteger(version) || version < 1) {

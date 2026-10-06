@@ -3,7 +3,7 @@
     <!-- 顶部导航 -->
     <view class="navbar">
       <view class="icon-btn" @click="goHome"><view class="ib" :style="iconBack" /></view>
-      <text class="nav-title">奶龙算账</text>
+      <text class="nav-title">奶蛙算账</text>
       <!-- 期间选择器：fields 随期间切换（日/周选日期、月选月、年选年） -->
       <picker mode="date" :fields="pickerFields" :value="pickerValue" @change="onPickDate">
         <view class="month-chip">{{ pickerLabel }}</view>
@@ -48,7 +48,7 @@
       <view v-else class="empty">
         <asset-slot slot-id="stats.empty" img-class="empty-img" />
         <text class="empty-title">{{ emptyTitle }}</text>
-        <text class="empty-sub">记几笔，奶龙帮你看看钱花哪了</text>
+        <text class="empty-sub">记几笔，奶蛙帮你看看钱花哪了</text>
       </view>
     </view>
 

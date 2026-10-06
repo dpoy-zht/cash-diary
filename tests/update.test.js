@@ -34,7 +34,7 @@ describe('应用内更新检查 —— 版本比较（纯函数）', () => {
 describe('stripReleaseNotes —— Release 说明压成弹窗纯文本', () => {
   it('去标题/粗体/列表符/链接，保留文字', () => {
     const md = [
-      '## 奶龙记账 v2.1.0',
+      '## 奶蛙记账 v2.1.0',
       '',
       '### 🆕 固定支出自动记账',
       '- 配置一次就行',
@@ -46,7 +46,7 @@ describe('stripReleaseNotes —— Release 说明压成弹窗纯文本', () => {
     expect(out).not.toContain('#')
     expect(out).not.toContain('**')
     expect(out).not.toContain('https://')
-    expect(out).toContain('奶龙记账 v2.1.0')
+    expect(out).toContain('奶蛙记账 v2.1.0')
     expect(out).toContain('· 配置一次就行')
     expect(out).toContain('同一个月绝不会重复记')
     expect(out).toContain('Releases')

@@ -73,14 +73,14 @@ export function centsToYuan(cents, negative) {
   return (negative ? '-' : '') + Number(s.slice(0, -2)) + '.' + s.slice(-2)
 }
 
-/** 账单文件名：奶龙记账-账单-2026-09-30-2210.csv */
+/** 账单文件名：奶蛙记账-账单-2026-09-30-2210.csv */
 export function csvFileName(nowTs) {
   const d = new Date(nowTs === null || nowTs === undefined ? Date.now() : nowTs)
   function p(n) {
     return String(n).padStart(2, '0')
   }
   return (
-    '奶龙记账-账单-' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+    '奶蛙记账-账单-' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
     '-' + p(d.getHours()) + p(d.getMinutes()) + '.csv'
   )
 }

@@ -79,7 +79,7 @@ export function reminderMessage(item, ctx) {
   const it = item || {}
   if (it.kind === 'daily') {
     return {
-      title: '奶龙记账 · 今天记账了吗？',
+      title: '奶蛙记账 · 今天记账了吗？',
       content: '花 30 秒记完今天的小花费，连续记账别断哦~',
       payload: PAYLOAD_DAILY
     }
@@ -90,7 +90,7 @@ export function reminderMessage(item, ctx) {
     const name = String(f.note || '').trim() || '固定支出'
     const amount = Number(f.amount_cents) || 0
     return {
-      title: '奶龙记账 · 缴费提醒',
+      title: '奶蛙记账 · 缴费提醒',
       content: '今天是「' + name + '」的记账日（¥' + formatCents(amount) + '），别忘了哦~',
       payload: PAYLOAD_FIXED
     }

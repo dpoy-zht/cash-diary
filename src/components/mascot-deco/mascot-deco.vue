@@ -28,7 +28,7 @@ import { placeholderStyle, placeholderLabel, showHint } from '../asset-slot/ph.j
 import { slot as slotOf, hasSlot } from '../../utils/asset-slots.js'
 
 /**
- * 奶龙 IP 装饰件。
+ * 奶蛙 IP 装饰件。
  *
  * 两种模式（placeholder 切换）：
  * - true  → 画占位框 + 用途说明，**不加载任何图片**（当前默认）

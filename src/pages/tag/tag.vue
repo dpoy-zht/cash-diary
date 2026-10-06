@@ -387,7 +387,7 @@ function confirmRemove(t) {
 
 
 
-/* 空状态插画：奶龙站在文案上方。组件根节点是 absolute，这里改 relative
+/* 空状态插画：奶蛙站在文案上方。组件根节点是 absolute，这里改 relative
    让它"占位参与排版"，用 auto margin 水平居中，文案位置不会被挤动。 */
 .row-empty {
   position: relative;

@@ -130,7 +130,7 @@ export function explainNotifyDenied(result) {
   if (result && result.deniedAlways) {
     uni.showModal({
       title: '通知权限被拒绝了',
-      content: '系统不会再弹权限问询，需要到「系统设置 → 应用管理 → 奶龙记账 → 通知」里手动打开。\n\n不打开的话，提醒只会显示在应用内。',
+      content: '系统不会再弹权限问询，需要到「系统设置 → 应用管理 → 奶蛙记账 → 通知」里手动打开。\n\n不打开的话，提醒只会显示在应用内。',
       confirmText: '去设置',
       cancelText: '知道了',
       success: function (r) {

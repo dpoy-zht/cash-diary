@@ -6,7 +6,7 @@
       <view class="icon-btn" style="visibility:hidden"><view class="ib" /></view>
     </view>
 
-    <!-- 本月总预算卡：右上角趴一只奶龙，表情跟着预算水位走 -->
+    <!-- 本月总预算卡：右上角趴一只奶蛙，表情跟着预算水位走 -->
     <view class="total-card">
       <mascot-deco class="tc-milo" :mood="totalMood" slot-id="deco.budget.card" />
       <text class="tc-label">本月总预算</text>
@@ -406,7 +406,7 @@ onShow(function () {
 
 
 
-/* ---- 奶龙 IP 装饰 ----
+/* ---- 奶蛙 IP 装饰 ----
    .tc-num 是 30px 大字、进度条满宽，装饰件绝对定位 + 右上下沉后
    视觉上"探出"卡片，不与任何数字重叠。overflow:hidden 保证不溢出圆角。 */
 .tc-milo {

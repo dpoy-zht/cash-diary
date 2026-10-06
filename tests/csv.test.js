@@ -99,9 +99,9 @@ describe('T4.2 —— 时间 / 金额 / 文件名', () => {
     expect(centsToYuan(-1990, false)).toBe('19.90')
   })
 
-  it('csvFileName：奶龙记账-账单-YYYY-MM-DD-HHmm.csv', () => {
-    expect(csvFileName(at(2026, 9, 30, 22, 10))).toBe('奶龙记账-账单-2026-09-30-2210.csv')
-    expect(csvFileName(at(2026, 1, 5, 8, 3))).toBe('奶龙记账-账单-2026-01-05-0803.csv')
+  it('csvFileName：奶蛙记账-账单-YYYY-MM-DD-HHmm.csv', () => {
+    expect(csvFileName(at(2026, 9, 30, 22, 10))).toBe('奶蛙记账-账单-2026-09-30-2210.csv')
+    expect(csvFileName(at(2026, 1, 5, 8, 3))).toBe('奶蛙记账-账单-2026-01-05-0803.csv')
   })
 })
 
