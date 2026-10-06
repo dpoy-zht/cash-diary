@@ -321,3 +321,22 @@ export function trendSpecFor(key, anchorTs) {
     end: monthRange(last[0], last[1])[1]
   }
 }
+
+/**
+ * 某一天的支出合计（整数分）。
+ *
+ * 用于首页日期标题后显示「今日消费」。判据与`expenseByCategory` 完全一致
+ * （type==='expense' 且未软删除）—— 两处口径必须相同，否则标题上的合计
+ * 和下方分类汇总对不上，用户会以为算错了。
+ *
+ * @param {Array} records 当天的流水
+ * @returns {number} 整数分；无支出返回 0
+ */
+export function expenseSumOfDay(records) {
+  let total = 0
+  for (const r of records || []) {
+    if (!r || r.type !== 'expense' || r.deleted_at != null) continue
+    total += r.amount_cents
+  }
+  return total
+}

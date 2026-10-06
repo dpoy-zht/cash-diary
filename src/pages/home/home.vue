@@ -81,7 +81,11 @@
       </view>
       <block v-if="filtered.length">
         <block v-for="g in groups" :key="g.day">
-          <view class="day-label">{{ dayLabel(g.day) }}</view>
+          <!-- 日期标题与当日支出同一行：左标题右金额，用 space-between 分到两端 -->
+          <view class="day-label">
+            <text class="dl-date">{{ dayLabel(g.day) }}</text>
+            <text class="dl-sum">支出 ¥{{ formatCents(dayExpenseCents(g.day)) }}</text>
+          </view>
           <tx-item
             v-for="r in g.items"
             :key="r.id"
@@ -153,7 +157,8 @@ import { useTagStore } from '../../stores/tag.js'
 import * as backupService from '../../services/backup.js'
 import * as fixedService from '../../services/fixed.js'
 import { buildEditInput } from '../../services/tx.js'
-import { groupByDay, dayLabel, ymOf, homeDateLabel } from '../../utils/date.js'
+import { groupByDay, dayLabel, ymOf, homeDateLabel, dayStart } from '../../utils/date.js'
+import { expenseSumOfDay } from '../../utils/stats.js'
 import { formatCents } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
 import { requestNotifyPermission, notifyLocal, REMIND_PREF_KEY, normalizeRemindEnabled } from '../../utils/notify.js'
@@ -352,6 +357,28 @@ async function onApplyFilter(filters) {
 const groups = computed(function () {
   return groupByDay(filtered.value)
 })
+
+/**
+ * 每天的支出合计（整数分），用于日期标题后的「今日消费」。
+ *
+ * 一次性遍历算成 Map，而不是在模板里对每个 g 调一次求和函数：
+ * 模板函数在每次重渲染都会重算，长列表下是明显的无谓开销。
+ * 判据走 stats.js 的 `expenseSumOfDay`（与分类汇总同口径），
+ * 这里按天分桶，判据本身交给那个纯函数，不重复写。
+ */
+const dayExpenseMap = computed(function () {
+  const buckets = new Map()
+  for (const r of filtered.value) {
+    const k = dayStart(r.occurred_at)
+    buckets.set(k, (buckets.get(k) || 0) + expenseSumOfDay([r]))
+  }
+  return buckets
+})
+
+/** 某天的支出合计（整数分）；这天没有支出返回 0 */
+function dayExpenseCents(day) {
+  return dayExpenseMap.value.get(day) || 0
+}
 
 /* ---- 列表项的标签（T5.1）----
  * 一次把当前列表所有流水的标签批量查回来（`tagStore.mapByTxs`），
@@ -835,6 +862,22 @@ onShow(async function () {
   color: var(--cd-ink-2);
   padding: 12px 0 4px;
   font-weight: 600;
+  /* 日期与当日支出同行：左标题右金额分到两端 */
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+/* ⚠️ <text> 放进横向 flex 容器必须显式 display:block ——
+   从 column 改成 row 后会失去隐式块级，标题与金额会挤到同一行叠字。 */
+.dl-date {
+  display: block;
+}
+.dl-sum {
+  display: block;
+  /* 用 --cd-ink-2 而不是更浅的 --cd-ink-3：ink-3 在 App.vue 里标注
+     "不承载正文"，而金额是正文信息，必须满足 ≥4.5:1 对比度。 */
+  color: var(--cd-ink-2);
+  font-weight: 500;
 }
 
 /* ---- 空状态 ---- */

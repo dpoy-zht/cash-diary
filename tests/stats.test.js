@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   expenseByCategory,
+  expenseSumOfDay,
   donutSegments,
   conicGradient,
   supportsConicGradient,
@@ -450,5 +451,49 @@ describe('supportsConicGradient —— 环形图降级检测（T3.7）', () => {
     withCSS({ supports: function () { throw new Error('boom') } }, function () {
       expect(supportsConicGradient()).toBe(false)
     })
+  })
+})
+
+/**
+ * 首页日期标题旁的「当日支出」（2026-10-06）。
+ *
+ * 关键约束：**口径必须与 `expenseByCategory` 完全一致**
+ * （type==='expense' 且未软删除）。两边判据一旦漂移，
+ * 标题上的合计就会和下方分类汇总对不上，用户会以为算错了。
+ */
+describe('expenseSumOfDay —— 当日支出合计', () => {
+  const E = (cents) => ({ type: 'expense', amount_cents: cents, deleted_at: null })
+  const I = (cents) => ({ type: 'income', amount_cents: cents, deleted_at: null })
+
+  it('只累加支出，收入不计', () => {
+    expect(expenseSumOfDay([E(1500), E(2250), I(9999)])).toBe(3750)
+  })
+
+  it('排除软删除的记录（deleted_at 非空）', () => {
+    const deleted = { type: 'expense', amount_cents: 500, deleted_at: 123 }
+    expect(expenseSumOfDay([E(1000), deleted])).toBe(1000)
+  })
+
+  it('无支出返回 0（含空数组/undefined/null）', () => {
+    expect(expenseSumOfDay([])).toBe(0)
+    expect(expenseSumOfDay(undefined)).toBe(0)
+    expect(expenseSumOfDay(null)).toBe(0)
+    expect(expenseSumOfDay([I(100)])).toBe(0)
+  })
+
+  it('容忍脏数据（null 元素不崩）', () => {
+    expect(expenseSumOfDay([E(100), null, undefined, E(200)])).toBe(300)
+  })
+
+  it('与 expenseByCategory 的分类汇总额度一致（同口径校验）', () => {
+    const records = [E(1500), E(2250), I(9999),
+      { type: 'expense', amount_cents: 500, deleted_at: 123 }]
+    const cats = [
+      { id: 1, name: '吃饭', icon: 'a', color: '#f00' },
+      { id: 2, name: '买菜', icon: 'b', color: '#0f0' }
+    ]
+    const byCat = expenseByCategory(records, cats)
+    const sum = byCat.reduce(function (s, r) { return s + r.cents }, 0)
+    expect(sum).toBe(expenseSumOfDay(records))   // 两处口径必须相等
   })
 })
