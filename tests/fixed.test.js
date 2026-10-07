@@ -197,7 +197,7 @@ describe('T3.5 —— 固定支出编辑', () => {
     await seedDefaultIfEmpty()
     cats = await listCats()
     lunch = cats.find(function (c) { return c.name === '午餐' })
-    home = cats.find(function (c) { return c.name === '住房' })
+    home = cats.find(function (c) { return c.name === '居住' })
   })
 
   it('金额 / 记账日 / 备注 / 分类 / 启停 都能改到', async () => {

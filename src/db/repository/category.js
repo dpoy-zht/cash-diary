@@ -1,12 +1,19 @@
 import { getStorage } from '../index.js'
 
+/**
+ * 归一化分类行。
+ * `parent_id` 为 NULL/undefined → `null`（一级分类）；否则转成数字。
+ * 老库（v6 及以前）没有这一列，`row.parent_id` 取到 undefined，正好落成一级，
+ * 与迁移的意图一致 —— 不需要为老数据单独分支。
+ */
 function normalizeCat(row) {
   return {
     id: Number(row.id),
     name: row.name,
     type: row.type,
     icon: row.icon || '',
-    sort: Number(row.sort) || 0
+    sort: Number(row.sort) || 0,
+    parent_id: row.parent_id == null ? null : Number(row.parent_id)
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { getStorage, resetStorageForTest } from '../src/db/index.js'
-import { seedIfEmpty, listAll as listCats } from '../src/services/category.js'
+import { seedIfEmpty, listAll as listCats, DEFAULT_CATEGORY_COUNT } from '../src/services/category.js'
 import * as accountService from '../src/services/account.js'
 import * as txService from '../src/services/tx.js'
 import { resetAll } from '../src/services/maintenance.js'
@@ -155,7 +155,7 @@ describe('多账本', () => {
       expect(accounts.length).toBe(1)
       expect(accounts[0].id).toBe(1)
       expect(accounts[0].count).toBe(0)
-      expect((await listCats()).length).toBe(20)
+      expect((await listCats()).length).toBe(DEFAULT_CATEGORY_COUNT)
 
       // 重置后还能正常记账
       await txService.addTx({ amountStr: '1', categoryId: incomeCat.id, type: 'income', ts: Date.now() })

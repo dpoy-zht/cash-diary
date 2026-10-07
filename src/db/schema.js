@@ -143,6 +143,28 @@ CREATE INDEX IF NOT EXISTS idx_tx_tag_tag  ON transaction_tag(tag_id);
 `
 
 /**
+ * v7：两级分类（一级 + 二级子类）。
+ *
+ * `parent_id` 语义：
+ * - **NULL = 一级分类**（能独立成为预算 / 统计的一档）
+ * - **非 NULL = 其所属一级分类的 id**
+ *
+ * 为什么用加列而不是重建表：`ALTER TABLE ... ADD COLUMN` 是纯增量操作，
+ * **已有分类行全部自动落成 NULL（即一级），历史流水一个字段都不动**，
+ * 所以这次迁移天然向后兼容、不需要清库。
+ * 「哪些二级该挂到哪个一级」属于**数据**层面的归属，由
+ * `services/category.js: migrateCategoryTree()` 按名字一次性补齐（幂等）。
+ *
+ * 索引说明：分类表只有几十行，索引本身收益有限，但 `parent_id` 会被
+ * 「取某个一级下的所有二级」这类查询反复用到，顺手建上避免全表扫。
+ */
+export const CATEGORY_TREE_SQL = `
+ALTER TABLE category ADD COLUMN parent_id INTEGER;
+
+CREATE INDEX IF NOT EXISTS idx_category_parent ON category(parent_id);
+`
+
+/**
  * 迁移登记：按版本号顺序执行。新增结构变更 → 追加一项，禁止修改已发布的版本。
  *
  * T2.6：每个迁移新增 `statements` 数组 —— **每条 SQL 一个元素**，执行时不再按
@@ -255,6 +277,15 @@ export const MIGRATIONS = [
 )`,
       'CREATE INDEX IF NOT EXISTS idx_tag_account ON tag(account_id)',
       'CREATE INDEX IF NOT EXISTS idx_tx_tag_tag  ON transaction_tag(tag_id)'
+    ]
+  },
+  {
+    version: 7,
+    name: 'v7_category_parent',
+    sql: CATEGORY_TREE_SQL,
+    statements: [
+      'ALTER TABLE category ADD COLUMN parent_id INTEGER',
+      'CREATE INDEX IF NOT EXISTS idx_category_parent ON category(parent_id)'
     ]
   }
 ]

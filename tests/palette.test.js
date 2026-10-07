@@ -9,7 +9,10 @@ import {
   tagColorOf,
   iconMaskStyle
 } from '../src/utils/palette.js'
-import { DEFAULT_CATEGORIES, iconOptions } from '../src/services/category.js'
+import {
+  DEFAULT_CATEGORIES, iconOptions, EXPENSE_TREE,
+  DEFAULT_CATEGORY_COUNT, DEFAULT_EXPENSE_COUNT, DEFAULT_INCOME_COUNT
+} from '../src/services/category.js'
 
 describe('tintOf —— 兜底底色（纯展示层）', () => {
   it('兜底表为 8 个合法十六进制色，且互不重复', () => {
@@ -50,10 +53,26 @@ describe('内置分类与 v2.0 参考包对齐', () => {
   const expense = DEFAULT_CATEGORIES.filter(function (c) { return c.type === 'expense' })
   const income = DEFAULT_CATEGORIES.filter(function (c) { return c.type === 'income' })
 
-  it('12 个支出 + 8 个收入 = 20 个（对齐参考包的分类体系）', () => {
-    expect(expense.length).toBe(12)
-    expect(income.length).toBe(8)
-    expect(DEFAULT_CATEGORIES.length).toBe(20)
+  it('支出一级 + 二级树，收入 8 个平铺（v7 两级体系）', () => {
+    expect(expense.length).toBe(DEFAULT_EXPENSE_COUNT)
+    expect(income.length).toBe(DEFAULT_INCOME_COUNT)
+    expect(DEFAULT_CATEGORIES.length).toBe(DEFAULT_CATEGORY_COUNT)
+    // 收入保持平铺：全部没有父级
+    expect(income.every(function (c) { return c.parentName === null })).toBe(true)
+    // 支出一级数量 == 事实源的一级数量
+    const tops = expense.filter(function (c) { return c.parentName === null })
+    expect(tops.length).toBe(EXPENSE_TREE.length)
+  })
+
+  it('每个二级都能在事实源里找到它的父级（parentName 不是凭空写的）', () => {
+    const topNames = DEFAULT_CATEGORIES
+      .filter(function (c) { return c.parentName === null })
+      .map(function (c) { return c.name })
+    DEFAULT_CATEGORIES
+      .filter(function (c) { return c.parentName !== null })
+      .forEach(function (c) {
+        expect(topNames, c.name + ' 的父级不在清单里').toContain(c.parentName)
+      })
   })
 
   it('每个分类都有配色与 SVG 图标，不会有分类退回 emoji', () => {
@@ -72,13 +91,17 @@ describe('内置分类与 v2.0 参考包对齐', () => {
     expect(CATEGORY_ICONS.gift).not.toBe(CATEGORY_ICONS.redbag)
   })
 
-  it('分类 id 由种子写入顺序决定，type 与 sort 不乱', () => {
-    expect(expense.map(function (c) { return c.sort })).toEqual(
-      Array.from({ length: 12 }, function (_v, i) { return i + 1 })
-    )
-    expect(income.map(function (c) { return c.sort })).toEqual(
-      Array.from({ length: 8 }, function (_v, i) { return i + 1 })
-    )
+  it('sort 是**组内**连续编号：一级 1..n；每个一级下的二级各自 1..m；收入 1..n', () => {
+    const tops = expense.filter(function (c) { return c.parentName === null })
+    expect(tops.map(function (c) { return c.sort }))
+      .toEqual(Array.from({ length: tops.length }, function (_v, i) { return i + 1 }))
+    EXPENSE_TREE.forEach(function (p) {
+      const kids = expense.filter(function (c) { return c.parentName === p.name })
+      expect(kids.map(function (c) { return c.sort }), p.name)
+        .toEqual(Array.from({ length: kids.length }, function (_v, i) { return i + 1 }))
+    })
+    expect(income.map(function (c) { return c.sort }))
+      .toEqual(Array.from({ length: income.length }, function (_v, i) { return i + 1 }))
   })
 
   it('内置分类的图标都在本类型的可选清单里（过滤器不会把既有图标藏起来）', () => {

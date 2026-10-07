@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { getStorage, resetStorageForTest } from '../src/db/index.js'
-import { seedIfEmpty, listAll as listCats, DEFAULT_CATEGORIES } from '../src/services/category.js'
+import {
+  seedIfEmpty, listAll as listCats, DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORY_COUNT, DEFAULT_EXPENSE_COUNT, DEFAULT_INCOME_COUNT
+} from '../src/services/category.js'
 import { resetAll } from '../src/services/maintenance.js'
 import * as txService from '../src/services/tx.js'
 import { buildAddInput, buildTx, buildEditInput } from '../src/services/tx.js'
@@ -20,18 +23,23 @@ describe('记账闭环（内存存储）', () => {
     ym = ymOf(Date.now())
   })
 
-  it('内置分类初始化：12 支出 + 8 收入（对齐 v2.0 参考包）', async () => {
+  it('内置分类初始化：一级 + 二级的支出树 + 8 个平铺收入（v7 两级）', async () => {
     const cats = await listCats()
-    expect(cats.length).toBe(20)
-    expect(cats.filter(function (c) { return c.type === 'expense' }).length).toBe(12)
-    expect(cats.filter(function (c) { return c.type === 'income' }).length).toBe(8)
-    expect(DEFAULT_CATEGORIES.length).toBe(20)
+    expect(cats.length).toBe(DEFAULT_CATEGORY_COUNT)
+    expect(cats.filter(function (c) { return c.type === 'expense' }).length).toBe(DEFAULT_EXPENSE_COUNT)
+    expect(cats.filter(function (c) { return c.type === 'income' }).length).toBe(DEFAULT_INCOME_COUNT)
+    expect(DEFAULT_CATEGORIES.length).toBe(DEFAULT_CATEGORY_COUNT)
+    // 两级：支出一级有 parent_id=null，二级指向一级
+    expect(cats.filter(function (c) { return c.type === 'expense' && c.parent_id == null }).length).toBeGreaterThan(0)
+    expect(cats.filter(function (c) { return c.type === 'expense' && c.parent_id != null }).length).toBeGreaterThan(0)
+    // 收入保持平铺
+    expect(cats.filter(function (c) { return c.type === 'income' && c.parent_id != null }).length).toBe(0)
   })
 
   it('分类种子幂等：重复初始化不产生重复数据', async () => {
     await seedIfEmpty()
     await seedIfEmpty()
-    expect((await listCats()).length).toBe(20)
+    expect((await listCats()).length).toBe(DEFAULT_CATEGORY_COUNT)
   })
 
   it('记账 → 列表 → 月合计 → 编辑 → 软删除 全链路', async () => {
@@ -286,9 +294,9 @@ describe('重置数据（我的页入口）', () => {
     expect((await txService.overview()).totalCount).toBe(0)
     // 分类被重新种回来，数量与内容不变
     const cats = await listCats()
-    expect(cats.length).toBe(20)
-    expect(cats.filter(function (c) { return c.type === 'expense' }).length).toBe(12)
-    expect(cats.filter(function (c) { return c.type === 'income' }).length).toBe(8)
+    expect(cats.length).toBe(DEFAULT_CATEGORY_COUNT)
+    expect(cats.filter(function (c) { return c.type === 'expense' }).length).toBe(DEFAULT_EXPENSE_COUNT)
+    expect(cats.filter(function (c) { return c.type === 'income' }).length).toBe(DEFAULT_INCOME_COUNT)
   })
 
   it('重置后还能正常记账（分类 id 可用）', async () => {
@@ -302,7 +310,7 @@ describe('重置数据（我的页入口）', () => {
   it('重复重置不报错', async () => {
     await resetAll()
     await resetAll()
-    expect((await listCats()).length).toBe(20)
+    expect((await listCats()).length).toBe(DEFAULT_CATEGORY_COUNT)
   })
 })
 

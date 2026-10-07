@@ -145,8 +145,13 @@ export async function categoryCount() {
 }
 
 export async function categoryInsert(cat) {
-  const cols = ['name', 'type', 'icon', 'sort']
-  const vals = cols.map(function (c) { return sqlValue(cat[c]) }).join(', ')
+  const cols = ['name', 'type', 'icon', 'sort', 'parent_id']
+  const vals = cols.map(function (c) {
+    // parent_id 必须显式落 INT 或 NULL：传数字字符串会被 sqlValue 当字符串加引号，
+    // SQLite 虽然能容忍，但会让「一级 vs 二级」的判空逻辑在两侧适配器上不一致
+    if (c === 'parent_id') return sqlValue(cat.parent_id == null ? null : Number(cat.parent_id))
+    return sqlValue(cat[c])
+  }).join(', ')
   await executeBatch(['INSERT INTO category (' + cols.join(',') + ') VALUES (' + vals + ')'])
 }
 
@@ -447,7 +452,7 @@ export async function clearAll() {
 /** 各表列名（导出/恢复共用，保证列顺序一致） */
 const TABLE_COLS = {
   account: ['id', 'name', 'created_at'],
-  category: ['id', 'name', 'type', 'icon', 'sort'],
+  category: ['id', 'name', 'type', 'icon', 'sort', 'parent_id'],
   transaction_record: [
     'id', 'account_id', 'category_id', 'type', 'amount_cents', 'note',
     'occurred_at', 'created_at', 'updated_at', 'deleted_at'

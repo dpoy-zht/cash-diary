@@ -179,6 +179,11 @@ export function validateBackup(obj) {
     if (!c || typeof c.name !== 'string' || (c.type !== 'income' && c.type !== 'expense')) {
       return { ok: false, error: '备份里的分类数据不合法' }
     }
+    // 两级分类（v7）：parent_id 是**可选**字段 —— 老备份（v3 及以前）没有它，
+    // 恢复后由 services/category.js: migrateCategoryTree() 重建父子关系，所以这里只做"给了就必须合法"的宽松校验
+    if (!isIntOrNull(c.parent_id)) {
+      return { ok: false, error: '备份里的分类上级不合法' }
+    }
   }
   for (const r of obj.transaction_record) {
     if (!r || !isPositiveInt(r.amount_cents) || (r.type !== 'income' && r.type !== 'expense')) {

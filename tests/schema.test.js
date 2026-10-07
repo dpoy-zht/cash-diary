@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { MIGRATIONS, SCHEMA_SQL, INDEX_SQL } from '../src/db/schema.js'
+import { MIGRATIONS, SCHEMA_SQL, INDEX_SQL, CATEGORY_TREE_SQL } from '../src/db/schema.js'
 
 describe('MIGRATIONS —— 迁移登记表', () => {
   it('版本号严格递增且唯一（云打包升级按序补跑）', () => {
     const versions = MIGRATIONS.map(function (m) { return m.version })
-    expect(versions).toEqual([1, 2, 3, 4, 5, 6])
+    expect(versions).toEqual([1, 2, 3, 4, 5, 6, 7])
   })
 
   it('v4：为 (account_id, occurred_at) 建复合索引，IF NOT EXISTS 幂等', () => {
@@ -56,5 +56,23 @@ describe('v5 —— 固定支出表', () => {
   it('last_posted_ym 默认空串（从没记过 → 首次必补记）', () => {
     const v5 = MIGRATIONS.find(function (m) { return m.version === 5 })
     expect(v5.sql).toContain("last_posted_ym TEXT    NOT NULL DEFAULT ''")
+  })
+})
+
+describe('v7 —— 两级分类', () => {
+  it('v7：给 category 加 parent_id 列并建索引（加列不重建表，历史行自动为 NULL）', () => {
+    const v7 = MIGRATIONS.find(function (m) { return m.version === 7 })
+    expect(v7.name).toBe('v7_category_parent')
+    expect(v7.sql).toBe(CATEGORY_TREE_SQL)
+    expect(v7.sql).toContain('ALTER TABLE category ADD COLUMN parent_id INTEGER')
+    expect(v7.sql).toContain('idx_category_parent')
+    // 必须是 ADD COLUMN（纯增量），**不能**是重建表 —— 重建会丢历史流水
+    expect(v7.sql).not.toContain('DROP TABLE')
+    expect(v7.sql).not.toContain('CREATE TABLE category')
+  })
+
+  it('v7 不触碰 transaction_record（老数据零影响）', () => {
+    const v7 = MIGRATIONS.find(function (m) { return m.version === 7 })
+    expect(v7.sql).not.toContain('transaction_record')
   })
 })

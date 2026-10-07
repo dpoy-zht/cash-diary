@@ -20,7 +20,7 @@ import {
 } from '../utils/backup.js'
 import { saveTextFile, listAutoBackupNames, removeDocFile } from '../utils/backup-file.js'
 import { buildTxCsvRows, toCsv, withBom, csvFileName } from '../utils/csv.js'
-import { seedIfEmpty } from './category.js'
+import { seedIfEmpty, migrateCategoryTree } from './category.js'
 import { seedDefaultIfEmpty } from './account.js'
 
 /** 导出：读全库 → 打包成备份对象 */
@@ -71,6 +71,9 @@ export async function restoreBackup(obj) {
   await maintenanceRepo.restoreAll(obj)
   // 兜底：万一备份里没有分类 / 账本，恢复完立刻补上，保证 App 马上可用
   await seedIfEmpty()
+  // 老备份（v3 及以前）里的分类是**一级平铺**的，恢复后要补一次两级父级关系。
+  // 新备份带着 parent_id，这一步自然 no-op。
+  await migrateCategoryTree()
   await seedDefaultIfEmpty()
   return check.counts
 }

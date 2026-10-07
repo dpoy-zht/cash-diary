@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { getStorage, resetStorageForTest } from '../src/db/index.js'
-import { seedIfEmpty, listAll as listCats } from '../src/services/category.js'
+import { seedIfEmpty, listAll as listCats, DEFAULT_CATEGORY_COUNT } from '../src/services/category.js'
 import * as accountService from '../src/services/account.js'
 import * as budgetService from '../src/services/budget.js'
 import { sortedBackupNames, exportResultMessage } from '../src/utils/backup-file.js'
@@ -164,7 +164,7 @@ describe('备份往返：导出 → 清空 → 恢复', () => {
     const json = await backupService.exportJson()
 
     await resetAll()
-    expect((await listCats()).length).toBe(20)
+    expect((await listCats()).length).toBe(DEFAULT_CATEGORY_COUNT)
     expect((await txService.listByMonth(ym, 1)).length).toBe(0)
 
     const counts = await backupService.restoreBackup(backupService.parseBackupText(json))
