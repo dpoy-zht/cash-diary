@@ -128,7 +128,7 @@
     />
     <edit-sheet
       :record="editing"
-      :categories="editingCats"
+      :tree="editingTree"
       :tags="tagStore.list"
       v-model:tag-ids="editTagIds"
       @close="closeEdit"
@@ -403,9 +403,9 @@ function tagsOf(txId) {
 const catMap = computed(function () {
   return new Map(categoryStore.list.map(function (c) { return [c.id, c] }))
 })
-const editingCats = computed(function () {
+const editingTree = computed(function () {
   if (!editing.value) return []
-  return editing.value.type === 'expense' ? categoryStore.expenseCats : categoryStore.incomeCats
+  return editing.value.type === 'expense' ? categoryStore.expenseTree : categoryStore.incomeTree
 })
 
 function catOf(id) {

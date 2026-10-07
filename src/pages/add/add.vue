@@ -37,8 +37,8 @@
       </picker>
     </view>
 
-    <!-- 分类宫格 -->
-    <category-grid v-model="categoryId" :categories="cats" />
+    <!-- 分类选择：一级宫格 + 二级横条（两级结构见 utils/category-ui.js） -->
+    <category-picker v-model="categoryId" :tree="tree" />
 
     <!-- 标签（可多选，可现场新建） -->
     <tag-chips v-model="tagIds" :tags="tagStore.list" @create="tagCreateShow = true" />
@@ -96,8 +96,11 @@ import { haptic } from '../../utils/notify.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
- * 记一笔（v2.0）：奶黄渐变头 + 支出/收入 + 大金额 + 备注/日期 + 分类宫格 + 奶黄键盘。
+ * 记一笔（v2.0）：奶黄渐变头 + 支出/收入 + 大金额 + 备注/日期 + 分类选择 + 奶黄键盘。
  * 参考包的"转账"页没有数据模型支撑，这里只保留 支出/收入 两个真实页签。
+ *
+ * 分类选择（v7 两级）：一级宫格 + 二级横条，组件是 `category-picker`。
+ * `cats` 保留为**一级列表**，只用于"默认选中第一个"和切换收支时的兜底。
  */
 const txStore = useTxStore()
 const categoryStore = useCategoryStore()
@@ -128,8 +131,13 @@ const successShow = ref(false)
 const lastSaved = ref(null)
 const saving = ref(false)
 
+/** 一级分类列表：默认选中第一项 / 切换收支时兜底用 */
 const cats = computed(function () {
-  return type.value === 'expense' ? categoryStore.expenseCats : categoryStore.incomeCats
+  return type.value === 'expense' ? categoryStore.expenseTops : categoryStore.incomeTops
+})
+/** 两级树：交给 category-picker 渲染 */
+const tree = computed(function () {
+  return type.value === 'expense' ? categoryStore.expenseTree : categoryStore.incomeTree
 })
 const calcEqualsOn = computed(function () {
   return canEquals(calc.value)
@@ -268,7 +276,7 @@ async function save() {
     return
   }
 
-  const cat = cats.value.find(function (c) { return c.id === categoryId.value })
+  const cat = categoryStore.byId(categoryId.value)
   saving.value = true
   try {
     // 字段名映射统一走 services/tx.js 的 buildAddInput，页面不直接拼字段；
@@ -340,18 +348,23 @@ const iconBack = svgMaskStyle('M15.4 7.4L14 6l-6 6 6 6 1.4-1.4L10.8 12z')
 const iconCheck = svgMaskStyle('M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z')
 
 /**
- * 默认选中第一个分类。
+ * 默认选中第一个一级分类。
  * 必须用 watch 而不是 setup 里判一次：分类是异步从库里读的（App 端 SQLite 更慢），
  * setup 执行时 cats 往往还是空的，那样 categoryId 会一直是 null → 点"记好啦"只会提示"选一个分类"。
- * 同时兼顾切到收入时的兜底（list 变了但当前选中项不在新列表里）。
+ *
+ * ⚠️ 合法性判据必须遍历**整棵树**（一级 + 二级），不能只看一级列表 ——
+ * 否则用户选好「早餐」之后，分类表任何一次刷新都会把他退回「餐饮」。
  */
 watch(
-  cats,
-  function (list) {
-    if (!list.length) return
-    if (!list.some(function (c) { return c.id === categoryId.value })) {
-      categoryId.value = list[0].id
-    }
+  tree,
+  function (nodes) {
+    const ids = []
+    ;(Array.isArray(nodes) ? nodes : []).forEach(function (n) {
+      ids.push(Number(n.cat.id))
+      ;(n.children || []).forEach(function (c) { ids.push(Number(c.id)) })
+    })
+    if (!ids.length) return
+    if (ids.indexOf(Number(categoryId.value)) === -1) categoryId.value = ids[0]
   },
   { immediate: true }
 )
