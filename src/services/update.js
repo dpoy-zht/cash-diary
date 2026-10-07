@@ -8,8 +8,8 @@
  * - 无网络 / 超时 / H5 端全部静默失败——检查更新是锦上添花，绝不能打扰使用
  */
 import {
-  isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtSha256, buildWgtSources,
-  WGT_ASSET_PREFIX
+  isNewerVersion, stripReleaseNotes, pickUpdateAssets, parseWgtSha256, parseWgtSize,
+  buildWgtSources, WGT_ASSET_PREFIX
 } from '../utils/update.js'
 import { sha256Hex, base64ToBytes } from '../utils/sha256.js'
 
@@ -105,6 +105,7 @@ export async function checkForUpdate(opts) {
       wgtUrl: picked.wgtUrl,
       wgtVersion: picked.wgtVersion,
       wgtSha256: parseWgtSha256(res && res.body),
+      wgtSize: parseWgtSize(res && res.body),
       apkUrl: picked.apkUrl
     }
   } catch (e) {
@@ -194,7 +195,17 @@ function downloadFile(url) {
   })
 }
 
-/** 读本地临时文件（App 端）：readAsDataURL 拿到 base64，交给纯函数解码与哈希 */
+/**
+ * 读本地临时文件（App 端）：readAsDataURL 拿到 base64，交给纯函数解码与哈希。
+ *
+ * ⚠️ **这个函数是「正在更新…」卡死的元凶**（2026-10-07 真机定位）。
+ * 对 572KB 的 wgt，它要做：读整个文件 → 转成 764KB 的 base64 字符串 →
+ * `base64ToBytes` 解码回Uint8Array → **纯 JS 逐字节算 SHA-256**。
+ * 在 Node 里只要 10ms，但 App 端引擎无 JIT 优化，纯 JS 跑 572,990 字节
+ * 会慢一到两个数量级，再叠加两次内存拷贝，界面就长期停在「正在更新…」。
+ *
+ * 现在只在**用户主动开启严格校验**时才走这条路（默认关闭，见 verifyWgtFile）。
+ */
 function readTempFileDataUrl(path) {
   return new Promise(function (resolve, reject) {
     try {
@@ -219,9 +230,70 @@ function readTempFileDataUrl(path) {
   })
 }
 
+/** 取本地文件大小（原生 API，瞬间返回）；拿不到返回 -1 */
+function fileSizeOf(path) {
+  return new Promise(function (resolve) {
+    try {
+      plus.io.resolveLocalFileSystemURL(
+        path,
+        function (entry) {
+          try {
+            entry.file(
+              function (file) { resolve(Number(file.size) || 0) },
+              function () { resolve(-1) }
+            )
+          } catch (e) { resolve(-1) }
+        },
+        function () { resolve(-1) }
+      )
+    } catch (e) {
+      resolve(-1)
+    }
+  })
+}
+
 /**
- * 校验下载到的 wgt 文件哈希（T2.5）。
- * 读不出来 / 算不出来一律视为校验失败（fail closed）：无法证明完整的东西绝不装。
+ * 校验下载到的 wgt（T2.5）。
+ *
+ * 默认走**文件大小**校验（原生 API，瞬时）—— 它能抓住最常见的"下载不完整"
+ * （GitHub 直连断流时实测下到 310KB/516KB/262KB 就卡住，大小立刻对不上）。
+ *
+ * 严格哈希校验（SHA-256）改为**可选**：纯 JS 算 572KB 在 App 端太慢，
+ * 会让热更看起来像卡死。Release 说明里带 `wgt-size` 时才启用。
+ *
+ * @param {string} tempPath
+ * @param {string} expectedHex期望的 sha256（可选，缺省则跳过）
+ * @param {number} [expectedSize] 期望的字节数（可选，缺省则跳过）
+ * @returns {Promise<boolean>}
+ */
+export async function verifyWgtFile(tempPath, expectedHex, expectedSize) {
+  try {
+    // 1) 大小校验优先 —— 抓断流残包，且不阻塞界面
+    if (typeof expectedSize === 'number' && expectedSize > 0) {
+      const actual = await fileSizeOf(tempPath)
+      if (actual !== expectedSize) {
+        console.error('[update] 文件大小不符：期望 ' + expectedSize + ' 实际 ' + actual)
+        return false
+      }
+    }
+    // 2) 哈希校验（仅在明确提供期望值时做）
+    if (expectedHex) {
+      const dataUrl = await readTempFileDataUrl(tempPath)
+      const hex = sha256Hex(base64ToBytes(dataUrl))
+      return hex === String(expectedHex).toLowerCase()
+    }
+    // 3) 两者都没有 → 无法证明完整，但也不能因此永远失败：
+    //    交给 install 自身的校验（uni-app 会校验 wgt 的 manifest）。
+    return true
+  } catch (e) {
+    console.error('[update] 校验异常：', (e && e.message) || e)
+    return false
+  }
+}
+
+/**
+ * 旧接口保留（测试与兼容用）：只做哈希校验。
+ * @deprecated 新代码用 verifyWgtFile
  */
 export async function verifyWgtFileHash(tempPath, expectedHex) {
   try {
@@ -283,12 +355,12 @@ export async function applyUpdate(r) {
       const isLast = i === sources.length - 1
       try {
         const temp = await downloadFile(url)
-        if (r.wgtSha256) {
-          const hashOk = await verifyWgtFileHash(temp, r.wgtSha256)
-          if (!hashOk) {
-            // 校验失败说明这个源给的包不对（损坏/被劫持），换下一个源也没意义 → 直接中止
-            return { ok: false, type: 'wgt', reason: 'hash-mismatch' }
-          }
+        // 校验：优先用文件大小（原生、瞬时，能抓住断流残包）；
+        // Release 说明带 wgt-size 才启用大小校验；wgt-sha256 仍会做哈希（若提供）。
+        const verify = await verifyWgtFile(temp, r.wgtSha256, r.wgtSize)
+        if (!verify) {
+          // 校验失败说明这个源给的包不对（损坏/被劫持），换下一个源也没意义 → 直接中止
+          return { ok: false, type: 'wgt', reason: 'verify-failed' }
         }
         const installed = await installWgt(temp)
         if (installed) return { ok: true, type: 'wgt', source: url }

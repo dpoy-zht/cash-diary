@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import {
   parseTagVersion, isNewerVersion, stripReleaseNotes, pickUpdateAssets,
-  parseWgtVersionFromName, parseWgtSha256, buildWgtSources
+  parseWgtVersionFromName, parseWgtSha256, parseWgtSize, buildWgtSources
 } from '../src/utils/update.js'
 import { currentAppVersion } from '../src/services/update.js'
 
@@ -213,5 +213,41 @@ describe('buildWgtSources —— 生成多源下载地址', () => {
     const list = buildWgtSources(url)
     expect(list[0]).toBe('https://ghfast.top/' + url)
     expect(list[1]).toBe(url)
+  })
+})
+
+/**
+ * `wgt-size` 解析（2026-10-07 真机定位到的卡死原因）。
+ *
+ * App 端算 SHA-256 是纯 JS 逐字节运算（`utils/sha256.js`），
+ * 572KB 的包在无 JIT 的引擎上慢一到两个数量级 → 界面卡在「正在更新…」。
+ * 文件大小走原生 API 瞬时返回，且能抓住断流残包（实测下到 310K/516K/262K）。
+ */
+describe('parseWgtSize —— 解析 wgt 字节数', () => {
+  it('标准格式 wgt-size: 572990', () => {
+    expect(parseWgtSize('wgt-size: 572990')).toBe(572990)
+  })
+
+  it('容忍中文冒号与各种分隔符', () => {
+    expect(parseWgtSize('wgt-size：572990')).toBe(572990)
+    expect(parseWgtSize('wgt_size = 572990')).toBe(572990)
+    expect(parseWgtSize('wgt-size=572990')).toBe(572990)
+  })
+
+  it('从多行Release 说明里提取', () => {
+    const body = '## v2.3.9\n\n修bug\n\nwgt-sha256: 771f039a7d0510029416c54016b95ef9cf8d44509598a014b14a9a14fcb5b033\nwgt-size: 572990\n'
+    expect(parseWgtSize(body)).toBe(572990)
+  })
+
+  it('没写 / 格式不对 / 空输入 → 返回 0（表示"不校验大小"而非"校验失败"）', () => {
+    expect(parseWgtSize('')).toBe(0)
+    expect(parseWgtSize(undefined)).toBe(0)
+    expect(parseWgtSize('wgt-size: abc')).toBe(0)
+    expect(parseWgtSize('随便一段说明')).toBe(0)
+  })
+
+  it('不会误认wgt-sha256 里的数字', () => {
+    const body = 'wgt-sha256: 771f039a7d0510029416c54016b95ef9cf8d44509598a014b14a9a14fcb5b033'
+    expect(parseWgtSize(body)).toBe(0)
   })
 })

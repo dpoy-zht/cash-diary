@@ -146,3 +146,19 @@ export function buildWgtSources(wgtUrl) {
     raw
   ]
 }
+
+/**
+ * 从 Release 说明里解析 wgt 文件的**字节数**。
+ *
+ * 为什么需要（2026-10-07 真机定位）：App 端做SHA-256 是纯 JS 逐字节算，
+ * 572KB 的包在无JIT 的引擎上要慢一到两个数量级 → 界面卡在「正在更新…」。
+ * 而文件大小是原生 API 瞬间返回，且**恰好能抓住最常见的失败模式** ——
+ * GitHub 直连断流时实测下到 310KB / 516KB / 262KB 就卡住，大小立刻对不上。
+ *
+ * 格式：`wgt-size: 572990`
+ * @returns {number} 字节数；没写或格式不对返回 0
+ */
+export function parseWgtSize(body) {
+  const m = /wgt[-_]size[:：=\s]+(\d+)/i.exec(String(body || ''))
+  return m ? Number(m[1]) || 0 : 0
+}
