@@ -5,7 +5,10 @@ import * as accountService from '../src/services/account.js'
 import * as budgetService from '../src/services/budget.js'
 import * as txService from '../src/services/tx.js'
 import { resetAll } from '../src/services/maintenance.js'
-import { budgetStatus, progressPercent, overText, overAlertKey, pickOverAlertKeys, WARN_RATIO } from '../src/utils/budget.js'
+import {
+  budgetStatus, progressPercent, overText, overAlertKey, pickOverAlertKeys, WARN_RATIO,
+  spentBySubtree
+} from '../src/utils/budget.js'
 import { ymOf } from '../src/utils/date.js'
 
 describe('budgetStatus —— 预算判断（纯函数）', () => {
@@ -224,5 +227,74 @@ describe('pickOverAlertKeys —— 重置数据时挑选要清的去重键', () 
     expect(pickOverAlertKeys(null)).toEqual([])
     expect(pickOverAlertKeys('not-array')).toEqual([])
     expect(pickOverAlertKeys([1, null, {}])).toEqual([])
+  })
+})
+
+describe('spentBySubtree —— 两级分类下按子树汇总（v7）', () => {
+  // 1 餐饮（一级）→ 11 早餐 / 12 午餐；2 交通（一级）→ 13 打车；3 其他（一级，无子类）
+  const cats = [
+    { id: 1, name: '餐饮', type: 'expense', parent_id: null },
+    { id: 2, name: '交通', type: 'expense', parent_id: null },
+    { id: 3, name: '其他', type: 'expense', parent_id: null },
+    { id: 11, name: '早餐', type: 'expense', parent_id: 1 },
+    { id: 12, name: '午餐', type: 'expense', parent_id: 1 },
+    { id: 13, name: '打车', type: 'expense', parent_id: 2 }
+  ]
+  const rec = function (category_id, amount_cents, type) {
+    return { category_id: category_id, amount_cents: amount_cents, type: type || 'expense' }
+  }
+
+  it('一级的已花 = 自己 + 所有子级（这是"给餐饮设预算却查不出已花"的修复）', () => {
+    const m = spentBySubtree([rec(11, 1000), rec(12, 2000), rec(1, 500)], cats)
+    expect(m.get(1)).toBe(3500)
+    // 子级各自只有自己的直接合计
+    expect(m.get(11)).toBe(1000)
+    expect(m.get(12)).toBe(2000)
+  })
+
+  it('没有子类的一级就是它自己的合计', () => {
+    const m = spentBySubtree([rec(3, 700)], cats)
+    expect(m.get(3)).toBe(700)
+  })
+
+  it('一级没有直接流水、只有子级流水时也能算出来', () => {
+    const m = spentBySubtree([rec(11, 1000)], cats)
+    expect(m.get(1)).toBe(1000)
+  })
+
+  it('各组互不串台：交通的流水不会算到餐饮头上', () => {
+    const m = spentBySubtree([rec(13, 900)], cats)
+    expect(m.get(2)).toBe(900)
+    expect(m.get(1)).toBeUndefined()
+  })
+
+  it('只算支出：收入不计入', () => {
+    const m = spentBySubtree([rec(11, 1000), rec(11, 9999, 'income')], cats)
+    expect(m.get(11)).toBe(1000)
+    expect(m.get(1)).toBe(1000)
+  })
+
+  it('分类表为空时退回"每个 id 的直接合计"', () => {
+    const m = spentBySubtree([rec(11, 100)], [])
+    expect(m.get(11)).toBe(100)
+    expect(m.get(1)).toBeUndefined()
+  })
+
+  it('parent_id 指向不存在的分类时静默忽略，不造出幽灵条目', () => {
+    const m = spentBySubtree([rec(11, 100)], [{ id: 11, parent_id: 999 }])
+    expect(m.get(999)).toBe(100)
+    expect(m.get(11)).toBe(100)
+  })
+
+  it('空入参返回空 Map，脏行跳过', () => {
+    expect(spentBySubtree(null, cats).size).toBe(0)
+    expect(spentBySubtree([null, {}, rec(11, 50)], cats).get(11)).toBe(50)
+  })
+
+  it('和 budgetStatus 串起来：给一级设 100 元、记在二级上会正常触发 warn/over', () => {
+    const m = spentBySubtree([rec(11, 9000)], cats) // 早餐 90 元
+    const st = budgetStatus(10000, m.get(1)) // 餐饮限额 100 元
+    expect(st.level).toBe('warn') // 9000 / 10000 = 90% ≥ 80%
+    expect(budgetStatus(10000, m.get(1)).ratio).toBeCloseTo(0.9, 10)
   })
 })

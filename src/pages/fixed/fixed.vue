@@ -47,15 +47,31 @@
       <view class="form" @click.stop>
         <text class="form-title">{{ isEditing ? '编辑固定支出' : '添加固定支出' }}</text>
 
-        <!-- 分类 -->
+        <!-- 分类：一级 chip + 二级 chip（两级结构，与记账页同一套选择规则） -->
         <text class="f-label">花在哪</text>
         <scroll-view scroll-x class="cat-scroll">
           <view class="cat-wrap">
             <view
-              v-for="c in expenseCats"
+              v-for="n in expenseTree"
+              :key="n.cat.id"
+              class="cat-chip"
+              :class="{ on: n.cat.id === sel.topId }"
+              @click="pickTop(n.cat.id)"
+            >{{ n.cat.name }}</view>
+          </view>
+        </scroll-view>
+        <scroll-view v-if="sel.children.length" scroll-x class="cat-scroll cat-sub">
+          <view class="cat-wrap">
+            <view
+              class="cat-chip"
+              :class="{ on: sel.isTopSelected }"
+              @click="form.categoryId = sel.topId"
+            >全部{{ sel.top.name }}</view>
+            <view
+              v-for="c in sel.children"
               :key="c.id"
               class="cat-chip"
-              :class="{ on: form.categoryId === c.id }"
+              :class="{ on: c.id === sel.selected }"
               @click="form.categoryId = c.id"
             >{{ c.name }}</view>
           </view>
@@ -103,10 +119,19 @@ import { useCategoryStore } from '../../stores/category.js'
 import { formatCents } from '../../utils/money.js'
 import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
+import { selectionOf, nextOnPickTop } from '../../utils/category-ui.js'
 
 const store = useFixedStore()
 const categoryStore = useCategoryStore()
-const expenseCats = computed(function () { return categoryStore.expenseCats })
+/** 两级分类：一级 chip 条 + 选中一级的二级 chip 条 */
+const expenseTree = computed(function () { return categoryStore.expenseTree })
+const sel = computed(function () { return selectionOf(expenseTree.value, form.categoryId) })
+/** 点一级只切一级，不把已选好的二级顶掉（规则与记账页共用 utils/category-ui.js） */
+function pickTop(topId) {
+  const next = nextOnPickTop(sel.value, topId)
+  if (next == null) return
+  form.categoryId = next
+}
 
 const formShow = ref(false)
 /** 正在编辑的配置 id；null = 新增（同一个弹层复用两种模式，字段完全一致） */
@@ -135,10 +160,11 @@ function onEnabledChange(e) {
   form.enabled = !!e.detail.value
 }
 
-/** 新增：清空表单。分类不预选——避免用户没注意就存到"早餐"名下 */
+/** 新增：清空表单。分类预选到**第一个一级**（不是二级）——
+   既让用户一眼看到两级选择条，又不会没注意就存到「早餐」那种二级名下 */
 function openCreate() {
   editingId.value = null
-  form.categoryId = null
+  form.categoryId = expenseTree.value.length ? expenseTree.value[0].cat.id : null
   form.amountStr = ''
   form.dayOfMonth = 1
   form.note = ''
@@ -432,6 +458,10 @@ onShow(function () {
 }
 .cat-scroll {
   white-space: nowrap;
+}
+/* 二级条紧贴一级条（同属"选分类"一组） */
+.cat-sub {
+  margin-top: -4px;
 }
 .cat-wrap {
   display: flex;

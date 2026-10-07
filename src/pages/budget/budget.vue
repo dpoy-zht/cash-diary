@@ -28,30 +28,31 @@
     </view>
 
     <!-- 分类预算 -->
-    <text class="section-label">分类预算（{{ setCount }} / {{ cats.length }} 已设）</text>
+    <text class="section-label">分类预算（{{ setCount }} / {{ rows.length }} 已设）</text>
     <view class="list-card">
       <view
-        v-for="c in cats"
-        :key="c.id"
+        v-for="r in rows"
+        :key="r.cat.id"
         class="row"
+        :class="{ sub: !r.isTop }"
         hover-class="row-hover"
-        @click="editCategory(c)"
+        @click="editCategory(r.cat)"
       >
-        <cat-icon :category="c" :size="36" />
+        <cat-icon :category="r.cat" :size="r.isTop ? 36 : 30" />
         <view class="row-main">
           <view class="row-line">
-            <text class="row-name">{{ c.name }}</text>
-            <text class="row-num" :class="rowClass(c)">{{ rowText(c) }}</text>
+            <text class="row-name" :class="{ 'sub-name': !r.isTop }">{{ r.cat.name }}</text>
+            <text class="row-num" :class="rowClass(r.cat)">{{ rowText(r.cat) }}</text>
           </view>
-          <view v-if="budgetStore.limitOf(c.id)" class="bar bar-sm">
-            <view class="bar-i" :class="statusOf(c).level" :style="{ width: percentOf(c) + '%' }" />
+          <view v-if="budgetStore.limitOf(r.cat.id)" class="bar bar-sm">
+            <view class="bar-i" :class="statusOf(r.cat).level" :style="{ width: percentOf(r.cat) + '%' }" />
           </view>
           <text v-else class="row-hint">点一下设个上限</text>
         </view>
       </view>
     </view>
 
-    <text class="foot">预算按账本单独保存，设一次每月都生效。点一行即可设置；把金额清空就是不设预算。</text>
+    <text class="foot">预算按账本单独保存，设一次每月都生效。点一行即可设置；把金额清空就是不设预算。一级分类的"已花"含它下面所有子分类。</text>
   </view>
 </template>
 
@@ -63,12 +64,19 @@ import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { useBudgetStore } from '../../stores/budget.js'
 import { formatCents } from '../../utils/money.js'
-import { budgetStatus, progressPercent } from '../../utils/budget.js'
+import { budgetStatus, progressPercent, spentBySubtree } from '../../utils/budget.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
- * 预算设置页：本月总预算 + 12 个支出分类的分类预算。
- * 点卡片/点行弹输入框设置，清空即取消预算。
+ * 预算设置页：本月总预算 + 分类预算。
+ *
+ * 两级分类（v7）下的三条口径：
+ * 1. 列表按**树**顺序铺开：一级一行、它的二级缩进跟在后面，一级二级都能单独设预算。
+ *    这样做也兼容老数据 —— 升级前给「奶茶」设的预算还挂在那条二级记录上，仍然能看见、能改。
+ * 2. **一级的"已花"= 自己 + 所有子分类**（`spentBySubtree`）。只按 category_id 精确匹配的话，
+ *    「餐饮」设了 500、天天记「早餐」，会永远显示 0%。
+ * 3. 因此一级的已花与它各子类之和是一致的，重复设两级预算时不会各算各的。
+ *
  * 判断逻辑全在 utils/budget.js（纯函数，有单测）。
  */
 const txStore = useTxStore()
@@ -76,20 +84,23 @@ const categoryStore = useCategoryStore()
 const metaStore = useMetaStore()
 const budgetStore = useBudgetStore()
 
-const cats = computed(function () {
-  return categoryStore.expenseCats
+/** 支出分类按树顺序铺平：一级 + 紧跟其二级（顺序由 store 的 sort 决定） */
+const rows = computed(function () {
+  const out = []
+  categoryStore.expenseTree.forEach(function (n) {
+    out.push({ cat: n.cat, isTop: true })
+    ;(n.children || []).forEach(function (c) { out.push({ cat: c, isTop: false }) })
+  })
+  return out
 })
 
-/** 本月各分类已花（按 category_id 汇总） */
+/** 本月各分类"作为预算主体"的已花（一级含子类），见 utils/budget.js: spentBySubtree */
 const spentByCat = computed(function () {
-  const map = {}
-  txStore.records.forEach(function (r) {
-    if (r.type !== 'expense') return
-    const k = String(r.category_id)
-    map[k] = (map[k] || 0) + r.amount_cents
-  })
-  return map
+  return spentBySubtree(txStore.records, categoryStore.list)
 })
+function spentOf(id) {
+  return spentByCat.value.get(Number(id)) || 0
+}
 
 const totalText = computed(function () {
   return formatCents(budgetStore.totalCents)
@@ -123,23 +134,22 @@ const totalMood = computed(function () {
 })
 const setCount = computed(function () {
   let n = 0
-  cats.value.forEach(function (c) {
-    if (budgetStore.limitOf(c.id)) n += 1
+  rows.value.forEach(function (r) {
+    if (budgetStore.limitOf(r.cat.id)) n += 1
   })
   return n
 })
 
 function statusOf(c) {
-  return budgetStatus(budgetStore.limitOf(c.id), spentByCat.value[String(c.id)] || 0)
+  return budgetStatus(budgetStore.limitOf(c.id), spentOf(c.id))
 }
 function percentOf(c) {
-  return progressPercent(budgetStore.limitOf(c.id), spentByCat.value[String(c.id)] || 0)
+  return progressPercent(budgetStore.limitOf(c.id), spentOf(c.id))
 }
 function rowText(c) {
   const limit = budgetStore.limitOf(c.id)
-  const spent = spentByCat.value[String(c.id)] || 0
   if (!limit) return '未设'
-  return '¥' + formatCents(spent) + ' / ¥' + formatCents(limit)
+  return '¥' + formatCents(spentOf(c.id)) + ' / ¥' + formatCents(limit)
 }
 function rowClass(c) {
   const lv = statusOf(c).level
@@ -354,6 +364,25 @@ onShow(function () {
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid var(--cd-line);
+}
+/* 二级行：左侧留白 + 竖线做出"挂在上一个一级下"的层次。
+   不靠灰字表达层级 —— 灰字会掉到 4.5:1 以下，文字一律 --cd-ink。 */
+.row.sub {
+  padding-left: 26px;
+  position: relative;
+}
+.row.sub::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--cd-line);
+}
+.sub-name {
+  font-weight: 600;
 }
 .row:last-child {
   border-bottom: none;

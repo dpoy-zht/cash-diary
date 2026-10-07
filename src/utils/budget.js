@@ -12,6 +12,43 @@
 export const WARN_RATIO = 0.8
 
 /**
+ * 按**分类子树**汇总支出（纯函数）。
+ *
+ * 为什么必须有它：两级分类下，用户可能给一级「餐饮」设预算、却天天记在二级「早餐」上。
+ * 如果只按 `category_id` 精确匹配，餐饮的已花会永远是 0、预算形同虚设。
+ * 所以一级的已花必须**把挂在它下面的二级流水也算进来**。
+ *
+ * 返回的 Map 里，每个分类 id（无论一级还是二级）都有值：
+ * - 二级 = 它自己的直接合计
+ * - 一级 = 自己的直接合计 + 所有直接子级的合计
+ *
+ * 只处理两层（结构上也只有两层）。`parent_id` 指向不存在的分类时静默忽略。
+ *
+ * @param {Array} records 流水（含 type / category_id / amount_cents）
+ * @param {Array} categories 分类表（含 id / parent_id）
+ * @returns {Map<number, number>} 分类 id → 子树支出合计（分）
+ */
+export function spentBySubtree(records, categories) {
+  const direct = new Map()
+  for (const r of (Array.isArray(records) ? records : [])) {
+    if (!r || r.type !== 'expense') continue
+    const id = Number(r.category_id)
+    if (!Number.isFinite(id)) continue
+    direct.set(id, (direct.get(id) || 0) + (Number(r.amount_cents) || 0))
+  }
+  const out = new Map(direct)
+  const cats = Array.isArray(categories) ? categories : []
+  for (const c of cats) {
+    if (!c || c.parent_id == null) continue
+    const mine = out.get(Number(c.id)) || 0
+    if (!mine) continue
+    const pid = Number(c.parent_id)
+    out.set(pid, (out.get(pid) || 0) + mine)
+  }
+  return out
+}
+
+/**
  * @param {number} limitCents 预算（分），0 表示未设置
  * @param {number} spentCents 已花（分）
  * @returns {{hasLimit:boolean, limitCents:number, spentCents:number, remainCents:number, ratio:number, level:'none'|'safe'|'warn'|'over'}}

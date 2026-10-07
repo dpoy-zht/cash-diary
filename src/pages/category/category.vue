@@ -17,29 +17,40 @@
       >{{ t.name }}（{{ countOf(t.key) }}）</view>
     </view>
 
-    <!-- 分类列表 -->
+    <!-- 分类列表：一级为分组标题，二级缩进挂在下面 -->
     <view class="list-card">
-      <view
-        v-for="c in rows"
-        :key="c.id"
-        class="row"
-        hover-class="row-hover"
-        @click="openActions(c)"
-      >
-        <cat-icon :category="c" :size="40" />
-        <view class="row-main">
-          <text class="row-name">{{ c.name }}</text>
-          <text class="row-sub">{{ c.count ? c.count + ' 笔记录' : '还没有记录' }}</text>
+      <block v-for="n in nodes" :key="n.cat.id">
+        <view class="row" hover-class="row-hover" hover-stay-time="80" @click="openActions(n.cat, true)">
+          <cat-icon :category="n.cat" :size="40" />
+          <view class="row-main">
+            <text class="row-name">{{ n.cat.name }}</text>
+            <text class="row-sub">{{ subTextOf(n) }}</text>
+          </view>
+          <text class="row-arrow">›</text>
         </view>
-        <text class="row-arrow">›</text>
-      </view>
-      <view v-if="!rows.length" class="row-empty">
+        <view
+          v-for="c in n.children"
+          :key="c.id"
+          class="row sub"
+          hover-class="row-hover"
+          hover-stay-time="80"
+          @click="openActions(c, false)"
+        >
+          <cat-icon :category="c" :size="32" />
+          <view class="row-main">
+            <text class="row-name sub-name">{{ c.name }}</text>
+            <text class="row-sub">{{ c.count ? c.count + ' 笔记录' : '还没有记录' }}</text>
+          </view>
+          <text class="row-arrow">›</text>
+        </view>
+      </block>
+      <view v-if="!nodes.length" class="row-empty">
         <mascot-deco class="empty-milo" slot-id="deco.category.empty" />
         <text class="row-hint">这一类还没有分类，点下面新建一个</text>
       </view>
     </view>
 
-    <text class="foot">点一行可以改名、换图标、上下移动或删除。已经有记录的分类不能删——先把那些记录改到别的分类。</text>
+    <text class="foot">点一行可以改名、换图标、上下移动或删除；点一级分类还能在它下面新建子分类。已经有记录的分类、或下面还挂着子分类的一级，都不能删。</text>
 
     <view class="create-wrap">
       <view class="create-btn" hover-class="create-hover" @click="openCreate">
@@ -58,6 +69,26 @@
           placeholder="分类名称（最多 6 个字）"
           maxlength="6"
         />
+        <!-- 两级分类：新建时选"作为一级"或挂到某个一级下 -->
+        <block v-if="panelMode === 'create'">
+          <text class="panel-label">放在哪里</text>
+          <scroll-view scroll-x class="parent-bar" :show-scrollbar="false">
+            <view class="parent-line">
+              <view
+                class="pchip"
+                :class="{ on: form.parentId == null }"
+                @click="form.parentId = null"
+              >作为一级分类</view>
+              <view
+                v-for="n in nodes"
+                :key="n.cat.id"
+                class="pchip"
+                :class="{ on: Number(form.parentId) === Number(n.cat.id) }"
+                @click="form.parentId = n.cat.id"
+              >{{ n.cat.name }}</view>
+            </view>
+          </scroll-view>
+        </block>
         <text class="panel-label">选个图标</text>
         <scroll-view scroll-y class="icon-scroll">
           <view class="icon-grid">
@@ -90,11 +121,14 @@ import { UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
- * 分类管理：支出/收入两个列表，支持新建、改名、换图标、上下移动、删除。
+ * 分类管理：支出/收入两组，每组按**两级结构**展示（一级为分组标题，二级缩进挂在下面）。
+ * 支持新建（可选挂到某个一级下）、改名、换图标、上下移动、删除。
  *
- * 两条硬规则（都在 services/category.js 里）：
- * - 新分类的图标必须从参考包的 19 个 key 里选：配色和图标都按 key 取，乱填会退化成 emoji
+ * 三条硬规则（都在 services/category.js 里）：
+ * - 新分类的图标必须从参考包的 key 里选：配色和图标都按 key 取，乱填会退化成 emoji
  * - 已有记录的分类不让删，避免出现指向不存在分类的孤儿流水
+ * - **下面还挂着子分类的一级也不让删**，否则那批二级会一起变成孤儿
+ * - 排序只在**同组内**（同类型 + 同父级）生效，二级不会串到别的一级下面去
  */
 const categoryStore = useCategoryStore()
 
@@ -103,14 +137,25 @@ const types = [
   { key: 'income', name: '收入' }
 ]
 const type = ref('expense')
-/** 列表（带笔数）由本页自己维护；store 那份是给记账/编辑页用的 */
-const all = ref([])
+/** 两种类型的完整树（带 count / total）；列表由本页自己维护，store 那份是给记账/编辑页用的 */
+const treeAll = ref([])
 
-const rows = computed(function () {
-  return all.value.filter(function (c) { return c.type === type.value })
+/** 当前类型的一级节点（每个节点自带 children） */
+const nodes = computed(function () {
+  return treeAll.value.filter(function (n) { return n.cat.type === type.value })
 })
+/** 某类型的分类总数（一级 + 二级） */
 function countOf(t) {
-  return all.value.filter(function (c) { return c.type === t }).length
+  return treeAll.value
+    .filter(function (n) { return n.cat.type === t })
+    .reduce(function (s, n) { return s + 1 + (n.children ? n.children.length : 0) }, 0)
+}
+/** 一级行的副标题：自己几笔 + 子分类几个 */
+function subTextOf(n) {
+  const kids = n.children ? n.children.length : 0
+  const own = n.cat.count ? n.cat.count + ' 笔' : '没有记录'
+  if (!kids) return own
+  return own + ' · ' + kids + ' 个子分类'
 }
 
 /**
@@ -122,7 +167,8 @@ const iconKeys = computed(function () {
 })
 
 async function reload() {
-  all.value = await categoryService.listWithStats()
+  // 一次拿到两种类型的完整树（一级 + children + count/total），页面自己按 type 过滤
+  treeAll.value = await categoryService.listTreeWithStats()
   // 同时刷新全局分类（记账宫格、编辑弹层用的是 store 那份）；
   // 这里是写操作后的强制刷新，必须走 reload（init 有 ready 守卫不生效）
   await categoryStore.reload()
@@ -132,13 +178,16 @@ async function reload() {
 const panelShow = ref(false)
 const panelMode = ref('create')
 const editingId = ref(null)
-const form = reactive({ name: '', icon: 'more' })
+/** parentId = null 表示新建一个**一级**分类 */
+const form = reactive({ name: '', icon: 'more', parentId: null })
 
-function openCreate() {
+/** 打开新建面板；传 topCat 时默认挂到它下面（从一级行的"新建子分类"进来） */
+function openCreate(topCat) {
   panelMode.value = 'create'
   editingId.value = null
   form.name = ''
-  form.icon = 'more'
+  form.icon = topCat ? topCat.icon : 'more'
+  form.parentId = topCat ? topCat.id : null
   panelShow.value = true
 }
 function openIcon(c) {
@@ -154,7 +203,12 @@ function closePanel() {
 async function submitPanel() {
   try {
     if (panelMode.value === 'create') {
-      await categoryService.create({ name: form.name, type: type.value, icon: form.icon })
+      await categoryService.create({
+        name: form.name,
+        type: type.value,
+        icon: form.icon,
+        parentId: form.parentId
+      })
     } else {
       await categoryService.setIcon(editingId.value, form.icon)
     }
@@ -167,15 +221,26 @@ async function submitPanel() {
 }
 
 /* ---- 行操作 ---- */
-function openActions(c) {
+/**
+ * @param {object} c 分类
+ * @param {boolean} isTop 是不是一级（一级多一项"新建子分类"）
+ */
+function openActions(c, isTop) {
+  const items = isTop
+    ? ['改名', '换个图标', '新建子分类', '上移', '下移', '删除']
+    : ['改名', '换个图标', '上移', '下移', '删除']
   uni.showActionSheet({
-    itemList: ['改名', '换个图标', '上移', '下移', '删除'],
+    itemList: items,
     success: function (res) {
       if (res.tapIndex === 0) doRename(c)
       else if (res.tapIndex === 1) openIcon(c)
-      else if (res.tapIndex === 2) doMove(c, -1)
-      else if (res.tapIndex === 3) doMove(c, 1)
-      else if (res.tapIndex === 4) doRemove(c)
+      else if (isTop && res.tapIndex === 2) openCreate(c)
+      else {
+        const i = isTop ? res.tapIndex - 3 : res.tapIndex - 2
+        if (i === 0) doMove(c, -1)
+        else if (i === 1) doMove(c, 1)
+        else if (i === 2) doRemove(c)
+      }
     }
   })
 }
@@ -348,6 +413,29 @@ onShow(function () {
   color: var(--cd-icon-3);
   font-size: 18px;
 }
+/* 二级行：左侧留白 + 竖线做出"挂在上面那个一级下"的层次感。
+   不要靠缩进 + 变灰来表达层级 —— 灰字会掉到 4.5:1 以下，文字一律用 --cd-ink。 */
+.row.sub {
+  padding-left: 26px;
+  position: relative;
+}
+.row.sub::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--cd-line);
+}
+.sub-name {
+  font-weight: 600;
+}
+/* 一级行与其第一个二级之间不要重复画线，视觉上更像一组 */
+.row.sub:first-of-type {
+  border-top: none;
+}
 .row-empty {
   padding: 18px 0;
 }
@@ -427,6 +515,28 @@ onShow(function () {
 }
 .icon-scroll {
   max-height: 260px;
+}
+/* 新建时的"放在哪里"选择条：横向滚动，chip 与编辑页的分类 chip 用同一套语言 */
+.parent-bar {
+  white-space: nowrap;
+}
+.parent-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+.pchip {
+  padding: 7px 14px;
+  border-radius: var(--cd-r-pill);
+  background: var(--cd-bg);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cd-ink);
+}
+.pchip.on {
+  background: var(--cd-primary);
+  box-shadow: 0 0 0 2px var(--cd-primary-deep);
 }
 .icon-grid {
   display: grid;
