@@ -258,6 +258,9 @@ function onSave() {
   padding: 8px 14px;
   margin-right: 8px;
   transition: transform var(--cd-dur) var(--cd-ease);
+  /* 同 category-picker：chip 超出屏幕时不允许被压扁换行（真机截图实测过） */
+  flex: none;
+  white-space: nowrap;
 }
 .chip-dot {
   width: 10px;

@@ -142,6 +142,11 @@ function pick(id) {
   background: var(--cd-surface);
   box-shadow: var(--cd-sh-card);
   transition: transform var(--cd-dur) var(--cd-ease);
+  /* ⚠️ 必须锁死宽度：chip 多到超出屏幕时（餐饮有 7 个子类），
+     inline-flex 的子项默认可收缩 → 文字被压成两行「早/餐」。
+     真机截图实测过，不是理论问题。 */
+  flex: none;
+  white-space: nowrap;
 }
 .sub-chip.on {
   background: var(--cd-primary);
