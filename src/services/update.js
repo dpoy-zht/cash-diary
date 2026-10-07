@@ -220,10 +220,23 @@ function downloadFile(url) {
       // 下载其实成功了（572,659 B 与线上一致），但后续 install 找不到文件 →
       // 表现为"一直加载中然后更新失败"。
       { filename: '_doc/update.wgt', timeout: timeoutMs },
-      function (download, status) {
+function (download, status) {
+        /**
+         * ⚠️ **这个回调会被反复调用多次**（status: 0 待开始→ 1 下载中 → 2 完成），
+         * **不是调用一次就结束**（2026-10-07 真机踩过）。
+         *
+         * 之前的写法是 `if (status === 2) {...} else if (status === 3) {...} else { reject }`，
+         * 结果**第一次回调（status=0）就落进 else 直接 reject**——
+         * 于是文件明明完整下载了（真机证据：doc 里 8 个文件全是 573,545 B，
+         * 与线上一致），代码却已判定「下载未完成」退出，
+         * 随后 7 次重试各存一个新文件（update(1)...update(8)）。
+         *
+         * 正确做法：**只在终态（2 完成 / 3 失败 / 4 取消）决策，其余状态直接忽略**。
+         */
+        if (status === 0 || status === 1) return   // 待开始/下载中 → 忽略，等后续回调
+
         clearTimeout(timer)
-        // status: 0=待开始 1=下载中 2=完成 3=失败 4=取消
-if (status === 2) {
+        if (status === 2) {
         /**
          * ⚠️ **必须拿到绝对路径，不是 file:// URL**（2026-10-07 真机定位）。
          *
@@ -255,9 +268,16 @@ if (status === 2) {
           }
         )
       } else if (status === 3) {
-          reject(new Error('下载失败（HTTP ' + download.statusCode + '）'))
+          reject(new Error('下载失败（HTTP ' + (download.statusCode || '未知') + '）'))
+        } else if (status === 4) {
+          reject(new Error('下载已取消'))
         } else {
-          reject(new Error('下载未完成'))
+          // 终态但不认识的状态码：不能当成失败就放弃，先去看文件是否已完整落盘
+          plus.io.resolveLocalFileSystemURL(
+            download.filename,
+            function (entry) { resolve(entry.fullPath) },
+            function () { reject(new Error('下载未完成（状态 ' + status + '）')) }
+          )
         }
       }
     )
