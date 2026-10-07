@@ -2,8 +2,8 @@
     "name" : "奶蛙记账",
     "appid" : "__UNI__F1ADD03",
     "description" : "奶蛙风个人记账 App（首页余额卡 / 3 秒记一笔 / 分类统计，本地 SQLite 持久化）",
-    "versionName" : "2.3.9",
-    "versionCode" : 233,
+    "versionName" : "2.3.10",
+    "versionCode" : 234,
     "transformPx" : false,
     "app-plus" : {
         "usingComponents" : true,
@@ -39,7 +39,14 @@
         "distribute" : {
             "permissions" : [
                 "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>"
-            ]
+            ],
+            "android" : {
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>"
+                ],
+                "usesCleartextTraffic" : true
+            }
         }
     },
     "h5" : {

@@ -15,6 +15,19 @@ import { sha256Hex, base64ToBytes } from '../utils/sha256.js'
 
 const UPDATE_LAST_KEY = 'cashDiary.updateCheck.lastAt'
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000
+
+/**
+ * 自建更新源（2026-10-07）。
+ *
+ * 为什么不用 GitHub 作为主源 —— 手机直连GitHub Release 在国内**时通时断**，
+ * 真机实测同一时刻：自建服务器 0.079s 拿到 / ghfast 下到 294KB 卡死 /
+ * GitHub 直连 9.7s 且随时可能断成残包。所以主源换成本人的服务器，
+ * GitHub 降级为**兜底**（服务器挂了还能试）。
+ *
+ * latest.json 由 `dist/dev/gen-latest-json.py` 生成（发版时自动推）。
+ */
+const SELF_HOSTED_API = 'http://121.40.24.123/update/latest.json'
+/** 自建源不可用时才走的兜底源 */
 const RELEASE_API = 'https://api.github.com/repos/dpoy-zht/cash-diary/releases/latest'
 const RELEASE_PAGE = 'https://github.com/dpoy-zht/cash-diary/releases/latest'
 
@@ -66,25 +79,72 @@ export async function checkForUpdate(opts) {
   const current = currentAppVersion()
   if (!current) return { hasUpdate: false, reason: 'not-app' }
 
-  try {
-    const res = await new Promise(function (resolve, reject) {
-      uni.request({
-        url: RELEASE_API,
-        method: 'GET',
-        /**
-         * 超时给 30s 而不是 10s：GitHub API 在国内访问延迟波动大，
-         * 10s 经常在慢网下直接超时 —— 那样亲友点「检查更新」永远只会看到
-         * 「网络不可用」，功能等于没有。宁可多等一会儿也要拿到结果。
-         */
-        timeout: 30000,
-        header: { 'User-Agent': 'cash-diary-app', 'Accept': 'application/vnd.github+json' },
-        success: function (r) {
-          if (r.statusCode !== 200) { reject(new Error('HTTP ' + r.statusCode)); return }
-          resolve(r.data)
-        },
-        fail: function () { reject(new Error('网络不可用')) }
-      })
+  // 主源：自建服务器（真机 0.079s）；失败才回退 GitHub
+  const self = await querySelfHosted(current)
+  if (self) return self
+  return await queryGithub(current)
+}
+
+/** 简单的 GET JSON */
+function fetchJson(url, timeout, header) {
+  return new Promise(function (resolve, reject) {
+    uni.request({
+      url: url,
+      method: 'GET',
+      timeout: timeout || 15000,
+      header: header || {},
+      success: function (r) {
+        if (r.statusCode !== 200) { reject(new Error('HTTP ' + r.statusCode)); return }
+        resolve(r.data)
+      },
+      fail: function () { reject(new Error('网络不可用')) }
     })
+  })
+}
+
+/**
+ * 主源：自建服务器上的 latest.json。
+ * 任何异常都返回 null（交给兜底源），**绝不抛错** —— 服务器挂了不该让用户看到报错。
+ */
+async function querySelfHosted(current) {
+  try {
+    const d = await fetchJson(SELF_HOSTED_API, 12000)
+    if (!d || !d.version) return null
+    if (!isNewerVersion(d.version, current)) {
+      return { hasUpdate: false, reason: 'latest', current: current }
+    }
+    const wgt = (d.assets && d.assets.wgt) || null
+    const apk = (d.assets && d.assets.apk) || null
+    // wgt 防降级：它的版本必须比当前已装资源新
+    const wgtUrl = wgt && wgt.url && isNewerVersion(d.version, current) ? wgt.url : ''
+    return {
+      hasUpdate: true,
+      source: 'self',
+      tag: d.tag || ('v' + d.version),
+      url: wgtUrl || (apk && apk.url) || RELEASE_PAGE,
+      notes: '修复与功能更新。',
+      current: current,
+      wgtUrl: wgtUrl,
+      wgtVersion: d.version,
+      // ⚠️ **只带 size、不带 sha256**：App 端纯 JS 算 572KB 的 SHA-256
+      // 会慢一到两个数量级（实测卡在「正在更新…」）。原生取大小瞬时，
+      // 且足以抓住断流残包。防篡改交给 install 自身校验。
+      wgtSha256: '',
+      wgtSize: (wgt && wgt.size) || 0,
+      apkUrl: (apk && apk.url) || ''
+    }
+  } catch (e) {
+    return null // 服务器不可达 → 用兜底源
+  }
+}
+
+/** 兜底源：GitHub Release API */
+async function queryGithub(current) {
+  try {
+    const res = await fetchJson(
+      RELEASE_API, 30000,
+      { 'User-Agent': 'cash-diary-app', 'Accept': 'application/vnd.github+json' }
+    )
     const tag = res && res.tag_name
     const notes = stripReleaseNotes(res && res.body, 120)
     if (!isNewerVersion(tag, current)) {
@@ -98,6 +158,7 @@ export async function checkForUpdate(opts) {
     }
     return {
       hasUpdate: true,
+      source: 'github',
       tag: tag,
       url: (res && res.html_url) || RELEASE_PAGE,
       notes: notes || '覆盖安装即可升级，账目数据都在。',

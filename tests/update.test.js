@@ -251,3 +251,37 @@ describe('parseWgtSize —— 解析 wgt 字节数', () => {
     expect(parseWgtSize(body)).toBe(0)
   })
 })
+
+/**
+ * 自建服务器源（2026-10-07）。
+ *
+ * 真机实测（同一时刻同一手机）：
+ *   http://121.40.24.123/        → HTTP 200 / 0.079s  ✓ 快 120 倍
+ *   https://ghfast.top/…        → 只下 294KB 就卡死（15s 超时）
+ *   https://github.com/…（直连） → 9.7s，且随时断成残包
+ * 所以主源换成本人服务器、GitHub 降级兜底。
+ */
+describe('自建更新源', () => {
+  const SELF_URL = 'http://121.40.24.123/update/nailong-ledger-v2.3.10.wgt'
+
+  it('自建源的 URL 不会被套上ghfast 代理', () => {
+    // buildWgtSources 只对 github.com 的链接加代理，
+    // 绝对 URL（自建源）必须原样返回，否则会拼出无效地址
+    expect(buildWgtSources(SELF_URL)).toEqual([SELF_URL])
+  })
+
+  it('自建源是http 也不会被改动（App 端明文访问由 Android 侧配置处理）', () => {
+    expect(buildWgtSources(SELF_URL)[0]).toBe(SELF_URL)
+  })
+
+  it('自建源 URL 不含 github.com 时不生成任何代理候选', () => {
+    const list = buildWgtSources(SELF_URL)
+    expect(list.length).toBe(1)
+    expect(list[0]).not.toMatch(/ghfast/)
+  })
+
+  it('GitHub 源仍然带代理兜底（主源挂了仍能工作）', () => {
+    const gh = 'https://github.com/dpoy-zht/cash-diary/releases/download/v2.3.10/x.wgt'
+    expect(buildWgtSources(gh)[0]).toBe('https://ghfast.top/' + gh)
+  })
+})
