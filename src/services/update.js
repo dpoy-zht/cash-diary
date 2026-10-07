@@ -223,29 +223,38 @@ function downloadFile(url) {
       function (download, status) {
         clearTimeout(timer)
         // status: 0=待开始 1=下载中 2=完成 3=失败 4=取消
-        if (status === 2) {
-          // plus.downloader 返回的 filename 可能是相对路径（如 "_doc/update.wgt"），
-          // 必须转成绝对路径才能交给 install。转换失败再走一次 resolve 兜底 ——
-          // 这两步任何一步出错，用户看到的就是"更新失败"，所以都要有退路。
-          let abs
-          try {
-            abs = plus.io.convertLocalFileSystemURL(download.filename)
-          } catch (e) { abs = '' }
-          if (!abs) {
+if (status === 2) {
+        /**
+         * ⚠️ **必须拿到绝对路径，不是 file:// URL**（2026-10-07 真机定位）。
+         *
+         * `plus.io.convertLocalFileSystemURL()` 返回的是 **URL 形式**
+         * （如 `file:///storage/emulate/0/Android/data/.../update.wgt`），
+         * 而 `plus.runtime.install()` **只接受本地绝对路径**
+         * （如 `/storage/emulate/0/Android/data/.../update.wgt`）。
+         *
+         * 之前的代码「转换成功就用返回值、不抛异常就不走兜底」，
+         * 于是把 file:// URL 传给了 install → **必然失败**。
+         * 真机证据：wgt 完整下载 573,397 B、zip 校验通过、sha256 与源一致，
+         * 但点更新就是失败 —— 文件本身毫无问题，纯粹是路径形态不对。
+         *
+         * 现在**一律以 entry.fullPath 为准**，convert 只用来判断文件存在。
+         */
+        plus.io.resolveLocalFileSystemURL(
+          download.filename,
+          function (entry) { resolve(entry.fullPath) },   // ← 绝对路径，install 要的就是这个
+          function () {
+            // 连文件都拿不到才退到 convert（可能已过期，但至少给 install 一个机会）
             try {
-              plus.io.resolveLocalFileSystemURL(
-                download.filename,
-                function (entry) { resolve(entry.fullPath) },
-                function () { reject(new Error('下载完成但找不到文件')) }
-              )
-              return
-            } catch (e2) {
+              const abs = plus.io.convertLocalFileSystemURL(download.filename)
+              if (!abs) return reject(new Error('下载完成但找不到文件'))
+              // convert 给的是 URL，去掉 file:// 前缀还原成绝对路径
+              resolve(abs.replace(/^file:\/\//, ''))
+            } catch (e) {
               reject(new Error('下载完成但路径解析失败'))
-              return
             }
           }
-          resolve(abs)
-        } else if (status === 3) {
+        )
+      } else if (status === 3) {
           reject(new Error('下载失败（HTTP ' + download.statusCode + '）'))
         } else {
           reject(new Error('下载未完成'))
