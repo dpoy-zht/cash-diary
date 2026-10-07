@@ -52,6 +52,10 @@ export function expenseByCategory(records, categories) {
 
 /**
  * 给每行补上占比与扇区边界（0~1）。
+ *
+ * `category_id` 原样带下去：点击扇区要按 id 筛选明细，**不能按 name**
+ * （收支两侧都有「红包」「其他」，按名字会串）。
+ *
  * @returns {Array} 每项多 pct / from / to 三个字段
  */
 export function donutSegments(rows) {
@@ -63,7 +67,15 @@ export function donutSegments(rows) {
     const from = acc / total
     acc += r.cents
     const to = acc / total
-    return { name: r.name, color: r.color, cents: r.cents, pct: r.cents / total, from: from, to: to }
+    return {
+      category_id: r.category_id,
+      name: r.name,
+      color: r.color,
+      cents: r.cents,
+      pct: r.cents / total,
+      from: from,
+      to: to
+    }
   })
 }
 
@@ -100,6 +112,128 @@ export function supportsConicGradient() {
   } catch (e) {
     return false
   }
+}
+
+/* ================= 环形图交互（2026-10-07） ================= */
+
+/**
+ * 圆环内圈的半径占比。
+ *
+ * 与 `stats.vue` 的 `.donut-center { inset: 25% }` 是同一个几何事实：
+ * 外径 200px → 外半径 100px；内圈盒子 ins 25% → 100px 宽 → 内半径 50px = 0.5 × 外半径。
+ * 改样式必须同步改这里，否则点中心会选中某个扇区（用户以为点错了）。
+ */
+export const DONUT_HOLE_RATIO = 0.5
+
+/**
+ * 触点落在哪个扇区（纯几何，可单测）。
+ *
+ * 只做角度与半径判定，不碰 DOM —— 坐标由调用方换算成"相对圆心"的偏移量。
+ * `conic-gradient` 的角度约定：**起点在正上方（12 点），顺时针递增**，
+ * 所以角度 = atan2(dx, -dy)（dy 向下为正，取负号把它翻成"向上为正"）。
+ *
+ * 下列情况返回 null（页面据此"取消选中"或什么都不做）：
+ * - 没有扇区 / 半径非法
+ * - 点在内圈留白里（中心放的是合计数字，不是扇区）
+ * - 点在外圈之外
+ *
+ * @param {Array} segments donutSegments 的产物（含 from / to）
+ * @param {number} dx 触点相对圆心的 x 偏移（px，右为正）
+ * @param {number} dy 触点相对圆心的 y 偏移（px，下为正）
+ * @param {number} radius 外半径（px）
+ * @returns {object|null} 命中的扇区
+ */
+export function sectorAtPoint(segments, dx, dy, radius) {
+  const list = Array.isArray(segments) ? segments : []
+  const r = Number(radius)
+  if (!list.length || !(r > 0)) return null
+  const x = Number(dx) || 0
+  const y = Number(dy) || 0
+  const dist = Math.sqrt(x * x + y * y)
+  if (dist > r) return null
+  if (dist < r * DONUT_HOLE_RATIO) return null
+
+  let angle = Math.atan2(x, -y)
+  if (angle < 0) angle += Math.PI * 2
+  const pct = angle / (Math.PI * 2)
+
+  for (const s of list) {
+    if (pct >= s.from && pct < s.to) return s
+  }
+  // 浮点边界：pct 恰好等于 1（理论不可达）时归给最后一个扇区
+  return list[list.length - 1]
+}
+
+/**
+ * 上一个「同长度期间」的半开区间：日 → 昨天、周 → 上周、月 → 上月、年 → 去年。
+ * 环比必须拿"同长度、紧邻"的期间比，跨年由 Date 自己处理，不做手工进位。
+ */
+export function prevPeriodRange(key, ts) {
+  const t = ts == null ? Date.now() : ts
+  if (key === 'day') return dayRange(t - 86400000)
+  if (key === 'week') return weekRange(t - WEEK_MS)
+  if (key === 'year') return yearRange(new Date(t).getFullYear() - 1)
+  const d = new Date(t)
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  return monthRange(m === 1 ? y - 1 : y, m === 1 ? 12 : m - 1)
+}
+
+/**
+ * 环比：本期与上期支出对比。
+ *
+ * **上期为 0 时返回 `dir:'none'` 且 text 为空串** —— 没有基准就不该编一个
+ * "↑100%" 出来（用户上一期没花过钱，那是"新增"不是"涨了一倍"）。
+ * 变化存在但不足 1% 时至少显示 1%，避免出现"↑0%"这种读起来像没变的文案。
+ * 超过 999% 时封顶显示 `↑999%+`：圆心只有 100px 宽，"↑102907%" 既放不下也没信息量。
+ *
+ * @returns {{dir:'up'|'down'|'flat'|'none', pct:number, text:string}}
+ */
+export function momOf(curCents, prevCents) {
+  const cur = Math.max(0, Math.round(Number(curCents) || 0))
+  const prev = Math.max(0, Math.round(Number(prevCents) || 0))
+  if (!prev) return { dir: 'none', pct: 0, text: '' }
+  const diff = cur - prev
+  if (diff === 0) return { dir: 'flat', pct: 0, text: '持平' }
+  const pct = Math.max(1, Math.round((Math.abs(diff) / prev) * 100))
+  if (diff > 0) {
+    return { dir: 'up', pct: pct, text: pct > 999 ? '↑999%+' : '↑' + pct + '%' }
+  }
+  return { dir: 'down', pct: pct, text: '↓' + pct + '%' }
+}
+
+/** 环比的对照对象文案：较昨日 / 较上周 / 较上月 / 较去年 */
+export function momLabelOf(key) {
+  if (key === 'day') return '较昨日'
+  if (key === 'week') return '较上周'
+  if (key === 'year') return '较去年'
+  return '较上月'
+}
+
+/**
+ * 占比文案：整数百分比（四舍五入）。
+ * 极小占比（< 0.5%）会显示成 0% —— 那是真实的"四舍五入结果"，
+ * 不硬凑成 1%，否则多个分项加起来会超过 100%。
+ */
+export function pctText(pct) {
+  const p = Math.max(0, Number(pct) || 0)
+  return Math.round(p * 100) + '%'
+}
+
+/**
+ * 明细列表按分类筛选（软删除已由上游过滤，这里只认 category_id）。
+ * `ids` 为 null / 空数组时返回原列表 —— 语义是"没筛"，不是"筛出空"。
+ *
+ * @param {Array} records 期间内的流水
+ * @param {number[]|null} ids 选中的分类 id（含子类）
+ */
+export function filterByCategoryIds(records, ids) {
+  const list = Array.isArray(records) ? records : []
+  const want = Array.isArray(ids) ? ids.filter(function (n) { return n != null }) : []
+  if (!want.length) return list
+  const set = {}
+  want.forEach(function (n) { set[Number(n)] = 1 })
+  return list.filter(function (r) { return r && set[Number(r.category_id)] })
 }
 
 /**

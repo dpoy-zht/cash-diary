@@ -28,20 +28,45 @@
       <text class="mt-item">{{ periodName }}收入 <text class="mt-num inc">{{ periodIncomeText }}</text></text>
     </view>
 
-    <!-- 环形图卡 -->
+    <!-- 环形图卡：圆环 + 圆心合计/环比 + 分类占比列表（点任意一行筛选下方明细） -->
     <view class="donut-wrap">
       <block v-if="segments.length">
-        <view class="donut" :style="{ background: donutBg }">
+        <view class="donut" :style="{ background: donutBg }" @click="onDonutTap">
           <view class="donut-center">
             <asset-slot slot-id="stats.donut" img-class="donut-milo" />
+            <view class="dc-text">
+              <text class="dc-label">{{ centerLabel }}</text>
+              <text class="dc-value" :class="centerValueSize">{{ centerValue }}</text>
+              <text v-if="mom.text" class="dc-mom" :class="mom.dir">{{ mom.text }} {{ momLabel }}</text>
+            </view>
           </view>
         </view>
-        <text v-if="!conicOk" class="donut-tip">这台设备画不出圆环图，往下看「花得最多的是…」里的占比条，一样准</text>
-        <view class="legend">
-          <view v-for="s in segments" :key="s.name" class="li">
-            <view class="dot" :style="{ background: s.color }" />
-            <text class="li-name">{{ s.name }}</text>
-            <text class="li-pct">{{ Math.round(s.pct * 100) }}%</text>
+        <text v-if="!conicOk" class="donut-tip">这台设备画不出圆环图，看下面的分类占比条，一样准</text>
+
+        <view class="donut-list">
+          <text class="dl-title">
+            {{ selectedId == null ? '按分类看' : '正在看「' + selectedName + '」，再点一次取消' }}
+          </text>
+          <view
+            v-for="s in segments"
+            :key="s.category_id"
+            class="dl-row pressable"
+            :class="{ on: s.category_id === selectedId }"
+            hover-class="pressable-hover"
+            hover-stay-time="80"
+            @click="toggleCategory(s)"
+          >
+            <cat-icon :category="catOf(s.category_id)" :size="32" />
+            <view class="dl-main">
+              <view class="dl-line">
+                <text class="dl-name">{{ s.name }}</text>
+                <text class="dl-amt">¥{{ formatCents(s.cents) }}</text>
+              </view>
+              <view class="dl-bar">
+                <view class="dl-bar-i" :style="{ width: barWidth(s), background: s.color }" />
+              </view>
+            </view>
+            <text class="dl-pct">{{ pctText(s.pct) }}</text>
           </view>
         </view>
       </block>
@@ -52,18 +77,31 @@
       </view>
     </view>
 
-    <!-- 排行卡 -->
-    <view v-if="segments.length" class="rank-card">
-      <text class="rank-title">花得最多的是…</text>
-      <view v-for="s in segments" :key="s.name" class="rank-row">
-        <cat-icon :category="catOf(s.name)" :size="32" />
-        <view class="rank-main">
-          <view class="rank-line">
-            <text class="rank-name">{{ s.name }}</text>
-            <text class="rank-amt">¥{{ formatCents(s.cents) }}</text>
-          </view>
-          <view class="bar"><view class="bar-i" :style="{ width: Math.round(s.pct * 100) + '%', background: s.color }" /></view>
+    <!-- 明细：点扇区/占比行筛选，再点一次取消 -->
+    <view v-if="segments.length" class="detail-card">
+      <view class="detail-head">
+        <text class="detail-title">本期明细</text>
+        <view v-if="selectedId != null" class="detail-chip pressable" hover-class="pressable-hover" hover-stay-time="80" @click="clearSelect">
+          <text class="dc-chip-text">{{ selectedName }}</text>
+          <text class="dc-chip-x">×</text>
         </view>
+        <text v-else class="detail-count">共 {{ detailAll.length }} 笔</text>
+      </view>
+      <view v-if="detailRows.length" class="detail-list">
+        <view v-for="r in detailRows" :key="r.id" class="dt-row">
+          <cat-icon :category="catOf(r.category_id)" :size="30" />
+          <view class="dt-main">
+            <text class="dt-name">{{ nameOf(r) }}</text>
+            <text class="dt-sub">{{ shortDateTime(r.occurred_at) }}{{ noteOf(r) }}</text>
+          </view>
+          <text class="dt-amt" :class="{ inc: r.type === 'income' }">
+            {{ r.type === 'income' ? '+' : '-' }}¥{{ formatCents(r.amount_cents) }}
+          </text>
+        </view>
+        <text v-if="detailMore > 0" class="dt-more">还有 {{ detailMore }} 笔没显示，缩小期间区间就能看全</text>
+      </view>
+      <view v-else class="detail-empty">
+        <text class="dt-empty-text">{{ selectedId == null ? '这个期间还没有记录' : '「' + selectedName + '」本期没有记录' }}</text>
       </view>
     </view>
 
@@ -114,30 +152,49 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
-import { expenseByCategory, donutSegments, conicGradient, supportsConicGradient, barPercents, maxIndex } from '../../utils/stats.js'
+import {
+  expenseByCategory,
+  donutSegments,
+  conicGradient,
+  supportsConicGradient,
+  sectorAtPoint,
+  momOf,
+  momLabelOf,
+  pctText,
+  filterByCategoryIds,
+  barPercents,
+  maxIndex
+} from '../../utils/stats.js'
 import {
   ymLabel,
   toDateStr,
   tsFromDateStr,
   weekStart,
   dayTrendLabel,
-  periodNameOf
+  periodNameOf,
+  shortDateTime
 } from '../../utils/date.js'
 import { formatCents, groupThousands } from '../../utils/money.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
- * 统计（v2.1）：日 / 周 / 月 / 年四种期间 —— 收支合计 + 环形图 + 分类排行 + 趋势柱状图。
+ * 统计（v2.1）：日 / 周 / 月 / 年四种期间 —— 收支合计 + 环形图 + 分类占比 + 明细 + 趋势柱状图。
  * 数据全部来自 txStore.loadStatsPeriod（一次区间查询 + JS 分桶，分桶逻辑在 utils/stats.js 纯函数）：
  * - day  → 当天，趋势看近 7 天逐日
  * - week → 本周（周一为一周之始），趋势看近 4 周逐周
  * - month→ 与首页共用 meta store 的月份，趋势看近 6 个月
  * - year → 当年，趋势看全年逐月
+ *
+ * 环形图交互（2026-10-07）：
+ * - 圆心 = 期间支出合计 + 环比（较昨日/上周/上月/去年）
+ * - 扇区与占比列表都能点：点中 → 下方明细只留该分类；再点一次取消
+ * - 点扇区靠**角度换算**（App 端没有 hover，也没有可点的 svg 分段），
+ *   几何都在 utils/stats.js: sectorAtPoint（纯函数、可单测）
  */
 const txStore = useTxStore()
 const categoryStore = useCategoryStore()
@@ -243,6 +300,132 @@ const donutBg = computed(function () {
   return conicOk.value ? conicGradient(segments.value) : ''
 })
 
+/* ---- 圆心：合计 + 环比 ---- */
+const centerLabel = computed(function () {
+  return periodName.value + '支出'
+})
+/** 环内直径只有 100px：位数多了就换紧凑写法，不让数字挤出圆心 */
+const centerValue = computed(function () {
+  const txt = periodExpenseText.value
+  return txt.length <= 9 ? txt : compactYuan(txStore.periodSummary.expenseCents)
+})
+const centerValueSize = computed(function () {
+  const n = centerValue.value.length
+  if (n >= 10) return 'sm'
+  if (n >= 8) return 'md'
+  return ''
+})
+const mom = computed(function () {
+  return momOf(txStore.periodSummary.expenseCents, txStore.periodPrevSummary.expenseCents)
+})
+const momLabel = computed(function () {
+  return momLabelOf(period.value)
+})
+
+/* ---- 选中分类 → 筛选下方明细 ---- */
+const selectedId = ref(null)
+const selectedName = computed(function () {
+  const hit = segments.value.find(function (s) { return s.category_id === selectedId.value })
+  return hit ? hit.name : ''
+})
+/**
+ * 期间/数据变化后，原来选中的分类可能已经不在本期里（切了月份、删了记录）。
+ * 不自动清掉的话，用户会看到一个"筛不出任何东西"的列表却不知道为什么。
+ */
+watch(segments, function (list) {
+  if (selectedId.value == null) return
+  const still = list.some(function (s) { return s.category_id === selectedId.value })
+  if (!still) selectedId.value = null
+})
+
+function toggleCategory(s) {
+  selectedId.value = s.category_id === selectedId.value ? null : s.category_id
+}
+function clearSelect() {
+  selectedId.value = null
+}
+
+/**
+ * 点圆环：把触点换算成"相对圆心"的偏移，交给纯函数判扇区。
+ *
+ * 跨端坐标口径不完全一致（`detail.x/y` 与 `touches[0].clientX/Y` 都是视口坐标，
+ * `pageX/pageY` 是文档坐标），所以：**先取视口坐标，取不到就不处理**。
+ * 宁可点击无反应（还有旁边的占比行可点），也不要按错误的坐标选中一个不相干的分类。
+ */
+function onDonutTap(e) {
+  if (!conicOk.value) return
+  const p = viewportPoint(e)
+  if (!p) return
+  let box = null
+  try {
+    uni.createSelectorQuery().select('.donut').boundingClientRect(function (res) {
+      box = res
+    }).exec()
+  } catch (err) {
+    return
+  }
+  if (!box || !box.width) return
+  const hit = sectorAtPoint(
+    segments.value,
+    p.x - (box.left + box.width / 2),
+    p.y - (box.top + box.height / 2),
+    box.width / 2
+  )
+  if (!hit) return
+  toggleCategory(hit)
+}
+
+function viewportPoint(e) {
+  const d = e && e.detail
+  if (d && typeof d.x === 'number' && typeof d.y === 'number') return { x: d.x, y: d.y }
+  const t = (e && e.touches && e.touches[0]) ||
+    (e && e.changedTouches && e.changedTouches[0]) || null
+  if (t && typeof t.clientX === 'number') return { x: t.clientX, y: t.clientY }
+  return null
+}
+
+/* ---- 分类取用与占比条 ---- */
+const catMap = computed(function () {
+  const m = new Map()
+  categoryStore.list.forEach(function (c) { m.set(Number(c.id), c) })
+  return m
+})
+function catOf(id) {
+  return catMap.value.get(Number(id)) || { id: Number(id), name: '其他', icon: 'more' }
+}
+function nameOf(r) {
+  const c = catMap.value.get(Number(r.category_id))
+  return c ? c.name : '其他'
+}
+function noteOf(r) {
+  const n = String(r.note || '').trim()
+  return n ? ' · ' + n : ''
+}
+function barWidth(s) {
+  const max = segments.value.length ? segments.value[0].cents : 0
+  if (!max) return '0%'
+  return Math.max(3, Math.round((s.cents / max) * 100)) + '%'
+}
+
+/* ---- 明细列表 ---- */
+/** 一次最多渲染多少条：一年期间可能几百笔，全铺出来会把列表渲染成本推爆 */
+const DETAIL_LIMIT = 60
+const detailAll = computed(function () {
+  return filterByCategoryIds(
+    txStore.periodRecords,
+    selectedId.value == null ? null : [selectedId.value]
+  )
+})
+const detailRows = computed(function () {
+  return detailAll.value
+    .slice()
+    .sort(function (a, b) { return b.occurred_at - a.occurred_at })
+    .slice(0, DETAIL_LIMIT)
+})
+const detailMore = computed(function () {
+  return Math.max(0, detailAll.value.length - DETAIL_LIMIT)
+})
+
 /* ---- 空状态文案随期间变化 ---- */
 const EMPTY_PREFIX = { day: '这一天', week: '这一周', month: '这个月', year: '这一年' }
 const emptyTitle = computed(function () {
@@ -303,9 +486,6 @@ function compactYuan(cents) {
   return '¥' + (yuan / 10000).toFixed(1) + '万'
 }
 
-function catOf(name) {
-  return categoryStore.list.find(function (c) { return c.name === name }) || { name: name, icon: '📦' }
-}
 function goHome() {
   uni.reLaunch({ url: '/pages/home/home' })
 }
@@ -408,14 +588,14 @@ onShow(function () {
   /* 兜底底色：设备画不了 conic-gradient 时，这里就是那圈"素色环"（T3.7） */
   background: var(--cd-primary-lt);
 }
-/* 降级提示：环画不出来时，把用户引到排行卡的占比条 */
+/* 降级提示：环画不出来时，把用户引到下面的占比列表 */
 .donut-tip {
   display: block;
   margin-top: 12px;
   text-align: center;
   font-size: 11px;
   line-height: 1.7;
-  color: var(--cd-ink-2);
+  color: var(--cd-ink);
 }
 .donut-center {
   position: absolute;
@@ -427,36 +607,119 @@ onShow(function () {
   justify-content: center;
   overflow: hidden;
 }
+/* 圆心 IP：垫在数字后面当水印。
+   ⚠️ 宽高由插槽登记表给（asset-slot 写行内样式），这里只加定位与透明度 ——
+   页面类再写 width/height 会和登记表的盒子打架。 */
 .donut-milo {
-  width: 82%;
-  height: 82%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.18;
 }
-.legend {
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.li {
+.dc-text {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  padding: 0 4px;
 }
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex: none;
-}
-.li-name {
-  font-size: 12px;
+/* 圆心底色是 --cd-primary-mid：小字一律用 --cd-ink（实测 6.2:1），
+   --cd-ink-2 在这个底色上只有 3.7:1，不达 AA，不能承载正文 */
+.dc-label {
+  font-size: 10px;
+  line-height: 1.3;
   color: var(--cd-ink);
-  flex: 1;
 }
-.li-pct {
+.dc-value {
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 800;
+  color: var(--cd-ink);
+  font-variant-numeric: tabular-nums;
+}
+.dc-value.md {
+  font-size: 15px;
+}
+.dc-value.sm {
+  font-size: 13px;
+}
+.dc-mom {
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--cd-ink);
+}
+/* 环比方向：花得更多用 --cd-danger-ink（在 --cd-primary-mid 上 4.6:1，达 AA）；
+   「花得更少」是好消息，不抢注意力，用主文字色 + ↓ 箭头表达。
+   --cd-income 在这个底色上只有 3.3:1，达不到 AA，所以不用它。 */
+.dc-mom.up {
+  color: var(--cd-danger-ink);
+}
+
+/* ---- 分类占比列表（环图的"图例 + 排行"） ---- */
+.donut-list {
+  margin-top: 16px;
+}
+.dl-title {
+  display: block;
   font-size: 12px;
   font-weight: 700;
   color: var(--cd-ink);
+  margin-bottom: 8px;
+}
+.dl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--cd-r-sm);
+}
+/* 选中态：蛋黄底 + 描边，和"点开筛选"的语义绑定 */
+.dl-row.on {
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 0 0 2px var(--cd-primary-deep);
+}
+.dl-main {
+  flex: 1;
+  min-width: 0;
+}
+.dl-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.dl-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cd-ink);
+}
+.dl-amt {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cd-ink);
+  font-variant-numeric: tabular-nums;
+}
+.dl-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.6);
+  margin-top: 5px;
+  overflow: hidden;
+}
+.dl-bar-i {
+  height: 100%;
+  border-radius: 3px;
+}
+.dl-pct {
+  width: 42px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cd-ink);
+  font-variant-numeric: tabular-nums;
+  flex: none;
 }
 
 /* ---- 空状态 ---- */
@@ -480,58 +743,104 @@ onShow(function () {
 }
 .empty-sub {
   font-size: 12px;
-  color: rgba(93, 78, 55, 0.75);
+  color: var(--cd-ink);
 }
 
-/* ---- 排行卡 ---- */
-.rank-card {
+/* ---- 明细卡 ---- */
+.detail-card {
   margin: 12px 16px;
   background: var(--cd-surface);
   border-radius: var(--cd-r-md);
   padding: 16px;
   box-shadow: var(--cd-sh-card);
 }
-.rank-title {
+.detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.detail-title {
   font-size: 15px;
   font-weight: 800;
   color: var(--cd-ink);
-  display: block;
-  margin-bottom: 10px;
 }
-.rank-row {
+.detail-count {
+  font-size: 12px;
+  color: var(--cd-ink-2);
+}
+/* 筛选态胶囊：点它取消筛选（等价于点一次已选中的扇区） */
+.detail-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--cd-primary-lt);
+  border-radius: var(--cd-r-pill);
+  padding: 4px 10px;
+}
+.dc-chip-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cd-icon);
+}
+.dc-chip-x {
+  font-size: 13px;
+  line-height: 1;
+  color: var(--cd-ink-2);
+}
+.detail-list {
+  margin-top: 6px;
+}
+.dt-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 0;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--cd-line);
 }
-.rank-main {
+.dt-row:last-child {
+  border-bottom: none;
+}
+.dt-main {
   flex: 1;
   min-width: 0;
 }
-.rank-line {
-  display: flex;
-  justify-content: space-between;
-}
-.rank-name {
+/* <text> 在横向 flex 里必须显式 block，否则两行会挤成一行 */
+.dt-name {
+  display: block;
   font-size: 13px;
   font-weight: 600;
   color: var(--cd-ink);
 }
-.rank-amt {
+.dt-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--cd-ink-2);
+}
+.dt-amt {
+  flex: none;
   font-size: 13px;
   font-weight: 700;
   color: var(--cd-ink);
+  font-variant-numeric: tabular-nums;
 }
-.bar {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--cd-line);
-  margin-top: 5px;
-  overflow: hidden;
+.dt-amt.inc {
+  color: var(--cd-income);
 }
-.bar-i {
-  height: 100%;
-  border-radius: 3px;
+.dt-more {
+  display: block;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--cd-ink-2);
+}
+.detail-empty {
+  padding: 18px 0 6px;
+  text-align: center;
+}
+.dt-empty-text {
+  font-size: 12px;
+  color: var(--cd-ink-2);
 }
 
 /* ---- 当月收支合计 ---- */
@@ -691,6 +1000,4 @@ onShow(function () {
   background: var(--cd-icon-3);
   flex: none;
 }
-
-
 </style>

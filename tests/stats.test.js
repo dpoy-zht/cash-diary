@@ -5,6 +5,13 @@ import {
   donutSegments,
   conicGradient,
   supportsConicGradient,
+  sectorAtPoint,
+  prevPeriodRange,
+  momOf,
+  momLabelOf,
+  pctText,
+  filterByCategoryIds,
+  DONUT_HOLE_RATIO,
   balanceCents,
   streakDays,
   levelOf,
@@ -495,5 +502,181 @@ describe('expenseSumOfDay —— 当日支出合计', () => {
     const byCat = expenseByCategory(records, cats)
     const sum = byCat.reduce(function (s, r) { return s + r.cents }, 0)
     expect(sum).toBe(expenseSumOfDay(records))   // 两处口径必须相等
+  })
+})
+
+/* ================= 环形图交互（2026-10-07） =================
+ * 这一批做的都是「看得见的交互」背后的算术：点扇区选中的是哪个分类、
+ * 圆心那只环比箭头该朝哪边、明细列表该留哪些行。
+ * 几何与判断全部落在纯函数里，页面只负责把事件坐标喂进来。
+ */
+
+describe('donutSegments —— 带上 category_id（点扇区后要按 id 筛选）', () => {
+  it('category_id 原样带下去：收支两侧都有「红包」，按名字筛会串', () => {
+    const segs = donutSegments([
+      { category_id: 11, name: '红包', color: '#111111', cents: 60 },
+      { category_id: 31, name: '红包', color: '#222222', cents: 40 }
+    ])
+    expect(segs.map(function (s) { return s.category_id })).toEqual([11, 31])
+    expect(segs[0].pct).toBeCloseTo(0.6)
+  })
+})
+
+describe('sectorAtPoint —— 点圆环落在哪个扇区', () => {
+  const SEGS = donutSegments([
+    { category_id: 1, name: 'a', color: '#ff8a65', cents: 50 },
+    { category_id: 2, name: 'b', color: '#4fc3f7', cents: 50 }
+  ])
+
+  it('角度约定：起点在正上方、顺时针递增（与 conic-gradient 一致）', () => {
+    // 正上 → 0% → 第一个扇区
+    expect(sectorAtPoint(SEGS, 0, -80, 100).category_id).toBe(1)
+    // 正右 → 25% → 仍在第一个扇区（0~50%）
+    expect(sectorAtPoint(SEGS, 80, 0, 100).category_id).toBe(1)
+    // 正下 → 50% → 进入第二个扇区
+    expect(sectorAtPoint(SEGS, 0, 80, 100).category_id).toBe(2)
+    // 正左 → 75% → 第二个扇区
+    expect(sectorAtPoint(SEGS, -80, 0, 100).category_id).toBe(2)
+  })
+
+  it('内圈留白不算扇区（那里放的是合计数字，不是环）', () => {
+    expect(DONUT_HOLE_RATIO).toBe(0.5)
+    expect(sectorAtPoint(SEGS, 0, 0, 100)).toBeNull()
+    expect(sectorAtPoint(SEGS, 10, 10, 100)).toBeNull()
+    // 恰好压在内圈边界上算命中环（阈值是严格小于）
+    expect(sectorAtPoint(SEGS, 0, -50, 100)).not.toBeNull()
+  })
+
+  it('环外不命中（贴着环点不会误选）', () => {
+    expect(sectorAtPoint(SEGS, 0, -120, 100)).toBeNull()
+    expect(sectorAtPoint(SEGS, 130, 130, 100)).toBeNull()
+  })
+
+  it('没有扇区 / 半径非法时返回 null，不抛错', () => {
+    expect(sectorAtPoint([], 0, -80, 100)).toBeNull()
+    expect(sectorAtPoint(null, 0, -80, 100)).toBeNull()
+    expect(sectorAtPoint(SEGS, 0, -80, 0)).toBeNull()
+    expect(sectorAtPoint(SEGS, 0, -80, -5)).toBeNull()
+  })
+
+  it('脏坐标当 0 处理（不产生 NaN 命中）', () => {
+    expect(sectorAtPoint(SEGS, undefined, undefined, 100)).toBeNull()
+  })
+})
+
+describe('prevPeriodRange —— 环比要跟"上一个同长度期间"比', () => {
+  it('日 → 昨天', () => {
+    const [s, e] = prevPeriodRange('day', at(2026, 9, 27, 15))
+    expect(s).toBe(at(2026, 9, 26, 0))
+    expect(e).toBe(at(2026, 9, 27, 0))
+  })
+
+  it('周 → 上周（9/27 所在周从 9/21 起，上一周从 9/14 起）', () => {
+    const [s, e] = prevPeriodRange('week', at(2026, 9, 27))
+    expect(s).toBe(at(2026, 9, 14, 0))
+    expect(e).toBe(at(2026, 9, 21, 0))
+  })
+
+  it('月 → 上月', () => {
+    const [s, e] = prevPeriodRange('month', at(2026, 9, 27))
+    expect(s).toBe(new Date(2026, 7, 1).getTime())
+    expect(e).toBe(new Date(2026, 8, 1).getTime())
+  })
+
+  it('1 月的上一个月要落到去年 12 月（跨年不做手工进位）', () => {
+    const [s, e] = prevPeriodRange('month', at(2026, 1, 15))
+    expect(s).toBe(new Date(2025, 11, 1).getTime())
+    expect(e).toBe(new Date(2026, 0, 1).getTime())
+  })
+
+  it('年 → 去年整年', () => {
+    const [s, e] = prevPeriodRange('year', at(2026, 9, 27))
+    expect([s, e]).toEqual(yearRange(2025))
+  })
+
+  it('未知 key 兜底为月（与 periodRange 的兜底口径一致）', () => {
+    const [s] = prevPeriodRange('whatever', at(2026, 9, 27))
+    expect(s).toBe(new Date(2026, 7, 1).getTime())
+  })
+})
+
+describe('momOf —— 环比（圆心那只箭头）', () => {
+  it('支出变多用 ↑（警示方向）', () => {
+    const r = momOf(1200, 1000)
+    expect(r.dir).toBe('up')
+    expect(r.pct).toBe(20)
+    expect(r.text).toBe('↑20%')
+  })
+
+  it('支出变少用 ↓', () => {
+    const r = momOf(800, 1000)
+    expect(r.dir).toBe('down')
+    expect(r.text).toBe('↓20%')
+  })
+
+  it('完全一样显示"持平"', () => {
+    const r = momOf(1000, 1000)
+    expect(r.dir).toBe('flat')
+    expect(r.text).toBe('持平')
+  })
+
+  it('上期为 0 时不给百分比 —— 没有基准就不该编一个"↑100%"', () => {
+    const r = momOf(500, 0)
+    expect(r.dir).toBe('none')
+    expect(r.text).toBe('')
+  })
+
+  it('有变化但不足 1% 时至少显示 1%（不出现读起来像没变的"↑0%"）', () => {
+    expect(momOf(1001, 1000).text).toBe('↑1%')
+  })
+
+  it('本期为 0（这期没花钱）是正常的 ↓100%', () => {
+    expect(momOf(0, 1000).text).toBe('↓100%')
+  })
+
+  it('涨幅超过 999% 时封顶 —— 圆心放不下"↑102907%"这种数，也没信息量', () => {
+    const r = momOf(12345678, 12000)
+    expect(r.dir).toBe('up')
+    expect(r.text).toBe('↑999%+')
+    expect(r.pct).toBeGreaterThan(999) // 真实比例仍然保留在 pct 里，界面才做展示裁剪
+  })
+
+  it('脏入参不抛错', () => {
+    expect(momOf(null, null).dir).toBe('none')
+    expect(momOf('abc', 100).dir).toBe('down')
+  })
+
+  it('文案与期间的对照名配套', () => {
+    expect(momLabelOf('day')).toBe('较昨日')
+    expect(momLabelOf('week')).toBe('较上周')
+    expect(momLabelOf('month')).toBe('较上月')
+    expect(momLabelOf('year')).toBe('较去年')
+  })
+})
+
+describe('pctText / filterByCategoryIds —— 占比文案与明细筛选', () => {
+  it('占比四舍五入成整数百分比', () => {
+    expect(pctText(0.4637)).toBe('46%')
+    expect(pctText(1)).toBe('100%')
+    expect(pctText(0)).toBe('0%')
+    expect(pctText(null)).toBe('0%')
+    expect(pctText(-1)).toBe('0%')
+  })
+
+  it('没传筛选条件时原样返回（"不筛"不等于"筛出空"）', () => {
+    const rs = [{ category_id: 1 }, { category_id: 2 }]
+    expect(filterByCategoryIds(rs, null)).toBe(rs)
+    expect(filterByCategoryIds(rs, [])).toBe(rs)
+  })
+
+  it('传了分类就只留这些分类的记录（容错字符串 id）', () => {
+    const rs = [{ category_id: 1 }, { category_id: '2' }, { category_id: 3 }]
+    expect(filterByCategoryIds(rs, [2]).map(function (r) { return r.category_id }))
+      .toEqual(['2'])
+  })
+
+  it('空入参不抛错', () => {
+    expect(filterByCategoryIds(null, [1])).toEqual([])
+    expect(filterByCategoryIds([{ category_id: 1 }, null], [1]).length).toBe(1)
   })
 })

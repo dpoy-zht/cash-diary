@@ -8,6 +8,7 @@ import {
   groupByDay,
   toDateStr,
   dateTimeLabel,
+  shortDateTime,
   tsFromDateStr,
   replaceDateKeepTime,
   weekStart,
@@ -353,5 +354,25 @@ describe('homeDateLabel —— 首页顶部日期（当月到日、其他月到�
     expect(homeDateLabel('', at(2026, 10, 4))).toBe('')
     expect(homeDateLabel(null, at(2026, 10, 4))).toBe('')
     expect(homeDateLabel('乱写', at(2026, 10, 4))).toBe('')
+  })
+})
+
+/* 统计页明细列表用（2026-10-07）：年份由期间标题给出，行里只留月/日 + 时分 */
+describe('shortDateTime —— 紧凑日期时间', () => {
+  it('格式为 M/D HH:mm，月日与时分都补足两位时/分', () => {
+    expect(shortDateTime(new Date(2026, 8, 28, 12, 30).getTime())).toBe('9/28 12:30')
+    expect(shortDateTime(new Date(2026, 0, 5, 9, 5).getTime())).toBe('1/5 09:05')
+  })
+
+  it('月与日不补前导零（列表里更紧凑）', () => {
+    expect(shortDateTime(new Date(2026, 11, 1, 0, 0).getTime())).toBe('12/1 00:00')
+  })
+
+  it('非法 / 0 / 负数返回空串（调用方据此不渲染）', () => {
+    expect(shortDateTime(0)).toBe('')
+    expect(shortDateTime(-1)).toBe('')
+    expect(shortDateTime(null)).toBe('')
+    expect(shortDateTime(undefined)).toBe('')
+    expect(shortDateTime('abc')).toBe('')
   })
 })

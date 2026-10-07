@@ -77,6 +77,17 @@ export function dateTimeLabel(ts) {
 }
 
 /**
+ * 紧凑日期时间：'9/28 12:30'（统计页明细里省地方 —— 年份由期间标题给出，不重复）。
+ * 非法 / 0 返回空串（调用方据此不渲染）。
+ */
+export function shortDateTime(ts) {
+  const n = Number(ts)
+  if (!isFinite(n) || n <= 0) return ''
+  const d = new Date(n)
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes())
+}
+
+/**
  * 最近 n 个月的 'YYYY-MM' 列表（含当月），**从旧到新**。
  * 用 Date 逐月回退，跨年/跨月由 Date 自己处理，不做手工进位。
  */

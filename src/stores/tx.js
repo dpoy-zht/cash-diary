@@ -6,7 +6,7 @@ import { useAccountStore } from './account.js'
 import { useMetaStore } from './meta.js'
 import { lastNMonths, monthRange, toDateStr, prevYmOf } from '../utils/date.js'
 import { emptyFilters, normalizeFilters, hasAnyFilter } from '../utils/search.js'
-import { monthlySummaries, periodRange, trendSpecFor, sumByType, bucketSummaries } from '../utils/stats.js'
+import { monthlySummaries, periodRange, trendSpecFor, sumByType, bucketSummaries, prevPeriodRange } from '../utils/stats.js'
 
 /** 趋势图统计的月份数 */
 export const TREND_MONTHS = 6
@@ -25,6 +25,8 @@ export const useTxStore = defineStore('tx', function () {
   const periodRecords = ref([])
   const periodSummary = ref({ expenseCents: 0, incomeCents: 0 })
   const periodTrend = ref([])
+  /** 上一「同长度期间」的收支合计 —— 环环比用（日→昨天 / 周→上周 / 月→上月 / 年→去年） */
+  const periodPrevSummary = ref({ expenseCents: 0, incomeCents: 0 })
 
   /** 月度报告（T4.4）：当月流水 + 上月流水（环比用）。总预算由页面从 budget store 取 */
   const reportRecords = ref([])
@@ -122,6 +124,10 @@ export const useTxStore = defineStore('tx', function () {
    * - week → 近 4 周逐周
    * - month→ 近 6 个月逐月
    * - year → 当年 12 个月
+   *
+   * 环比（较昨日/上周/上月/去年）的上一期数据**优先从已取回的 rows 里筛**：
+   * 日/周/月三种期间的上一期本来就落在趋势区间内，不用再查一次库；
+   * 只有「年」的去年在区间之外，才补发一次查询。
    */
   async function loadStatsPeriod(key, anchorTs) {
     const aid = currentAccount()
@@ -135,6 +141,15 @@ export const useTxStore = defineStore('tx', function () {
     })
     periodSummary.value = sumByType(periodRecords.value)
     periodTrend.value = bucketSummaries(rows, spec.keys, spec.keyOf)
+
+    const prev = prevPeriodRange(key, anchorTs)
+    const covered = prev[0] >= start && prev[1] <= end
+    const prevRows = covered
+      ? rows.filter(function (r) {
+        return r.occurred_at >= prev[0] && r.occurred_at < prev[1]
+      })
+      : await txService.listByRange(prev[0], prev[1], aid)
+    periodPrevSummary.value = sumByType(prevRows)
   }
 
   /**
@@ -244,6 +259,7 @@ export const useTxStore = defineStore('tx', function () {
     periodRecords,
     periodSummary,
     periodTrend,
+    periodPrevSummary,
     reportRecords,
     reportPrevRecords,
     searchKeyword,
