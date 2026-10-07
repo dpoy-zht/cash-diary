@@ -366,20 +366,36 @@ export async function verifyWgtFileHash(tempPath, expectedHex) {
   }
 }
 
-/** plus.runtime.install 包装：失败 resolve false，不抛错 */
+/**
+ * plus.runtime.install 包装。
+ *
+ * ⚠️ 失败时**把原因带出去**（resolve {ok, reason, detail}）而不是只给 boolean ——
+ * 之前只返回 false，界面上只能显示「更新失败，稍后再试」，
+ * 到底是版本没变、文件损坏还是路径不对全靠猜（2026-10-06/07 在这上面绕了两晚）。
+ * 现在 detail 会原样进 toast，真机一眼能看出问题。
+ */
 function installWgt(tempFilePath) {
   return new Promise(function (resolve) {
-    plus.runtime.install(
-      tempFilePath,
-      { force: false },
-      function () { resolve(true) },
-      function (err) {
-        // 把失败原因打出来：install 失败可能是版本没变、文件损坏、路径不对，
-        // 不打日志就只能靠猜（2026-10-06 就在这上面绕了很久）
-        console.error('[update] install 失败：', (err && err.message) || err)
-        resolve(false)
-      }
-    )
+    try {
+      plus.runtime.install(
+        tempFilePath,
+        // ⚠️ **force 必须 true**：wgt 的版本号与已装资源包相同时，
+        // force:false 会让 install 直接拒绝。真机上实测：v2.3.10 装 v2.3.11
+        // 连续失败 6 次（文件大小完全正确，就是这里被拒）。
+        // 同版本重装本来就该允许 —— 那是用户重试的正常诉求。
+        { force: true },
+        function () { resolve({ ok: true }) },
+        function (err) {
+          const detail = String((err && (err.message || err.code)) || err || '未知原因')
+          console.error('[update] install 失败：', detail)
+          resolve({ ok: false, reason: 'install-failed', detail: detail })
+        }
+      )
+    } catch (e) {
+      const detail = String((e && e.message) || e || '未知原因')
+      console.error('[update] install 抛异常：', detail)
+      resolve({ ok: false, reason: 'install-throw', detail: detail })
+    }
   })
 }
 
@@ -424,8 +440,9 @@ export async function applyUpdate(r) {
           return { ok: false, type: 'wgt', reason: 'verify-failed' }
         }
         const installed = await installWgt(temp)
-        if (installed) return { ok: true, type: 'wgt', source: url }
-        return { ok: false, type: 'wgt', reason: 'install-failed' }
+        if (installed.ok) return { ok: true, type: 'wgt', source: url }
+        // detail 原样带出去：真机弹窗能直接看到 install 的真实原因
+        return { ok: false, type: 'wgt', reason: installed.reason, detail: installed.detail }
       } catch (e) {
         console.error('[update] 源 ' + (i + 1) + '/' + sources.length + ' 失败：',
           (e && e.message) || e)
@@ -439,6 +456,25 @@ export async function applyUpdate(r) {
   // 2) 回退：打开下载页走整包
   const opened = openReleasePage(r.url)
   return { ok: opened, type: 'apk', reason: opened ? undefined : 'open-failed' }
+}
+
+/**
+ * 失败文案：把**真实原因**露出来。
+ *
+ * 之前一律显示「更新失败，稍后再试」，真机调试只能靠猜 ——
+ * 2026-10-06/07 连续两晚卡在同一个问题上，就是因为看不到 install 的原始报错。
+ * 现在 install 的 err.message 会直接进toast，一眼看出是版本没变还是路径不对。
+ */
+function failText(u) {
+  if (u.reason === 'open-failed') return '浏览器打开失败，请到项目主页手动下载'
+  if (u.reason === 'verify-failed') return '更新包校验失败（' + (u.detail || '大小不符') + '）'
+  if (u.reason === 'install-failed' || u.reason === 'install-throw') {
+    return '安装失败：' + (u.detail || '未知原因')
+  }
+  if (u.reason === 'download-failed') {
+    return '下载失败（' + (u.error || '网络不通') + '）'
+  }
+  return '更新失败，稍后再试'
 }
 
 /**
@@ -465,10 +501,9 @@ export function updateNow(r) {
       }
       if (!u.ok) {
         uni.showToast({
-          title: u.reason === 'open-failed' ? '浏览器打开失败，请到项目主页手动下载'
-            : u.reason === 'hash-mismatch' ? '更新包校验失败，请通过整包安装'
-            : '更新失败，稍后再试',
-          icon: 'none'
+          title: failText(u),
+          icon: 'none',
+          duration: 4000   // 带原因的文案较长，多给点显示时间
         })
         return u
       }
