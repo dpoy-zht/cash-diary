@@ -44,17 +44,36 @@
         <text v-if="!conicOk" class="donut-tip">这台设备画不出圆环图，看下面的分类占比条，一样准</text>
 
         <view class="donut-list">
-          <text class="dl-title">
-            {{ selectedId == null ? '按分类看' : '正在看「' + selectedName + '」，再点一次取消' }}
-          </text>
+          <text class="dl-title">{{ listTitle }}</text>
+          <!-- 下钻头：点它 = 选整个一级（含所有二级） -->
           <view
-            v-for="s in segments"
-            :key="s.category_id"
+            v-if="drill"
             class="dl-row pressable"
-            :class="{ on: s.category_id === selectedId }"
+            :class="{ on: activeId === drill.topId }"
             hover-class="pressable-hover"
             hover-stay-time="80"
-            @click="toggleCategory(s)"
+            @click="toggleCategory(drill.topId)"
+          >
+            <cat-icon :category="drill.topCat" :size="32" />
+            <view class="dl-main">
+              <view class="dl-line">
+                <text class="dl-name">全部{{ drill.topCat.name }}</text>
+                <text class="dl-amt">¥{{ formatCents(drill.total) }}</text>
+              </view>
+              <view class="dl-bar">
+                <view class="dl-bar-i" :style="{ width: '100%', background: drill.topColor }" />
+              </view>
+            </view>
+            <text class="dl-pct">{{ pctText(1) }}</text>
+          </view>
+          <view
+            v-for="s in listRows"
+            :key="s.category_id"
+            class="dl-row pressable"
+            :class="{ on: s.category_id === activeId }"
+            hover-class="pressable-hover"
+            hover-stay-time="80"
+            @click="toggleCategory(s.category_id)"
           >
             <cat-icon :category="catOf(s.category_id)" :size="32" />
             <view class="dl-main">
@@ -81,8 +100,8 @@
     <view v-if="segments.length" class="detail-card">
       <view class="detail-head">
         <text class="detail-title">本期明细</text>
-        <view v-if="selectedId != null" class="detail-chip pressable" hover-class="pressable-hover" hover-stay-time="80" @click="clearSelect">
-          <text class="dc-chip-text">{{ selectedName }}</text>
+        <view v-if="activeId != null" class="detail-chip pressable" hover-class="pressable-hover" hover-stay-time="80" @click="clearSelect">
+          <text class="dc-chip-text">{{ activeName }}</text>
           <text class="dc-chip-x">×</text>
         </view>
         <text v-else class="detail-count">共 {{ detailAll.length }} 笔</text>
@@ -101,7 +120,7 @@
         <text v-if="detailMore > 0" class="dt-more">还有 {{ detailMore }} 笔没显示，缩小期间区间就能看全</text>
       </view>
       <view v-else class="detail-empty">
-        <text class="dt-empty-text">{{ selectedId == null ? '这个期间还没有记录' : '「' + selectedName + '」本期没有记录' }}</text>
+        <text class="dt-empty-text">{{ activeId == null ? '这个期间还没有记录' : '「' + activeName + '」本期没有记录' }}</text>
       </view>
     </view>
 
@@ -168,7 +187,10 @@ import {
   pctText,
   filterByCategoryIds,
   barPercents,
-  maxIndex
+  maxIndex,
+  rollupToTopLevel,
+  drillSegments,
+  subtreeIds
 } from '../../utils/stats.js'
 import {
   ymLabel,
@@ -211,7 +233,12 @@ const period = ref('month')
 const anchorTs = ref(Date.now())
 
 const rows = computed(function () {
-  return expenseByCategory(txStore.periodRecords, categoryStore.list)
+  // ⚠️ 圆环按**一级**汇总：升级后支出有 12 个一级 + 37 个二级，
+  // 直接画 49 个分类会切成一堆碎扇形。点开某个一级再看它的二级（下钻）。
+  return expenseByCategory(
+    rollupToTopLevel(txStore.periodRecords, categoryStore.list),
+    categoryStore.list
+  )
 })
 
 /* ---- 期间收支合计 ---- */
@@ -322,27 +349,87 @@ const momLabel = computed(function () {
   return momLabelOf(period.value)
 })
 
-/* ---- 选中分类 → 筛选下方明细 ---- */
-const selectedId = ref(null)
-const selectedName = computed(function () {
-  const hit = segments.value.find(function (s) { return s.category_id === selectedId.value })
-  return hit ? hit.name : ''
+/* ---- 选中分类 → 筛选下方明细（一级可下钻到二级） ---- */
+/**
+ * `activeId` 既可能是一级也可能是二级：
+ * - 点圆环扇区 / 一级行 → 一级（明细收敛到**整棵子树**）
+ * - 下钻列表里点某个二级 → 二级（明细只留这一个）
+ * 再点一次同一个 → 全部取消。
+ */
+const activeId = ref(null)
+
+/** 当前选中项对应的分类对象（查不到 = 已被删/换期间，视作未选中） */
+const activeCat = computed(function () {
+  if (activeId.value == null) return null
+  return categoryStore.byId(activeId.value)
 })
+const activeName = computed(function () {
+  const c = activeCat.value
+  return c ? c.name : ''
+})
+
+/**
+ * 正在下钻的一级：选中项是一级就用它自己，是二级就取其父级。
+ * 只有在"该一级确实有子类"时才算下钻，否则列表还是原来的一级排行。
+ */
+const drill = computed(function () {
+  const c = activeCat.value
+  if (!c) return null
+  const top = c.parent_id == null ? c : categoryStore.byId(c.parent_id)
+  if (!top) return null
+  const hasChild = categoryStore.list.some(function (x) { return Number(x.parent_id) === Number(top.id) })
+  if (!hasChild) return null
+  const sub = drillSegments(txStore.periodRecords, categoryStore.list, top.id)
+  if (!sub.rows.length) return null
+  const hit = segments.value.find(function (s) { return s.category_id === Number(top.id) })
+  return {
+    topId: Number(top.id),
+    topCat: top,
+    topColor: hit ? hit.color : '',
+    total: sub.total,
+    rows: sub.rows
+  }
+})
+
+/** 列表内容：下钻时看二级，否则看一级排行 */
+const listRows = computed(function () {
+  return drill.value ? drill.value.rows : segments.value
+})
+const barMax = computed(function () {
+  const list = listRows.value
+  return list.length ? list[0].cents : 0
+})
+const listTitle = computed(function () {
+  if (activeId.value == null) return '按分类看（点一下筛明细）'
+  if (drill.value) {
+    return activeCat.value && activeCat.value.parent_id != null
+      ? '「' + activeName.value + '」在「' + drill.value.topCat.name + '」里，再点一次取消'
+      : '看「' + drill.value.topCat.name + '」的明细，再点一次取消'
+  }
+  return '正在看「' + activeName.value + '」，再点一次取消'
+})
+
 /**
  * 期间/数据变化后，原来选中的分类可能已经不在本期里（切了月份、删了记录）。
  * 不自动清掉的话，用户会看到一个"筛不出任何东西"的列表却不知道为什么。
+ * 一级按它自己判断，二级按它所属的一级判断（一级本期没数据，其子类必然也没有）。
  */
 watch(segments, function (list) {
-  if (selectedId.value == null) return
-  const still = list.some(function (s) { return s.category_id === selectedId.value })
-  if (!still) selectedId.value = null
+  if (activeId.value == null) return
+  const c = activeCat.value
+  if (!c) { activeId.value = null; return }
+  const topId = c.parent_id == null ? Number(c.id) : Number(c.parent_id)
+  const still = list.some(function (s) { return s.category_id === topId })
+  if (!still) activeId.value = null
 })
 
-function toggleCategory(s) {
-  selectedId.value = s.category_id === selectedId.value ? null : s.category_id
+/** 点圆环扇区 / 一级行 / 下钻行 —— 同一个再点一次就取消 */
+function toggleCategory(id) {
+  const n = Number(id)
+  activeId.value = activeId.value === n ? null : n
 }
 function clearSelect() {
-  selectedId.value = null
+  activeId.value = null
 }
 
 /**
@@ -372,7 +459,7 @@ function onDonutTap(e) {
     box.width / 2
   )
   if (!hit) return
-  toggleCategory(hit)
+  toggleCategory(hit.category_id)
 }
 
 function viewportPoint(e) {
@@ -402,7 +489,7 @@ function noteOf(r) {
   return n ? ' · ' + n : ''
 }
 function barWidth(s) {
-  const max = segments.value.length ? segments.value[0].cents : 0
+  const max = barMax.value
   if (!max) return '0%'
   return Math.max(3, Math.round((s.cents / max) * 100)) + '%'
 }
@@ -410,11 +497,20 @@ function barWidth(s) {
 /* ---- 明细列表 ---- */
 /** 一次最多渲染多少条：一年期间可能几百笔，全铺出来会把列表渲染成本推爆 */
 const DETAIL_LIMIT = 60
+/**
+ * 筛选口径：
+ * - 未选中 → 全部
+ * - 选中一级 → **整棵子树**（自己 + 所有二级），否则直接记在一级上的那些流水会漏掉
+ * - 选中二级 → 只有它自己
+ */
+const detailIds = computed(function () {
+  const c = activeCat.value
+  if (!c) return null
+  if (c.parent_id != null) return [Number(c.id)]
+  return subtreeIds(categoryStore.list, c.id)
+})
 const detailAll = computed(function () {
-  return filterByCategoryIds(
-    txStore.periodRecords,
-    selectedId.value == null ? null : [selectedId.value]
-  )
+  return filterByCategoryIds(txStore.periodRecords, detailIds.value)
 })
 const detailRows = computed(function () {
   return detailAll.value

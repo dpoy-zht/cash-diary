@@ -18,6 +18,87 @@ import {
 } from './date.js'
 
 /**
+ * 两级分类（v7）的统计口径 —— 全部是纯函数，可单测。
+ *
+ * 为什么需要它们：升级后支出有 12 个一级 + 37 个二级，
+ * 直接把 49 个分类画进圆环会切成一堆碎扇形、完全看不出钱花在哪。
+ * 所以**圆环按一级汇总**，点开某个一级再**下钻看它的二级**。
+ */
+
+/** 把一个分类 id 归一到它所属的**一级** id（本身就是一级 / 查不到 → 原样返回） */
+export function topLevelIdOf(categories, id) {
+  const cats = Array.isArray(categories) ? categories : []
+  const c = cats.find(function (x) { return Number(x.id) === Number(id) })
+  if (!c || c.parent_id == null) return Number(id)
+  return Number(c.parent_id)
+}
+
+/** 某个分类的**子树** id 集合（自己 + 直接子级）—— 点一级筛明细时要连子级一起算 */
+export function subtreeIds(categories, id) {
+  const target = Number(id)
+  const cats = Array.isArray(categories) ? categories : []
+  const out = [target]
+  cats.forEach(function (c) {
+    if (Number(c.parent_id) === target) out.push(Number(c.id))
+  })
+  return out
+}
+
+/**
+ * 把流水复制一份、`category_id` 换成所属一级的 id（**不改原数组**）。
+ * 明细列表仍用原始流水（要显示真实的二级名字），只有圆环图用归一后的副本。
+ */
+export function rollupToTopLevel(records, categories) {
+  const cats = Array.isArray(categories) ? categories : []
+  const byId = new Map(cats.map(function (c) { return [Number(c.id), c] }))
+  return (Array.isArray(records) ? records : []).map(function (r) {
+    if (!r) return r
+    const c = byId.get(Number(r.category_id))
+    if (!c || c.parent_id == null) return r
+    return Object.assign({}, r, { category_id: Number(c.parent_id) })
+  })
+}
+
+/**
+ * 下钻：某个一级分类下，按**二级子类**聚合本期支出（金额降序，带占比与扇区边界）。
+ *
+ * - 直接记在一级自己身上的流水会落进 `category_id === topId` 那一行
+ *   （界面显示成「全部<一级>」）—— **不能丢掉**，否则下钻后各行的和对不上总数。
+ * - 返回的 `total` 是该一级子树的本期合计，用于界面上"占本期 x%"的换算。
+ *
+ * @returns {{rows:Array, total:number}}
+ */
+export function drillSegments(records, categories, topId) {
+  const target = Number(topId)
+  const cats = Array.isArray(categories) ? categories : []
+  const byId = new Map(cats.map(function (c) { return [Number(c.id), c] }))
+  const allowed = new Set(subtreeIds(cats, target))
+  const map = new Map()
+  let total = 0
+  for (const r of (Array.isArray(records) ? records : [])) {
+    if (!r || r.type !== 'expense' || r.deleted_at != null) continue
+    const cid = Number(r.category_id)
+    if (!allowed.has(cid)) continue
+    const cur = map.get(cid) || { category_id: cid, cents: 0 }
+    cur.cents += r.amount_cents
+    map.set(cid, cur)
+    total += r.amount_cents
+  }
+  const rows = []
+  for (const row of map.values()) {
+    const cat = byId.get(row.category_id)
+    rows.push({
+      category_id: row.category_id,
+      name: cat ? cat.name : '其他',
+      color: cat ? colorOf(cat) : colorOf({ id: row.category_id }),
+      cents: row.cents
+    })
+  }
+  rows.sort(function (a, b) { return b.cents - a.cents })
+  return { rows: donutSegments(rows), total: total }
+}
+
+/**
  * 把一个月内的支出流水聚合成"分类 → 金额"，按金额降序。
  * 只统计支出；收入不进环形图（与 v2.0 参考包一致）。
  * @param {Array} records 流水（含 type / category_id / amount_cents）

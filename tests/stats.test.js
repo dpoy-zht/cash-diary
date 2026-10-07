@@ -11,6 +11,10 @@ import {
   momLabelOf,
   pctText,
   filterByCategoryIds,
+  rollupToTopLevel,
+  drillSegments,
+  subtreeIds,
+  topLevelIdOf,
   DONUT_HOLE_RATIO,
   balanceCents,
   streakDays,
@@ -678,5 +682,113 @@ describe('pctText / filterByCategoryIds —— 占比文案与明细筛选', () 
   it('空入参不抛错', () => {
     expect(filterByCategoryIds(null, [1])).toEqual([])
     expect(filterByCategoryIds([{ category_id: 1 }, null], [1]).length).toBe(1)
+  })
+})
+
+describe('两级分类统计口径（v7）', () => {
+  // 一级 1 餐饮 / 2 交通；二级 11 早餐 / 12 午餐 挂餐饮，13 打车 挂交通；14 独立一级
+  const cats = [
+    { id: 1, name: '餐饮', type: 'expense', icon: 'food', parent_id: null },
+    { id: 2, name: '交通', type: 'expense', icon: 'traffic', parent_id: null },
+    { id: 11, name: '早餐', type: 'expense', icon: 'breakfast', parent_id: 1 },
+    { id: 12, name: '午餐', type: 'expense', icon: 'lunch', parent_id: 1 },
+    { id: 13, name: '打车', type: 'expense', icon: 'taxi', parent_id: 2 },
+    { id: 14, name: '其他', type: 'expense', icon: 'more', parent_id: null }
+  ]
+  const tx = function (category_id, amount_cents, type, deleted_at) {
+    return { id: category_id * 100 + amount_cents, category_id: category_id, amount_cents: amount_cents, type: type || 'expense', deleted_at: deleted_at || null }
+  }
+
+  describe('topLevelIdOf', () => {
+    it('二级 → 一级；一级 → 自己；查不到 → 原样', () => {
+      expect(topLevelIdOf(cats, 11)).toBe(1)
+      expect(topLevelIdOf(cats, 13)).toBe(2)
+      expect(topLevelIdOf(cats, 14)).toBe(14)
+      expect(topLevelIdOf(cats, 999)).toBe(999)
+      expect(topLevelIdOf(null, 11)).toBe(11)
+    })
+
+    it('字符串 id 也能归一到数字', () => {
+      expect(topLevelIdOf(cats, '11')).toBe(1)
+    })
+  })
+
+  describe('subtreeIds', () => {
+    it('一级 → 自己 + 所有直接子级；二级 → 只有自己', () => {
+      expect(subtreeIds(cats, 1).sort()).toEqual([1, 11, 12])
+      expect(subtreeIds(cats, 11)).toEqual([11])
+      expect(subtreeIds(cats, 14)).toEqual([14])
+    })
+
+    it('空入参不炸', () => {
+      expect(subtreeIds(null, 1)).toEqual([1])
+    })
+  })
+
+  describe('rollupToTopLevel', () => {
+    it('二级流水被归到一级；一级流水原样；**不修改原数组**', () => {
+      const records = [tx(11, 100), tx(1, 200), tx(14, 50)]
+      const snap = JSON.stringify(records)
+      const out = rollupToTopLevel(records, cats)
+      expect(out.map(function (r) { return r.category_id })).toEqual([1, 1, 14])
+      // 原数组未被改动（明细列表还要用它显示真实二级名）
+      expect(JSON.stringify(records)).toBe(snap)
+      // 金额等其它字段原样带过去
+      expect(out[0].amount_cents).toBe(100)
+    })
+
+    it('查不到的分类 id 原样保留（脏数据不丢）', () => {
+      expect(rollupToTopLevel([tx(999, 10)], cats)[0].category_id).toBe(999)
+    })
+
+    it('空入参返回空数组', () => {
+      expect(rollupToTopLevel(null, cats)).toEqual([])
+      expect(rollupToTopLevel([], null)).toEqual([])
+    })
+  })
+
+  describe('drillSegments', () => {
+    it('按二级聚合，降序；直接记在一级上的流水归到「一级自己」那一行', () => {
+      const records = [tx(11, 1000), tx(11, 500), tx(12, 3000), tx(1, 200), tx(14, 999)]
+      const out = drillSegments(records, cats, 1)
+      expect(out.total).toBe(4700) // 1000+500+3000+200，不含「其他」的 999
+      expect(out.rows.map(function (r) { return r.category_id })).toEqual([12, 11, 1])
+      expect(out.rows.map(function (r) { return r.cents })).toEqual([3000, 1500, 200])
+    })
+
+    it('各二级的占比合计为 1（含一级自己那行，不会丢掉直接记一级的钱）', () => {
+      const out = drillSegments([tx(11, 100), tx(12, 300), tx(1, 100)], cats, 1)
+      const sum = out.rows.reduce(function (s, r) { return s + r.pct }, 0)
+      expect(sum).toBeCloseTo(1, 10)
+      const fromSum = out.rows.reduce(function (s, r) { return s + r.cents }, 0)
+      expect(fromSum).toBe(out.total)
+    })
+
+    it('只统计支出、跳过软删除', () => {
+      const out = drillSegments([
+        tx(11, 100),
+        tx(12, 200, 'income'),
+        tx(11, 400, 'expense', 123)
+      ], cats, 1)
+      expect(out.total).toBe(100)
+      expect(out.rows.length).toBe(1)
+    })
+
+    it('该一级本期没有流水 → rows 空、total 为 0', () => {
+      const out = drillSegments([tx(14, 100)], cats, 1)
+      expect(out.rows).toEqual([])
+      expect(out.total).toBe(0)
+    })
+
+    it('一级本身没有子类时，只有它自己一行', () => {
+      const out = drillSegments([tx(14, 100), tx(14, 50)], cats, 14)
+      expect(out.rows.length).toBe(1)
+      expect(out.rows[0].category_id).toBe(14)
+      expect(out.total).toBe(150)
+    })
+
+    it('空入参不炸', () => {
+      expect(drillSegments(null, cats, 1)).toEqual({ rows: [], total: 0 })
+    })
   })
 })
