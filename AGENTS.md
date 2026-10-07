@@ -23,6 +23,15 @@
 - 新增表必须同时改三处：`db/schema.js` 的 MIGRATIONS、两个适配器的表清单（`sqlite.js TABLE_COLS` / `memory.js TABLES`）、两侧 `clearAll`
 - 存储适配层两实现方法签名必须严格一致，改一处必须同步另一处
 
+### 分类体系（两级，2026-10-07 起）
+- **唯一事实源 = `services/category.js: EXPENSE_TREE`**，种子（新装机）与迁移（老库）共用一份定义，防止两条路径产出不同分类
+- `category.parent_id`：`NULL` = 一级，非 `NULL` = 所属一级 id，**最多两级**
+- **老库迁移 `migrateCategoryTree()` 必须幂等**：判据是「库里还存在名字属于老叶子集合的平铺支出分类」，跑完自然为假，**不另存迁移标记**
+- 老分类改名走「**别名改名**」而不是新插一条（如 住房 → 居住），否则历史流水会变孤儿
+- 一级预算必须按**子树**汇总（`utils/budget.js: spentBySubtree`），否则给一级设预算形同虚设
+- 统计圆环**按一级画**（49 个分类直接画会碎成一堆扇形），点一级再下钻看二级
+- ⚠️ `plus.sqlite` 的 insert **拿不到 `lastInsertRowid`** → 插完一级要**重新查库**取 id 再挂二级
+
 ### App 端特有坑
 - **禁用 `Intl` / `toLocaleString(locale, options)`**：App 端 app-service 引擎无 `Intl`，`(1800).toLocaleString('zh-CN',{minimumFractionDigits:2})` 返回 `'1800'`。千分位走 `utils/money.js: groupThousands()`，日期走 `utils/date.js`。**H5 有完整 ICU，浏览器截图永远掩盖此 bug，只能真机暴露**
 - **动态 SQL 只允许一处**：`db/tx-search-sql.js` 纯函数产出，动态值必须过 `sqlValue()`（`plus.sqlite` 无参数绑定）
