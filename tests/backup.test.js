@@ -653,3 +653,20 @@ describe('withTimeout —— plus.io 挂起时的救命绳', () => {
     expect(LIST_TIMEOUT_MS).toBe(4000)
   })
 })
+
+describe('selectRestoreNames —— 去重（Download 与 Documents 可能扫到同一份）', () => {
+  it('同名只出现一次', () => {
+    const dup = '奶蛙记账-备份-2026-10-08-0930.json'
+    const r = selectRestoreNames([dup, dup])
+    expect(r.shown).toEqual([dup])
+    expect(r.total).toBe(1)
+  })
+
+  it('去重后再统计总数，不虚高', () => {
+    const a = '奶蛙记账-备份-2026-10-08-0930.json'
+    const b = '奶蛙记账-自动备份-2026-10-08-0900.json'
+    const r = selectRestoreNames([a, b, a, b])
+    expect(r.total).toBe(2)
+    expect(r.truncated).toBe(false)
+  })
+})

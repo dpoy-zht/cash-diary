@@ -114,6 +114,9 @@ export function selectRestoreNames(names, opts) {
   const all = (Array.isArray(names) ? names : [])
     .filter(function (n) { return isBackupName(n) })
     .slice()
+    // ⚠️ 去重：公共目录扫描会把 Download 和 Documents 都扫一遍，
+    // 同一个文件可能被收两次，列表里出现两条一样的名字会让用户懵
+    .filter(function (n, i, arr) { return arr.indexOf(n) === i })
     .sort(function (a, b) { return a < b ? 1 : a > b ? -1 : 0 })
   const manual = all.filter(function (n) { return !isAutoBackupName(n) })
   const auto = all.filter(isAutoBackupName)
