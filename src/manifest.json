@@ -2,8 +2,8 @@
     "name" : "奶蛙记账",
     "appid" : "__UNI__F1ADD03",
     "description" : "奶蛙风个人记账 App（首页余额卡 / 3 秒记一笔 / 分类统计，本地 SQLite 持久化）",
-    "versionName" : "2.3.18",
-    "versionCode" : 242,
+    "versionName" : "2.3.19",
+    "versionCode" : 243,
     "transformPx" : false,
     "app-plus" : {
         "usingComponents" : true,
