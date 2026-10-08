@@ -52,16 +52,31 @@ npm test && npm run build:app
 # 3. 打 wgt（以上一版 wgt 为结构模板）
 python dist/dev/gen-wgt.py dist/release/nailong-ledger-v<旧>.wgt dist/build/app dist/release/nailong-ledger-v<新>.wgt
 # 4. HBuilderX 云打包（需 HBuilderX 已启动 + DCloud 登录态有效）
-E:/HBuilderX/cli.exe pack --config dist/pack-config.json
+#    ⚠️ --config 必须是绝对路径；给相对路径会「报参数错误但 exit 0」= 假成功
+E:/HBuilderX/cli.exe pack --config "F:/360MoveData/Users/zhtzh/Desktop/记账app/dist/pack-config.json"
 cp dist/release/apk/__UNI__F1ADD03__<时间戳>.apk dist/release/nailong-ledger-v<新>.apk
 # 5. 校验 + 上传 + 写双 sha256
 python dist/dev/publish-release.py v<新> --apply
 # 6. git commit + push
 ```
 
+- **纯前端改动不必等云打包**：先 `publish-release.py v<新> --wgt-only --apply` 把 wgt 发出去，
+  APK 好了再补跑一次不带 `--wgt-only` 的即可（同名资产会先删后传）
+- ⚠️ **`dist/dev/release.js` 在本机走不通**：它在 Node 里 `spawnSync` 托管 python，
+  被沙箱拦成 `EBUSY`。改为手工跑 `gen-latest-json.py` + `node dist/dev/push-update.js <wgt文件名>`
+  （该脚本只用 ssh2 + fs，不 spawn 任何东西）。跑 `dist/dev/*.js` 要带
+  `NODE_PATH=C:/Users/zhtzh/.workbuddy/binaries/node/workspace/node_modules`（ssh2 在那里）
+- ⚠️ **云打包排队时段决定速度**（两次实证）：22:40 提交 → 队列 94 位、15 分钟未进打包；
+  08:07 提交 → 1 分 13 秒完成。排查打包慢先看时段，别怀疑代码
+- ⚠️ **云打包的轮询进程会随会话结束被回收** → 云端任务照跑完成，但 APK 不会落到本地；
+  重跑一次 `cli pack` 即可（会多提交一个任务，不影响正确性）
+
 - **Release 说明必须含 `wgt-sha256: <64位hex>` 行**（正则 `/wgt[-_]sha256[:：=\s]+([0-9a-fA-F]{64})/`）。写成 `wgt SHA-256：` 会让校验被静默跳过 —— v2.2.0/2.2.1 踩过
+- 改Release 说明时**必须先摘出再放回 `wgt-sha256` / `wgt-size` 行**，否则热更校验被静默跳过
 - **重发同一 tag 必须先删线上资产**（GitHub 不允许同名共存，直接 POST 返 422）；`publish-release.py` 已自动处理
 - **正式包覆盖安装后调试基座失效**（外置 www 热替换通道消失），需重装 `dist/debug/android_debug.apk`
+- 校验包内容用 python `zipfile` 读 `assets/apps/__UNI__F1ADD03/www/`；**搜业务字面量别搜函数名**（压缩后改名），
+  中文要同时试 `\uXXXX` 转义形式；数字常量可能被转成科学计数法（`25000` → `2.5e4`）
 
 ## 真机验证限制（HyperOS / 小米 14 Pro 实测）
 
