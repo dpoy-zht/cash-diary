@@ -4,7 +4,10 @@ import {
   formatCents,
   formatSigned,
   groupThousands,
-  displayAmount
+  displayAmount,
+  compactYuan,
+  amountSizeClass,
+  COMPACT_FROM_LEN
 } from '../src/utils/money.js'
 
 describe('parseAmountToCents —— 金额一律整数分，禁止浮点存储', () => {
@@ -104,5 +107,72 @@ describe('displayAmount —— 记账页大数字展示', () => {
   it('千分位但不补齐小数', () => {
     expect(displayAmount('1234567')).toBe('1,234,567')
     expect(displayAmount('19.9')).toBe('19.9')
+  })
+})
+
+/**
+ * 余额卡大数字的紧凑写法与字号分档（2026-10-08）。
+ *
+ * 起因：vivo iQOO 12/OriginOS 用户截图里首页「已花」被截成「¥22⋯」，
+ * 同页流水却明明是 ¥225.00。实测那列只有 100~130px 可用，
+ * 28px 的 7 字符就要 104px —— 系统字体一大必截断。
+ */
+describe('compactYuan —— 金额紧凑写法', () => {
+  it('0 → ¥0', () => {
+    expect(compactYuan(0)).toBe('¥0')
+    expect(compactYuan(null)).toBe('¥0')
+    expect(compactYuan(-100)).toBe('¥0')
+  })
+
+  it('不到 1 万显示整数元（不带小数）', () => {
+    expect(compactYuan(22500)).toBe('¥225')
+    expect(compactYuan(123400)).toBe('¥1,234')
+    expect(compactYuan(999900)).toBe('¥9,999')
+  })
+
+  it('四舍五入到元（¥9999.99 → ¥10,000），不是截断', () => {
+    expect(compactYuan(999999)).toBe('¥10,000')
+  })
+
+  it('过万走「万」，一位小数', () => {
+    expect(compactYuan(1234567)).toBe('¥1.2万')
+    expect(compactYuan(12345678)).toBe('¥12.3万')
+  })
+
+  it('比 formatCents 明显更短（这才是它存在的意义）', () => {
+    const long = 12345678
+    expect(formatCents(long).length).toBeGreaterThan(compactYuan(long).length)
+  })
+})
+
+describe('amountSizeClass —— 大数字字号档位', () => {
+  it('≤6 字符保持默认 28px（设计主角不降档）', () => {
+    expect(amountSizeClass('0.00')).toBe('')     // 4
+    expect(amountSizeClass('225.00')).toBe('')    // 6  ← 用户截图那个金额，够短
+    expect(amountSizeClass('9,999')).toBe('')     // 5
+  })
+
+  it('7~8 字符降一档', () => {
+    expect(amountSizeClass('1225.00')).toBe('md')  // 7
+    expect(amountSizeClass('1,225.00')).toBe('md') // 8
+  })
+
+  it('≥9 字符降到 sm', () => {
+    expect(amountSizeClass('12,345.67')).toBe('sm')  // 9
+    expect(amountSizeClass('123,456.78')).toBe('sm') // 10
+  })
+
+  it('空/非法输入不炸', () => {
+    expect(amountSizeClass(null)).toBe('')
+    expect(amountSizeClass('')).toBe('')
+    expect(amountSizeClass(undefined)).toBe('')
+  })
+
+  it('阈值和紧凑写法衔接得上：超过阈值就换成更短的文本', () => {
+    // COMPACT_FROM_LEN 以上走 compactYuan，compactYuan 的结果必然落回 ≤8 字符
+    expect(COMPACT_FROM_LEN).toBe(9)
+    const compact = compactYuan(123456789).replace(/^¥/, '')
+    expect(compact.length).toBeLessThan(COMPACT_FROM_LEN)
+    expect(amountSizeClass(compact)).not.toBe('sm')
   })
 })

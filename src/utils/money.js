@@ -66,3 +66,41 @@ export function displayAmount(str) {
   const intPart = parts[0] ? groupThousands(parts[0]) : '0'
   return parts.length > 1 ? intPart + '.' + parts[1] : intPart
 }
+
+/**
+ * 金额紧凑写法：0 → ¥0；< 1 万 → ¥1,234；≥ 1 万 → ¥1.8万。
+ *
+ * 什么时候必须用它：首页余额卡的「已花」是 28px 大数字，
+ * 而那一列在 360dp 窄屏 + 系统大字体下只有一百多 px 可用，
+ * `¥12,345.67` 这种 10 字符会被 CSS 截成 `¥12,345…`（用户真机截图实测）。
+ * 压到 6 个字符以内是唯一稳的办法 —— 改字号挡不住系统字体缩放。
+ */
+export function compactYuan(cents) {
+  const c = Math.max(0, Number(cents) || 0)
+  if (!c) return '¥0'
+  const yuan = c / 100
+  if (yuan < 10000) return '¥' + groupThousands(Math.round(yuan))
+  return '¥' + (yuan / 10000).toFixed(1) + '万'
+}
+
+/** 超过这个字符数就改用 compactYuan（10 字符 = ¥12,345.67，再长就没法看了） */
+export const COMPACT_FROM_LEN = 9
+
+/**
+ * 大号金额的字号档位（纯函数，可单测）。
+ *
+ * ⚠️ **为什么不能只靠字号分档解决**：OriginOS / vivo 的「系统字体大小」会把
+ * WebView 文本整体放大（实测列宽 108px 时 7 字符就要 104px，字号一放大必截断）。
+ * 字号降档只能扛住一部分缩放，所以 `home.vue` 是**两件事一起做**：
+ * ① 超过 9 字符改用 compactYuan（把字符数压下来，缩放也扛得住）
+ * ② 剩下的按字符数降一档字号。
+ *
+ * @param {string} text 已格式化好的金额（不含 ¥）
+ * @returns {string} ''（默认）/ 'md' / 'sm'，对应 CSS 里的字号档
+ */
+export function amountSizeClass(text) {
+  const n = String(text == null ? '' : text).length
+  if (n <= 6) return ''
+  if (n <= 8) return 'md'
+  return 'sm'
+}

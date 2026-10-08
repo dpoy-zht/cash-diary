@@ -3,7 +3,16 @@ import { getStorage, resetStorageForTest } from '../src/db/index.js'
 import { seedIfEmpty, listAll as listCats, DEFAULT_CATEGORY_COUNT } from '../src/services/category.js'
 import * as accountService from '../src/services/account.js'
 import * as budgetService from '../src/services/budget.js'
-import { sortedBackupNames, exportResultMessage } from '../src/utils/backup-file.js'
+import {
+  sortedBackupNames,
+  exportResultMessage,
+  isBackupName,
+  isAutoBackupName,
+  selectRestoreNames,
+  restoreListHint,
+  withTimeout,
+  LIST_TIMEOUT_MS
+} from '../src/utils/backup-file.js'
 import * as txService from '../src/services/tx.js'
 import * as backupService from '../src/services/backup.js'
 import { resetAll } from '../src/services/maintenance.js'
@@ -523,5 +532,124 @@ describe('改名兼容：自动备份新旧前缀都要认', () => {
   it('备份内容标识仍是英文 cash-diary（改名不影响备份格式兼容）', () => {
     // BACKUP_APP 是内容里的机器标识符，不随显示名变 —— 否则旧备份全都读不了
     expect(BACKUP_APP).toBe('cash-diary')
+  })
+})
+
+/**
+ * 恢复入口的选择逻辑（2026-10-08）。
+ *
+ * 起因：vivo / OriginOS 用户反馈「备份功能无效，备份后无法恢复」。
+ * 两个真因都在这段逻辑里：
+ *① 恢复只列应用私有目录，但导出会**复制一份到公共目录**——
+ *    用户从「下载」里选到的备份，恢复时根本列不出来；
+ * ② 自动备份每 6 小时一份，久了私有目录几十个，
+ *    `uni.showActionSheet` 装不下 → 点了没反应。
+ */
+describe('isBackupName / isAutoBackupName —— 只认自己的备份', () => {
+  it('认本App 的新旧前缀 + .json', () => {
+    expect(isBackupName('奶蛙记账-备份-2026-10-08-0930.json')).toBe(true)
+    expect(isBackupName('奶蛙记账-自动备份-2026-10-08-0930.json')).toBe(true)
+    expect(isBackupName('奶龙记账-备份-2026-09-27-2344.json')).toBe(true) // 改名前
+  })
+
+  it('公共目录里别人的 json 一律不认', () => {
+    expect(isBackupName('微信导出.json')).toBe(false)
+    expect(isBackupName('backup.json')).toBe(false)
+    expect(isBackupName('奶蛙记账-备份-2026-10-08-0930.txt')).toBe(false)
+    expect(isBackupName('')).toBe(false)
+    expect(isBackupName(null)).toBe(false)
+  })
+
+  it('自动备份与手动备份能区分（新的旧的都认）', () => {
+    expect(isAutoBackupName('奶蛙记账-自动备份-2026-10-08-0930.json')).toBe(true)
+    expect(isAutoBackupName('奶龙记账-自动备份-2026-09-27-2344.json')).toBe(true)
+    expect(isAutoBackupName('奶蛙记账-备份-2026-10-08-0930.json')).toBe(false)
+  })
+})
+
+describe('selectRestoreNames —— 恢复列表该显示哪些', () => {
+  it('空输入不炸', () => {
+    const r = selectRestoreNames(null)
+    expect(r.shown).toEqual([])
+    expect(r.total).toBe(0)
+    expect(r.truncated).toBe(false)
+  })
+
+  it('别人家的 json 被过滤掉', () => {
+    const r = selectRestoreNames(['微信导出.json', '奶蛙记账-备份-2026-10-08-0930.json'])
+    expect(r.shown).toEqual(['奶蛙记账-备份-2026-10-08-0930.json'])
+    expect(r.total).toBe(1)
+  })
+
+  it('手动备份优先，位置不够了才轮到自动备份', () => {
+    const names = [
+      '奶蛙记账-备份-2026-10-08-0930.json',
+      '奶蛙记账-自动备份-2026-10-08-0900.json',
+      '奶蛙记账-自动备份-2026-10-08-0300.json'
+    ]
+    const r = selectRestoreNames(names, { limit: 2 })
+    expect(r.shown[0]).toBe(names[0])
+    expect(r.shown[1]).toBe('奶蛙记账-自动备份-2026-10-08-0900.json') // 较新的那个
+    expect(r.truncated).toBe(true)
+  })
+
+  it('数量超限时如实报告被截断（不让用户以为备份丢了）', () => {
+    const names = []
+    for (let i = 1; i <= 20; i += 1) {
+      names.push('奶蛙记账-自动备份-2026-10-08-1' + String(i).padStart(4, '0') + '.json')
+    }
+    const r = selectRestoreNames(names, { limit: 6 })
+    expect(r.shown).toHaveLength(6)
+    expect(r.total).toBe(20)
+    expect(r.truncated).toBe(true)
+    expect(restoreListHint(r)).toContain('只列出最近 6 份')
+    expect(restoreListHint(r)).toContain('共 20 份')
+  })
+
+  it('时间倒序：最新备份排最前', () => {
+    const r = selectRestoreNames([
+      '奶蛙记账-备份-2026-10-01-1000.json',
+      '奶蛙记账-备份-2026-10-08-0930.json',
+      '奶蛙记账-备份-2026-10-05-1000.json'
+    ])
+    expect(r.shown[0]).toBe('奶蛙记账-备份-2026-10-08-0930.json')
+    expect(r.shown[1]).toBe('奶蛙记账-备份-2026-10-05-1000.json')
+  })
+
+  it('不分目录：私有 + 公共混在一起也能正确挑', () => {
+    const r = selectRestoreNames([
+      '奶蛙记账-自动备份-2026-10-08-0900.json',   // 私有目录的自动备份
+      '奶蛙记账-备份-2026-10-08-0930.json'        // 公共目录（下载）里的手动备份
+    ])
+    expect(r.shown[0]).toBe('奶蛙记账-备份-2026-10-08-0930.json')
+    expect(r.manualCount).toBe(1)
+    expect(r.autoCount).toBe(1)
+  })
+})
+
+describe('withTimeout —— plus.io 挂起时的救命绳', () => {
+  it('正常完成时原样返回', async () => {
+    await expect(withTimeout(Promise.resolve('ok'), 200)).resolves.toBe('ok')
+  })
+
+  it('原promise 失败时原样抛错', async () => {
+    await expect(withTimeout(Promise.reject(new Error('boom')), 200)).rejects.toThrow('boom')
+  })
+
+  it('永不 settle 的 promise 会超时 reject（createReader 挂起就靠它）', async () => {
+    const stuck = new Promise(function () {})
+    await expect(withTimeout(stuck, 60, '读取文件超时')).rejects.toThrow('读取文件超时')
+  })
+
+  it('超时后原 promise 迟到的结果被忽略，不会二次 resolve', async () => {
+    let late = null
+    const p = new Promise(function (resolve) { setTimeout(function () { late = 'late'; resolve('late') }, 80) })
+    await expect(withTimeout(p, 20, '超时')).rejects.toThrow('超时')
+    await new Promise(function (r) { setTimeout(r, 120) })
+    expect(late).toBe('late') // 迟到值被丢弃，没有未处理的 rejection
+  })
+
+  it('默认超时是LIST_TIMEOUT_MS（4s）', () => {
+    expect(LIST_TIMEOUT_MS).toBe(4000)
   })
 })

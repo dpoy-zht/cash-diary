@@ -481,11 +481,41 @@ function onDailyTimeChange(e) {
 /* ---- 数据备份与恢复 ---- */
 function openBackupMenu() {
   uni.showActionSheet({
-    itemList: ['导出备份（JSON 文件）', '导出账单（CSV 表格）', '从备份恢复'],
+    itemList: [
+      '导出备份（JSON 文件）',
+      '导出账单（CSV 表格）',
+      '从备份恢复（选文件）',
+      '从剪贴板恢复'
+    ],
     success: function (res) {
       if (res.tapIndex === 0) doExport()
       else if (res.tapIndex === 1) doExportCsv()
       else if (res.tapIndex === 2) doRestore()
+      else if (res.tapIndex === 3) doRestoreFromClipboard()
+    }
+  })
+}
+
+/**
+ * 从剪贴板恢复（2026-10-08 新增）。
+ *
+ * 为什么要有这条旁路：文件恢复那条路要靠 plus.io 列目录，
+ * 而 `createReader()` 在部分 ROM（实测 vivo / OriginOS）上会**永久挂起**，
+ * 表现就是「点了恢复没反应」。剪贴板不碰文件系统，是最稳的一条路。
+ * 适用场景也很常见 —— 备份发到微信后直接长按复制。
+ */
+function doRestoreFromClipboard() {
+  uni.getClipboardData({
+    success: function (res) {
+      const text = String((res && res.data) || '').trim()
+      if (!text) {
+        uni.showToast({ title: '剪贴板是空的', icon: 'none' })
+        return
+      }
+      doRestoreWithText(text, '剪贴板')
+    },
+    fail: function () {
+      uni.showToast({ title: '读不到剪贴板，可能被系统限制', icon: 'none' })
     }
   })
 }
@@ -587,9 +617,14 @@ async function doRestore() {
     if (!err || !err.cancelled) uni.showToast({ title: (err && err.message) || '读取失败', icon: 'none' })
     return
   }
+  doRestoreWithText(picked.text, picked.name)
+}
+
+/** 恢复的公共后半段：解析 → 只读校验 → 二次确认 → 执行 */
+function doRestoreWithText(text, from) {
   let obj
   try {
-    obj = backupService.parseBackupText(picked.text)
+    obj = backupService.parseBackupText(text)
   } catch (err) {
     uni.showToast({ title: err.message, icon: 'none' })
     return
@@ -604,6 +639,7 @@ async function doRestore() {
   uni.showModal({
     title: '从备份恢复',
     content:
+      '来源：' + (from || '备份文件') + '\n' +
       '备份时间：' + fmtTs(obj.exportedAt) + '\n' +
       '包含：' + c.account + ' 个账本、' + c.category + ' 个分类、' +
       c.transaction_record + ' 笔流水、' + c.budget + ' 条预算\n\n' +

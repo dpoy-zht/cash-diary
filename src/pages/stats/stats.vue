@@ -217,7 +217,7 @@ import {
   periodNameOf,
   shortDateTime
 } from '../../utils/date.js'
-import { formatCents, groupThousands } from '../../utils/money.js'
+import { formatCents, compactYuan } from '../../utils/money.js'
 import { readableInk } from '../../utils/palette.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
@@ -603,15 +603,6 @@ const trendFoot = computed(function () {
   }).length
   return meta.span + '共' + word + ' ¥' + formatCents(total) + '（有记录的 ' + n + ' ' + meta.unit + '）'
 })
-/** 金额紧凑写法：0 → ¥0；< 1 万 → ¥1,234；≥ 1 万 → ¥1.8万 */
-function compactYuan(cents) {
-  const c = Math.max(0, Number(cents) || 0)
-  if (!c) return '¥0'
-  const yuan = c / 100
-  if (yuan < 10000) return '¥' + groupThousands(Math.round(yuan))
-  return '¥' + (yuan / 10000).toFixed(1) + '万'
-}
-
 function goHome() {
   uni.reLaunch({ url: '/pages/home/home' })
 }

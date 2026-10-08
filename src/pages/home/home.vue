@@ -24,11 +24,11 @@
       <view class="bal-cols">
         <view class="bal-col">
           <text class="bal-col-label">已存</text>
-          <text class="bal-col-num inc">¥{{ incomeText }}</text>
+          <text class="bal-col-num inc" :class="incomeSizeClass">¥{{ incomeText }}</text>
         </view>
         <view class="bal-col">
           <text class="bal-col-label">已花</text>
-          <text class="bal-col-num">¥{{ expenseText }}</text>
+          <text class="bal-col-num" :class="expenseSizeClass">¥{{ expenseText }}</text>
         </view>
       </view>
       <view class="heart" :style="iconHeart" />
@@ -159,7 +159,7 @@ import * as fixedService from '../../services/fixed.js'
 import { buildEditInput } from '../../services/tx.js'
 import { groupByDay, dayLabel, ymOf, homeDateLabel, dayStart } from '../../utils/date.js'
 import { expenseSumOfDay } from '../../utils/stats.js'
-import { formatCents } from '../../utils/money.js'
+import { formatCents, compactYuan, amountSizeClass, COMPACT_FROM_LEN } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
 import { requestNotifyPermission, notifyLocal, REMIND_PREF_KEY, normalizeRemindEnabled } from '../../utils/notify.js'
 import { countFilters, filterSummary } from '../../utils/search.js'
@@ -285,11 +285,42 @@ function maybeAlertOver() {
   }
 }
 
+/**
+ * 余额卡两个金额的统一算法（纯函数在 utils/money.js，可单测）。
+ *
+ * 为什么要压长度：余额卡是 28px 大数字，而每列在窄屏（360dp）加系统大字体下
+ * 只有一百多 px 可用 —— vivo/OriginOS 的「系统字体大小」会把 WebView 文本整体
+ * 放大，`¥12,345.67` 这种 10 字符必被 CSS 截成 `¥12,345…`（用户真机截图实测）。
+ * **改字号挡不住字体缩放，只能压字符数** → 超过 9 位改用 compactYuan（¥1.2万）。
+ */
+function balanceAmount(cents) {
+  const full = formatCents(cents)
+  if (full.length >= COMPACT_FROM_LEN) {
+    // compactYuan 自带 ¥（stats 页的圆心/柱标直接用它，那里没模板前缀），
+    // 这里模板已经写死了「¥{{ }}」，所以要把它那个 ¥ 剥掉，否则渲染成「¥¥1.2万」
+    const bare = String(compactYuan(cents)).replace(/^¥/, '')
+    return { text: bare, size: amountSizeClass(bare) }
+  }
+  return { text: full, size: amountSizeClass(full) }
+}
+
+const incomeAmount = computed(function () {
+  return balanceAmount(txStore.summary.incomeCents)
+})
+const expenseAmount = computed(function () {
+  return balanceAmount(txStore.summary.expenseCents)
+})
 const incomeText = computed(function () {
-  return formatCents(txStore.summary.incomeCents)
+  return incomeAmount.value.text
 })
 const expenseText = computed(function () {
-  return formatCents(txStore.summary.expenseCents)
+  return expenseAmount.value.text
+})
+const incomeSizeClass = computed(function () {
+  return incomeAmount.value.size
+})
+const expenseSizeClass = computed(function () {
+  return expenseAmount.value.size
 })
 
 const filtered = computed(function () {
@@ -644,15 +675,27 @@ onShow(async function () {
   height: 90px;
 }
 /* 两列并排：标签在上、数字在下（数字是主角，字号接近标签的 2.2 倍）。
-   右侧留出奶蛙的位置，避免数字压到它身上。 */
+   ⚠️ 宽度**按内容分配**，不再两列等分（2026-10-08 改）：
+   等分时「已花」那列在 360dp 窄屏只剩 100px，而 28px 的 `¥225.00` 要 104px
+   —— 再叠上 OriginOS 的系统大字体就必然被 CSS 截成「¥22…」（用户真机截图）。
+   现在「已存」按内容收缩并封顶 45%，剩下的全给「已花」；
+   金额过长时还有 compactYuan + 字号分档两道保险（见 utils/money.js）。 */
 .bal-cols {
   display: flex;
   gap: 12px;
-  padding-right: 76px;
+  padding-right: 44px;
 }
 .bal-col {
-  flex: 1;
   min-width: 0;
+}
+/* 已存：按内容收缩，最多占 45%（免得它把「已花」挤没） */
+.bal-col:first-child {
+  flex: 0 1 auto;
+  max-width: 45%;
+}
+/* 已花：吃掉剩下的全部空间 */
+.bal-col:last-child {
+  flex: 1 1 0;
 }
 .bal-col-label {
   font-size: 13px;
@@ -670,6 +713,14 @@ onShow(async function () {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* 字号分档：字符越多字越小（amountSizeClass 决定挂哪个 class）。
+   28px 是设计主角，只有 7 个字符以上才降档。 */
+.bal-col-num.md {
+  font-size: 23px;
+}
+.bal-col-num.sm {
+  font-size: 20px;
 }
 /* 已存用收入绿，和已花（主文字色）一眼分得开 */
 .bal-col-num.inc {
