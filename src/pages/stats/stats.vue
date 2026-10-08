@@ -28,7 +28,7 @@
       <text class="mt-item">{{ periodName }}收入 <text class="mt-num inc">{{ periodIncomeText }}</text></text>
     </view>
 
-    <!-- 环形图卡：圆环 + 圆心合计/环比 + 分类占比列表（点任意一行筛选下方明细） -->
+    <!-- 环形图卡：圆环 + 环内占比 + 圆心合计/环比 + 分类占比列表（点任意一行筛选下方明细） -->
     <view class="donut-wrap">
       <block v-if="segments.length">
         <view class="donut" :style="{ background: donutBg }" @click="onDonutTap">
@@ -40,8 +40,18 @@
               <text v-if="mom.text" class="dc-mom" :class="mom.dir">{{ mom.text }} {{ momLabel }}</text>
             </view>
           </view>
+          <!-- 环内占比：按扇区中点角度定位，小扇区不显示（避免互相压住），
+               没显示的那些在下方图例里仍带百分比，信息不丢 -->
+          <view
+            v-for="lb in labels"
+            :key="'lb' + lb.category_id"
+            v-show="lb.show"
+            class="donut-lb"
+            :style="{ left: lb.xPct + '%', top: lb.yPct + '%', color: inkOf(lb.color) }"
+          >
+            <text class="donut-lb-t">{{ lb.pctText }}</text>
+          </view>
         </view>
-        <text v-if="!conicOk" class="donut-tip">这台设备画不出圆环图，看下面的分类占比条，一样准</text>
 
         <view class="donut-list">
           <text class="dl-title">{{ listTitle }}</text>
@@ -57,7 +67,10 @@
             <cat-icon :category="drill.topCat" :size="32" />
             <view class="dl-main">
               <view class="dl-line">
-                <text class="dl-name">全部{{ drill.topCat.name }}</text>
+                <view class="dl-name">
+                  <view class="dl-swatch" :style="{ background: drill.topColor }" />
+                  <text class="dl-name-t">全部{{ drill.topCat.name }}</text>
+                </view>
                 <text class="dl-amt">¥{{ formatCents(drill.total) }}</text>
               </view>
               <view class="dl-bar">
@@ -78,7 +91,10 @@
             <cat-icon :category="catOf(s.category_id)" :size="32" />
             <view class="dl-main">
               <view class="dl-line">
-                <text class="dl-name">{{ s.name }}</text>
+                <view class="dl-name">
+                  <view class="dl-swatch" :style="{ background: s.color }" />
+                  <text class="dl-name-t">{{ s.name }}</text>
+                </view>
                 <text class="dl-amt">¥{{ formatCents(s.cents) }}</text>
               </view>
               <view class="dl-bar">
@@ -180,7 +196,7 @@ import {
   expenseByCategory,
   donutSegments,
   conicGradient,
-  supportsConicGradient,
+  donutLabels,
   sectorAtPoint,
   momOf,
   momLabelOf,
@@ -202,6 +218,7 @@ import {
   shortDateTime
 } from '../../utils/date.js'
 import { formatCents, groupThousands } from '../../utils/money.js'
+import { readableInk } from '../../utils/palette.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
 /**
@@ -318,14 +335,28 @@ const segments = computed(function () {
   return donutSegments(rows.value)
 })
 /**
- * 老 WebView（Chrome < 69）不支持 conic-gradient，行内样式会被忽略、环形图整块空白（T3.7）。
- * 检测一次即可（同一台设备的渲染引擎不会中途变），不支持时返回空背景，
- * 让 CSS 里那层纯色环兜底，并在环下方给出"看占比条"的指引。
+ * 背景色（conic-gradient + 扇区白缝）。
+ *
+ * ⚠️ 这里曾经有个 `conicOk = supportsConicGradient()` 的开关：探测不到
+ * conic-gradient 就返回空背景、让 CSS 兜底色接管并显示"这台设备画不出圆环图"。
+ * 但那个探测在 **App 端恒为假** —— uni-app 逻辑层没有 `CSS` 全局
+ * （渲染层才是 WebView），`typeof CSS === 'undefined'` 直接短路。
+ * 结果真机上圆环一直是素色+ 那句降级提示，尽管 WebView 是 Chrome 150、
+ * 完全支持。已改为无条件应用（详见 utils/stats.js: supportsConicGradient）。
  */
-const conicOk = ref(supportsConicGradient())
 const donutBg = computed(function () {
-  return conicOk.value ? conicGradient(segments.value) : ''
+  return conicGradient(segments.value)
 })
+
+/** 环内百分比标签：几何在 utils/stats.js: donutLabels（纯函数、可单测） */
+const labels = computed(function () {
+  return donutLabels(segments.value)
+})
+
+/** 扇区底色深浅跨度大，字色逐扇区决定（utils/palette.js: readableInk） */
+function inkOf(hex) {
+  return readableInk(hex)
+}
 
 /* ---- 圆心：合计 + 环比 ---- */
 const centerLabel = computed(function () {
@@ -440,7 +471,6 @@ function clearSelect() {
  * 宁可点击无反应（还有旁边的占比行可点），也不要按错误的坐标选中一个不相干的分类。
  */
 function onDonutTap(e) {
-  if (!conicOk.value) return
   const p = viewportPoint(e)
   if (!p) return
   let box = null
@@ -681,17 +711,28 @@ onShow(function () {
   border-radius: 50%;
   margin: 0 auto;
   position: relative;
-  /* 兜底底色：设备画不了 conic-gradient 时，这里就是那圈"素色环"（T3.7） */
+  /* 兜底底色：万一设备真的画不了 conic-gradient（Chrome < 69），
+     行内 background 会被忽略，这里就是那圈"素色环"。 */
   background: var(--cd-primary-lt);
 }
-/* 降级提示：环画不出来时，把用户引到下面的占比列表 */
-.donut-tip {
+/* 环内占比标签：按扇区中点角度绝对定位，字色由 readableInk 逐段决定。
+   ⚠️ 必须显式 display:block —— 放进绝对定位容器后不再靠默认块级撑开。 */
+.donut-lb {
+  position: absolute;
   display: block;
-  margin-top: 12px;
+  width: 46px;
+  margin-left: -23px;
+  margin-top: -8px;
   text-align: center;
+  /* 不加 transform：uni-app App 端对 left/top 百分比 +负margin 的组合
+     比 transform 稳（少一次合成，跨端表现一致） */
+}
+.donut-lb-t {
+  display: block;
   font-size: 11px;
-  line-height: 1.7;
-  color: var(--cd-ink);
+  font-weight: 700;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
 }
 .donut-center {
   position: absolute;
@@ -787,9 +828,30 @@ onShow(function () {
   align-items: baseline;
 }
 .dl-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--cd-ink);
+}
+/* ⚠️ <text> 进横向 flex 必须显式 display:block，否则会失去隐式块级 */
+.dl-name-t {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* 图例色块：与扇区填充色**完全同一个值**，让"名称↔颜色"对应关系可核对。
+   图标（cat-icon）表达的是分类语义，这个方块表达的是"环上那块颜色"。 */
+.dl-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 .dl-amt {
   font-size: 13px;

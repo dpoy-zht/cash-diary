@@ -7,7 +7,10 @@ import {
   tintOf,
   colorOf,
   tagColorOf,
-  iconMaskStyle
+  iconMaskStyle,
+  luminanceOf,
+  readableInk,
+  INK_ON_LIGHT
 } from '../src/utils/palette.js'
 import {
   DEFAULT_CATEGORIES, iconOptions, EXPENSE_TREE,
@@ -199,5 +202,51 @@ describe('T5.1 —— tagColorOf（标签取色）', () => {
 
   it('色 key 优先于 id：同一个 id 换色即换色（不依赖 id 兜底）', () => {
     expect(tagColorOf({ id: 1, color: 'c5' })).not.toBe(tagColorOf({ id: 1, color: 'c6' }))
+  })
+})
+
+/**
+ * 环内百分比标签的字色（2026-10-08）。
+ *
+ * 统计页圆环把分类色当扇区填充，色深浅跨度很大：
+ * #ffca28（宠物）亮到白字读不出来，#42a5f5（交通）深到黑字看不见。
+ * 所以字色必须逐扇区决定，不能固定一种。
+ */
+describe('readableInk —— 扇区上的字色', () => {
+  it('白色/黑色是亮度两端', () => {
+    expect(luminanceOf('#ffffff')).toBeCloseTo(1, 3)
+    expect(luminanceOf('#000000')).toBeCloseTo(0, 3)
+  })
+
+  it('#rgb 短写法与 #rrggbb 等价', () => {
+    expect(luminanceOf('#fff')).toBeCloseTo(luminanceOf('#ffffff'), 6)
+    expect(luminanceOf('#000')).toBeCloseTo(luminanceOf('#000000'), 6)
+  })
+
+  it('带alpha 的写法也能解析（只看前6 位）', () => {
+    expect(luminanceOf('#ff8a65cc')).toBeCloseTo(luminanceOf('#ff8a65'), 6)
+  })
+
+  it('亮色底用深墨、暗色底用白字', () => {
+    expect(readableInk('#ffca28')).toBe(INK_ON_LIGHT) // 宠物：亮黄
+    expect(readableInk('#ffc93c')).toBe(INK_ON_LIGHT) // 购物：亮黄
+    expect(readableInk('#42a5f5')).toBe('#ffffff')     // 交通：亮蓝其实偏亮
+    expect(readableInk('#7e57c2')).toBe('#ffffff')     // 教育：深紫
+    expect(readableInk('#4a3a0a')).toBe('#ffffff')     // 深墨底
+  })
+
+  it('全部一级分类色都能拿到字色，不会返回空', () => {
+    Object.keys(CATEGORY_COLORS).forEach(function (k) {
+      const ink = readableInk(CATEGORY_COLORS[k])
+      expect(typeof ink).toBe('string')
+      expect(ink.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('认不出的输入退回白字，不抛错', () => {
+    expect(readableInk(null)).toBe('#ffffff')
+    expect(readableInk('')).toBe('#ffffff')
+    expect(readableInk('rgb(1,2,3)')).toBe('#ffffff')
+    expect(luminanceOf('#zzz')).toBe(0)
   })
 })

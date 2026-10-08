@@ -162,14 +162,44 @@ export function donutSegments(rows) {
 
 /**
  * 生成 conic-gradient() 背景值（百分比制，与 v2.0 参考包一致）。
+ *
+ * **扇区之间插白色分隔线**（`gapPct` 控制半宽，默认 0.8% ≈ 2.9°）：
+ * 分类色是按 icon key 取的，同环里相邻两段完全可能撞色
+ * （8 色轮转vs 12 个一级分类，必然出现 index 差 8 的相邻对）。
+ * 一条白缝比"重新配色"更合适 —— 重新配色会让图例颜色和分类在
+ * 首页/详情里的颜色对不上。
+ *
  * 无数据返回 'none'。
+ *
+ * @param {Array} segments donutSegments 的产物
+ * @param {Object} [opts] { gapPct, lineColor }
  */
-export function conicGradient(segments) {
-  if (!segments || !segments.length) return 'none'
-  const stops = segments.map(function (s) {
-    const from = (s.from * 100).toFixed(2)
-    const to = (s.to * 100).toFixed(2)
-    return s.color + ' ' + from + '% ' + to + '%'
+export function conicGradient(segments, opts) {
+  const list = Array.isArray(segments) ? segments : []
+  if (!list.length) return 'none'
+  const o = opts || {}
+  const gap = typeof o.gapPct === 'number' ? o.gapPct : 0.8
+  const line = typeof o.lineColor === 'string' ? o.lineColor : 'rgba(255,255,255,0.92)'
+  const f = function (v) {
+    return (v < 0 ? 0 : v > 100 ? 100 : v).toFixed(2)
+  }
+  const last = list.length - 1
+  const stops = []
+  let cur = 0
+  list.forEach(function (s, i) {
+    if (i > 0) {
+      // 白缝骑在扇区边界上：左半吃到上一段里，右半吃进下一段里
+      const b = s.from * 100
+      const lo = Math.max(cur, b - gap)
+      const hi = Math.min(100, b + gap)
+      if (hi > lo) {
+        stops.push(line + ' ' + f(lo) + '% ' + f(hi) + '%')
+        cur = hi
+      }
+    }
+    const endPct = i === last ? 100 : Math.max(cur, s.to * 100 - gap)
+    stops.push(s.color + ' ' + f(cur) + '% ' + f(endPct) + '%')
+    cur = endPct
   })
   return 'conic-gradient(' + stops.join(',') + ')'
 }
@@ -177,22 +207,66 @@ export function conicGradient(segments) {
 /**
  * 当前环境能不能画 conic-gradient（T3.7）。
  *
- * Chrome 69 以下（Android 8 及更早的 WebView）不支持，环形图会整块空白；
- * 统计页据此降级为纯色环 + 文字指引，保证"结构和数字仍可读"。
- * 取不到 CSS.supports（非浏览器环境）时保守返回 false。
+ * ⚠️ **2026-10-08 修正：这里原本是「能力探测」，在 App 端恒为 false。**
+ *
+ * 原实现第一行是 `if (typeof CSS === 'undefined' || ...) return false`。
+ * 但**uni-app App 端逻辑层是独立的 V8/JSCore 引擎，没有 window / document /
+ * CSS**（渲染层才是 WebView）—— 页面 `setup()` 跑在逻辑层，所以 `typeof CSS`
+ * 永远是 'undefined'，判定恒假 → 统计页在真机上一直显示素色环 +
+ * 「这台设备画不出圆环图」的降级提示。
+ *
+ * 实测小米 14 Pro（Android16 / WebView **Chrome 150.0.7871.183**）完全支持
+ * conic-gradient，纯粹是被这个探测误杀。
+ *
+ * 所以不再探测：**直接给 true**。万一真有老WebView 不支持，
+ * 行内 `background` 会被忽略，自动落到 CSS 里那层纯色兜底色
+ * （`.donut { background: var(--cd-primary-lt) }`），行为和以前一致。
  *
  * @returns {boolean}
  */
 export function supportsConicGradient() {
-  try {
-    if (typeof CSS === 'undefined' || typeof CSS.supports !== 'function') return false
-    return (
-      CSS.supports('background', 'conic-gradient(#fff, #000)') ||
-      CSS.supports('background-image', 'conic-gradient(#fff, #000)')
-    )
-  } catch (e) {
-    return false
-  }
+  return true
+}
+
+/**
+ * 环内百分比标签的几何（纯函数，可单测）。
+ *
+ * 为什么放环内而不是环外：环外标签要引线才不重叠，uni-app 里引线得靠
+ * 伪元素 + 旋转，跨端容易错位。环内只要「扇区中点角度 + 环带中线半径」
+ * 定位就天然不互相压住 —— 前提是**小扇区不显示**，由 minPct 兜住。
+ * 剩下的极小扇区靠下方图例兜底（图例每个分类都带百分比，不丢信息）。
+ *
+ * 角度约定与 sectorAtPoint 一致：**起点正上方，顺时针递增**。
+ *
+ * @param {Array} segments donutSegments 的产物
+ * @param {Object} [opts]
+ *   - radius 标签半径占**外半径**的比例（0~1），默认 0.75。
+ *     ⚠️ 别忘了环是"空心"的：DONUT_HOLE_RATIO = 0.5，环带只占半径的
+ *     50%~100%，所以 0.375 会把标签打到内圈留白里（真机截图踩过）。
+ *   - minPct 低于该占比不显示，默认 0.1
+ * @returns {Array} 每项多pctText / angleDeg / xPct / yPct / show
+ */
+export function donutLabels(segments, opts) {
+  const list = Array.isArray(segments) ? segments : []
+  const o = opts || {}
+  const radius = typeof o.radius === 'number' ? o.radius : 0.75
+  const minPct = typeof o.minPct === 'number' ? o.minPct : 0.1
+  return list.map(function (s) {
+    const mid = (s.from + s.to) / 2
+    const angle = mid * Math.PI * 2
+    return {
+      category_id: s.category_id,
+      name: s.name,
+      color: s.color,
+      cents: s.cents,
+      pct: s.pct,
+      pctText: pctText(s.pct),
+      angleDeg: Math.round(mid * 360),
+      xPct: 50 + 50 * radius * Math.sin(angle),
+      yPct: 50 - 50 * radius * Math.cos(angle),
+      show: s.pct >= minPct
+    }
+  })
 }
 
 /* ================= 环形图交互（2026-10-07） ================= */

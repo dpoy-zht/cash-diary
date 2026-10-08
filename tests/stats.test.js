@@ -4,6 +4,7 @@ import {
   expenseSumOfDay,
   donutSegments,
   conicGradient,
+  donutLabels,
   supportsConicGradient,
   sectorAtPoint,
   prevPeriodRange,
@@ -108,19 +109,154 @@ describe('donutSegments —— 环形图扇区', () => {
 })
 
 describe('conicGradient —— 环形图背景值', () => {
+  const TWO = [
+    { color: '#ff8a65', from: 0, to: 0.5 },
+    { color: '#ffc93c', from: 0.5, to: 1 }
+  ]
+
   it('无数据返回 none', () => {
     expect(conicGradient([])).toBe('none')
     expect(conicGradient(null)).toBe('none')
   })
 
-  it('生成百分比制的 conic-gradient 字符串', () => {
-    const g = conicGradient([
-      { color: '#ff8a65', from: 0, to: 0.5 },
-      { color: '#ffc93c', from: 0.5, to: 1 }
-    ])
+  it('gapPct=0 时是干净的两段百分比制（分隔线是可选项）', () => {
+    const g = conicGradient(TWO, { gapPct: 0 })
     expect(g.indexOf('conic-gradient(')).toBe(0)
-    expect(g).toContain('#ff8a65 0.00% 50.00%')
-    expect(g).toContain('#ffc93c 50.00% 100.00%')
+    expect(g).toBe('conic-gradient(#ff8a65 0.00% 50.00%,#ffc93c 50.00% 100.00%)')
+  })
+
+  it('默认在每个扇区边界插白缝，两侧颜色各让出 gapPct', () => {
+    const g = conicGradient(TWO)
+    expect(g).toBe(
+      'conic-gradient(' +
+        '#ff8a65 0.00% 49.20%,' +
+        'rgba(255,255,255,0.92) 49.20% 50.80%,' +
+        '#ffc93c 50.80% 100.00%)'
+    )
+  })
+
+  it('白缝数量 = 扇区数 − 1（单扇区不画缝）', () => {
+    expect(conicGradient(TWO).match(/rgba\(255,255,255/g)).toHaveLength(1)
+    const one = conicGradient([{ color: '#ff8a65', from: 0, to: 1 }])
+    expect(one).toBe('conic-gradient(#ff8a65 0.00% 100.00%)')
+  })
+
+  it('最后一段一定收尾到 100%（不留透明缺口）', () => {
+    const g = conicGradient([
+      { color: '#aaa', from: 0, to: 0.333 },
+      { color: '#bbb', from: 0.333, to: 0.667 },
+      { color: '#ccc', from: 0.667, to: 1 }
+    ])
+    expect(g.endsWith('100.00%)')).toBe(true)
+  })
+
+  it('扇区比白缝还窄时不产生倒挂区间（不抛错）', () => {
+    const tiny = []
+    let acc = 0
+    for (let i = 0; i < 12; i += 1) {
+      const from = acc
+      acc += 0.01
+      tiny.push({ color: '#888', from, to: Math.min(1, acc) })
+    }
+    const g = conicGradient(tiny, { gapPct: 0.8 })
+    // ⚠️ 不能按 ',' 切：分隔色是 rgba(...)，里面自带逗号
+    const re = /(\S+)\s+([\d.]+)%\s+([\d.]+)%/g
+    const stops = []
+    let m
+    while ((m = re.exec(g)) !== null) stops.push([m[2], m[3]])
+    expect(stops.length).toBeGreaterThan(12)
+    // 每一段都必须"起点 ≤ 终点"，否则 WebView 会整条声明作废
+    stops.forEach(function (s) {
+      expect(parseFloat(s[1])).toBeGreaterThanOrEqual(parseFloat(s[0]))
+    })
+  })
+
+  it('自定义分隔线颜色', () => {
+    const g = conicGradient(TWO, { lineColor: '#000000' })
+    expect(g).toContain('#000000 49.20% 50.80%')
+  })
+})
+
+describe('donutLabels —— 环内百分比标签几何', () => {
+  const ONE = [{ category_id: 1, name: '餐饮', color: '#ffa726', cents: 500, pct: 1, from: 0, to: 1 }]
+
+  it('空数据返回空数组', () => {
+    expect(donutLabels([])).toEqual([])
+    expect(donutLabels(null)).toEqual([])
+  })
+
+  it('整圈时落在正下方（中点 50% = 6 点钟方向）', () => {
+    const [a] = donutLabels(ONE, { radius: 0.375 })
+    expect(a.angleDeg).toBe(180)
+    expect(a.xPct).toBeCloseTo(50, 5)
+    // 起点在 12 点、顺时针 → 走到 50% 就是正下方，y 反而更大
+    expect(a.yPct).toBeCloseTo(68.75, 5)
+    expect(a.pctText).toBe('100%')
+  })
+
+  it('两等分时分别落在右半与左半（0~50% 在右，50~100% 在左）', () => {
+    const segs = [
+      { category_id: 1, name: 'A', color: '#aaa', cents: 500, pct: 0.5, from: 0, to: 0.5 },
+      { category_id: 2, name: 'B', color: '#bbb', cents: 500, pct: 0.5, from: 0.5, to: 1 }
+    ]
+    const [a, b] = donutLabels(segs, { radius: 0.4 })
+    expect(Math.round(a.xPct)).toBe(70)
+    expect(Math.round(a.yPct)).toBe(50)
+    expect(Math.round(b.xPct)).toBe(30)
+    expect(Math.round(b.yPct)).toBe(50)
+  })
+
+  it('四等分落在四个斜角（上右/右下/左下/左上）', () => {
+    const segs = [0, 1, 2, 3].map(function (i) {
+      return { category_id: i + 1, name: 'c' + i, color: '#888', cents: 250, pct: 0.25, from: i / 4, to: (i + 1) / 4 }
+    })
+    const pos = donutLabels(segs, { radius: 0.4 }).map(function (l) {
+      return [Math.round(l.xPct), Math.round(l.yPct)]
+    })
+    expect(pos).toEqual([[64, 36], [64, 64], [36, 64], [36, 36]])
+  })
+
+  it('占比低于 minPct 的不显示（避免互相压住），但字段仍完整', () => {
+    const segs = [
+      { category_id: 1, name: '大', color: '#aaa', cents: 950, pct: 0.95, from: 0, to: 0.95 },
+      { category_id: 2, name: '小', color: '#bbb', cents: 5, pct: 0.05, from: 0.95, to: 1 }
+    ]
+    const [big, small] = donutLabels(segs)
+    expect(big.show).toBe(true)
+    expect(small.show).toBe(false)
+    expect(small.pctText).toBe('5%')
+    expect(small.category_id).toBe(2)
+  })
+
+  it('minPct 可覆盖；坐标始终落在圆内', () => {
+    const segs = [{ category_id: 1, name: 'x', color: '#aaa', cents: 1, pct: 1, from: 0, to: 1 }]
+    expect(donutLabels(segs, { minPct: 0 })[0].show).toBe(true)
+    expect(donutLabels(segs, { minPct: 1 })[0].show).toBe(true)
+    donutLabels(segs, { radius: 1 }).forEach(function (l) {
+      expect(l.xPct).toBeGreaterThanOrEqual(0)
+      expect(l.xPct).toBeLessThanOrEqual(100)
+      expect(l.yPct).toBeGreaterThanOrEqual(0)
+      expect(l.yPct).toBeLessThanOrEqual(100)
+    })
+  })
+
+  /**
+   * 回归：默认半径必须落在**环带**里。
+   * 环是空心的，DONUT_HOLE_RATIO = 0.5 → 环带占外半径的 50%~100%。
+   * 曾经默认取0.375，标签全打到内圈留白上、压住圆心的合计数字
+   * （浏览器截图实测）。这条断言就是防它再犯。
+   */
+  it('默认半径落在环带内，不压圆心', () => {
+    const segs = [0, 1, 2, 3, 4, 5].map(function (i) {
+      return { category_id: i + 1, name: 'c' + i, color: '#888', cents: 100, pct: 1 / 6, from: i / 6, to: (i + 1) / 6 }
+    })
+    donutLabels(segs).forEach(function (l) {
+      const dx = (l.xPct - 50) / 50
+      const dy = (l.yPct - 50) / 50
+      const r = Math.sqrt(dx * dx + dy * dy)
+      expect(r).toBeGreaterThanOrEqual(DONUT_HOLE_RATIO)
+      expect(r).toBeLessThanOrEqual(1)
+    })
   })
 })
 
@@ -429,39 +565,31 @@ describe('trendSpecFor —— 各期间趋势分桶规格', () => {
   })
 })
 
-describe('supportsConicGradient —— 环形图降级检测（T3.7）', () => {
-  function withCSS(fake, fn) {
-    globalThis.CSS = fake
+/**
+ * 降级检测的历史包袱（T3.7 → 2026-10-08 修正）。
+ *
+ * 原实现是「能力探测」：`typeof CSS === 'undefined' → return false`。
+ * 但 **uni-app App端逻辑层没有 CSS 全局**（渲染层才是 WebView），
+ * 页面 setup() 跑在逻辑层 → 这个探测在真机上**恒为假** →
+ * 圆环一直是素色环+ 「这台设备画不出圆环图」的降级提示，
+ * 而实测 WebView 是 Chrome 150，完全支持 conic-gradient。
+ *
+ * 现在无条件返回 true：真不支持时行内 background 被忽略，
+ * 自动落到 CSS 里的纯色兜底色，行为与原来一致。
+ */
+describe('supportsConicGradient —— 不再做能力探测', () => {
+  it('恒为 true：不能因为逻辑层没有 CSS 全局就误判为不支持', () => {
+    expect(typeof CSS).toBe('undefined')
+    expect(supportsConicGradient()).toBe(true)
+  })
+
+  it('即使注入了 CSS.supports 也不改变结果（说明它已不被使用）', () => {
+    globalThis.CSS = { supports: function () { return false } }
     try {
-      fn()
+      expect(supportsConicGradient()).toBe(true)
     } finally {
       delete globalThis.CSS
     }
-  }
-
-  it('取不到 CSS.supports（非浏览器环境）时保守返回 false', () => {
-    expect(typeof CSS).toBe('undefined')
-    expect(supportsConicGradient()).toBe(false)
-  })
-
-  it('渲染引擎认 conic-gradient 时返回 true', () => {
-    withCSS({ supports: function () { return true } }, function () {
-      expect(supportsConicGradient()).toBe(true)
-    })
-  })
-
-  it('渲染引擎不认 conic-gradient（老 WebView）时返回 false', () => {
-    withCSS({
-      supports: function (prop, val) { return String(val).indexOf('conic-gradient') === -1 }
-    }, function () {
-      expect(supportsConicGradient()).toBe(false)
-    })
-  })
-
-  it('CSS.supports 抛错时不影响页面渲染，仍返回 false', () => {
-    withCSS({ supports: function () { throw new Error('boom') } }, function () {
-      expect(supportsConicGradient()).toBe(false)
-    })
   })
 })
 

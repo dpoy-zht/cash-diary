@@ -194,3 +194,53 @@ export function tintOf(id) {
   const i = Math.abs(Math.trunc(n) - 1) % CATEGORY_TINTS.length
   return CATEGORY_TINTS[i]
 }
+
+/** #rgb / #rrggbb / #rrggbbaa→ [r,g,b] 0~255；认不出来的返回 null */
+function parseRgb(hex) {
+  if (typeof hex !== 'string') return null
+  const s = hex.trim().replace(/^#/, '')
+  if (s.length === 3 || s.length === 4) {
+    if (!/^[0-9a-fA-F]+$/.test(s)) return null
+    const r = parseInt(s[0] + s[0], 16)
+    const g = parseInt(s[1] + s[1], 16)
+    const b = parseInt(s[2] + s[2], 16)
+    return [r, g, b]
+  }
+  if (s.length === 6 || s.length === 8) {
+    if (!/^[0-9a-fA-F]+$/.test(s)) return null
+    return [
+      parseInt(s.slice(0, 2), 16),
+      parseInt(s.slice(2, 4), 16),
+      parseInt(s.slice(4, 6), 16)
+    ]
+  }
+  return null
+}
+
+/** 亮底上用的深墨（对 --cd-ink 的色相保持一致，对比度约 8:1） */
+export const INK_ON_LIGHT = '#4A3A0A'
+
+/** 环带上的字该用多深（0~1）。WCAG 相对亮度公式 */
+export function luminanceOf(hex) {
+  const rgb = parseRgb(hex)
+  if (!rgb) return 0
+  const lin = rgb.map(function (v) {
+    const c = v / 255
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  })
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+}
+
+/**
+ * 给定底色，返回压在上面该用深字还是白字（纯函数，可单测）。
+ *
+ * 为什么需要：分类色深浅跨度很大 —— #ffca28（宠物）亮到白字读不出来，
+ * #42a5f5（交通）深到黑字看不见。统计页圆环把这些色当扇区填充，
+ * 环上要打百分比，字色必须逐扇区决定。
+ *
+ * @param {string} hex 底色
+ * @returns {string} '#ffffff' 或深墨色
+ */
+export function readableInk(hex) {
+  return luminanceOf(hex) > 0.42 ? INK_ON_LIGHT : '#ffffff'
+}
