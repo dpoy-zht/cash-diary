@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { getStorage, resetStorageForTest } from '../src/db/index.js'
+import * as categoryRepo from '../src/db/repository/category.js'
 import * as categoryService from '../src/services/category.js'
 import * as txService from '../src/services/tx.js'
+import * as fixedService from '../src/services/fixed.js'
+import * as budgetService from '../src/services/budget.js'
+import * as accountService from '../src/services/account.js'
 import { colorOf, iconMaskStyle } from '../src/utils/palette.js'
 import { ymOf } from '../src/utils/date.js'
 
@@ -22,6 +26,7 @@ describe('分类管理（两级结构 + 增删改 + 排序）', () => {
     resetStorageForTest()
     await getStorage().init()
     await categoryService.seedIfEmpty()
+    await accountService.seedDefaultIfEmpty()
     ym = ymOf(Date.now())
     all = await categoryService.listAll()
     expense = all.filter(function (c) { return c.type === 'expense' })
@@ -276,6 +281,124 @@ describe('分类管理（两级结构 + 增删改 + 排序）', () => {
       await txService.removeTx(list[0].id)
       await categoryService.removeIfEmpty(target.id)
       expect((await categoryService.listAll()).length).toBe(all.length - 1)
+    })
+  })
+
+  describe('countRefs —— 数固定支出 / 预算引用（纯函数）', () => {
+    it('空表 / 非数组 → 全0（不炸）', () => {
+      expect(S.countRefs([], [], 1)).toEqual({ fixed: 0, budget: 0 })
+      expect(S.countRefs(null, undefined, 1)).toEqual({ fixed: 0, budget: 0 })
+    })
+
+    it('只数category_id 对上的那些', () => {
+      const r = S.countRefs(
+        [{ category_id: 7 }, { category_id: 8 }, { category_id: 7 }],
+        [{ category_id: 7 }, { category_id: 9 }],
+        7
+      )
+      expect(r).toEqual({ fixed: 2, budget: 1 })
+    })
+
+    it('总预算（category_id 为 null）不算引用 —— null 不能被当成0', () => {
+      // ⚠️ 这是真实踩过的坑方向：`Number(null)===0`，若不做 != null 判断，
+      // 删 id=0 或判0 号分类时总预算会被误算成引用。
+      expect(S.countRefs([], [{ category_id: null }], 0)).toEqual({ fixed: 0, budget: 0 })
+      expect(S.countRefs([], [{ category_id: null }], null)).toEqual({ fixed: 0, budget: 0 })
+      expect(S.countRefs([], [{ category_id: 0 }], 0)).toEqual({ fixed: 0, budget: 1 })
+    })
+
+    it('字符串 id 与数字 id 视为同一个（DB/页面可能给字符串）', () => {
+      expect(S.countRefs([{ category_id: '7' }], [{ category_id: '7' }], 7))
+        .toEqual({ fixed: 1, budget: 1 })
+    })
+  })
+
+  describe('删除保护：固定支出 / 预算的引用（孤儿引用防线）', () => {
+    /** 找一个空的二级（无子无流水），专门用来做删除实验 */
+    async function emptyChild() {
+      const list = await categoryService.listAll()
+      const top = S.topLevelOf(list, 'expense').find(function (c) { return c.name === '购物' })
+      return S.childrenOf(list, top.id)[0]
+    }
+
+    it('被固定支出引用 → 拒绝删除，并说清有几笔', async () => {
+      const target = await emptyChild()
+      await fixedService.addFixed({ amountStr: '30', categoryId: target.id, dayOfMonth: 5 }, 1, Date.now())
+      await expect(categoryService.removeIfEmpty(target.id)).rejects.toThrow('固定支出')
+      expect((await categoryService.listAll()).some(function (c) { return c.id === target.id })).toBe(true)
+    })
+
+    it('设了分类预算 → 拒绝删除', async () => {
+      const target = await emptyChild()
+      await budgetService.setCategory(1, target.id, '100')
+      await expect(categoryService.removeIfEmpty(target.id)).rejects.toThrow('预算')
+      expect((await categoryService.listAll()).some(function (c) { return c.id === target.id })).toBe(true)
+    })
+
+    it('⭐ 引用在**别的账本**下也一样拦得住（分类是全局的，引用不是）', async () => {
+      const target = await emptyChild()
+      // 建第二个账本，把固定支出 + 预算都挂到它下面
+      const acc2 = await accountService.create('旅行账本')
+      expect(acc2.id).not.toBe(1)
+      const fxId = await fixedService.addFixed({ amountStr: '30', categoryId: target.id, dayOfMonth: 5 }, acc2.id, Date.now())
+
+      // 当前账本是 1，仍应被拦住 —— 否则就造出了「A 账本删分类弄坏 B 账本」的孤儿
+      await expect(categoryService.removeIfEmpty(target.id)).rejects.toThrow('固定支出')
+
+      // 预算也挂在别的账本下，同样拦得住
+      await fixedService.removeFixed(fxId)
+      await budgetService.setCategory(acc2.id, target.id, '88')
+      await expect(categoryService.removeIfEmpty(target.id)).rejects.toThrow('预算')
+
+      // 清掉之后就能删了（证明确实是「查到了才拦」，不是无条件拒绝）
+      await budgetService.setCategory(acc2.id, target.id, '')
+      await categoryService.removeIfEmpty(target.id)
+      expect((await categoryService.listAll()).some(function (c) { return c.id === target.id })).toBe(false)
+    })
+
+    it('先把引用清掉，分类就能删了（不是死锁）', async () => {
+      const target = await emptyChild()
+      const fxId = await fixedService.addFixed({ amountStr: '30', categoryId: target.id, dayOfMonth: 5 }, 1, Date.now())
+      await budgetService.setCategory(1, target.id, '100')
+      await expect(categoryService.removeIfEmpty(target.id)).rejects.toThrow()
+
+      await fixedService.removeFixed(fxId)
+      await budgetService.setCategory(1, target.id, '')   // 空串 = 清除预算
+      await categoryService.removeIfEmpty(target.id)
+      expect((await categoryService.listAll()).some(function (c) { return c.id === target.id })).toBe(false)
+    })
+
+    it('停用（enabled=false）的固定支出**仍然**拦着 —— 配置还在，删了就成孤儿', async () => {
+      const target = await emptyChild()
+      const fxId = await fixedService.addFixed({ amountStr: '30', categoryId: target.id, dayOfMonth: 5 }, 1, Date.now())
+      await fixedService.toggleFixed(fxId, false)
+      await expect(categoryService.removeIfEmpty(target.id)).rejects.toThrow('固定支出')
+    })
+  })
+
+  describe('固定支出不会被删掉的分类静默补记（老数据的悬挂引用）', () => {
+    it('分类被删后，固定支出仍会按月补记出category_id 悬空的流水（已知退化，需如实告知）', async () => {
+      // 复现「v2.3.19 之前」的老数据状态：先建配置，再绕过保护直接删掉分类。
+      // 这条断言是把当前真实行为钉住，防止以后有人误以为已经不发生了。
+      const list = await categoryService.listAll()
+      const top = S.topLevelOf(list, 'expense').find(function (c) { return c.name === '购物' })
+      const target = S.childrenOf(list, top.id)[0]
+      // 建在 2026-09 → last_posted_ym='2026-09'，跑 10 月时它才是「到期」的
+      const created = new Date(2026, 8, 20, 12, 0, 0).getTime()
+      await fixedService.addFixed({ amountStr: '30', categoryId: target.id, dayOfMonth: 5 }, 1, created)
+
+      await categoryRepo.remove(target.id)          // 硬删，模拟老版本删干净了
+      const after = await categoryService.listAll()
+      expect(after.some(function (c) { return c.id === target.id })).toBe(false)
+
+      // 补记仍会发生，且写进去的 category_id 指向不存在的分类
+      const r = await fixedService.postDueFixed(1, new Date(2026, 9, 20, 12, 0, 0).getTime())
+      expect(r.posted).toBeGreaterThan(0)
+      const recs = await txService.listByMonth('2026-10', 1)
+      const orphan = recs.filter(function (t) { return t.category_id === target.id })
+      expect(orphan.length).toBeGreaterThan(0)
+      // 页面上拿不到名字 → fixed.vue 显示「分类已删除」（不再含糊成「其他」）
+      expect(after.length).toBeGreaterThan(0)
     })
   })
 

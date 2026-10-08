@@ -9,7 +9,8 @@
  *   - 一级：能独立成为预算 / 统计里的一档
  *   - 二级：挂在某个一级下，记一笔时可选，统计里默认被汇总到一级
  *   - **收入分类保持一级平铺**（收入语义本来就扁平，强行分类反而难用）
- * - **删除保护**：分类下有流水、或一级分类下还挂着二级，都不许删。
+ * - **删除保护**：分类下有流水、或一级分类下还挂着二级、
+ *   或被**固定支出 / 分类预算**引用着，都不许删。
  * - 分类是**全局的**（不按账本区分）：多账本共用一套分类，符合使用直觉。
  *
  * ⚠️ 向后兼容是硬约束：`seedIfEmpty()` 只在空表播种，而用户手机上早就有真实数据，
@@ -17,8 +18,11 @@
  * （补父级、连父子、规范排序），**一个字节都不动 transaction_record**。
  */
 import * as categoryRepo from '../db/repository/category.js'
+import * as accountRepo from '../db/repository/account.js'
+import * as fixedRepo from '../db/repository/fixed.js'
+import * as budgetRepo from '../db/repository/budget.js'
 import { CATEGORY_ICONS, CATEGORY_ICON_GROUPS } from '../utils/palette.js'
-import { TYPE_EXPENSE, TYPE_INCOME } from '../utils/constant.js'
+import { TYPE_EXPENSE, TYPE_INCOME, DEFAULT_ACCOUNT_ID } from '../utils/constant.js'
 
 /**
  * 内建**支出**分类树：一级 → 二级子类。
@@ -593,8 +597,32 @@ export async function move(id, dir) {
 }
 
 /**
- * 只允许删除**没有流水、也没有子级**的分类。
- * 有记录 / 有子级时抛错并说清原因 —— 避免产生孤儿记录或突然消失的一整组分类。
+ * 数出「有多少固定支出 / 分类预算在用这个分类」。
+ *
+ * 纯函数（不碰 DB），方便直接单测各分支。
+ *
+ * ⚠️ **分类是全局的，固定支出和预算是按账本存的** —— 所以引用可能出现在
+ * *任意*账本下，不只是当前账本。调用方需把所有账本的配置都传进来，
+ * 否则会出现「在 A 账本删分类、把 B 账本的固定支出搞成孤儿」。
+ *
+ * @param {Array} fixedList 固定支出配置（跨账本合并）
+ * @param {Array} budgetList 预算配置（跨账本合并，category_id 为 null 的是总预算，不计）
+ * @param {number} categoryId 被引用的分类 id
+ */
+export function countRefs(fixedList, budgetList, categoryId) {
+  const cid = Number(categoryId)
+  const fixed = (Array.isArray(fixedList) ? fixedList : [])
+    .filter(function (f) { return Number(f.category_id) === cid }).length
+  // 总预算的 category_id 是 null，必须排除，否则 null===0 会误判
+  const budget = (Array.isArray(budgetList) ? budgetList : [])
+    .filter(function (b) { return b.category_id != null && Number(b.category_id) === cid }).length
+  return { fixed: fixed, budget: budget }
+}
+
+/**
+ * 只允许删除**没有流水、没有子级、也没有被固定支出/预算引用**的分类。
+ * 有记录 / 有子级 / 被引用时抛错并说清原因 —— 避免产生孤儿记录、
+ * 突然消失的一整组分类，或固定支出悄悄退化成「其他」。
  */
 export async function removeIfEmpty(id) {
   const all = await categoryRepo.listAll()
@@ -607,6 +635,27 @@ export async function removeIfEmpty(id) {
   const stats = await categoryRepo.statsMap()
   const n = stats.get(cat.id) || 0
   if (n > 0) throw new Error('这个分类下还有 ' + n + ' 笔记录，先把它们改到别的分类再删')
+
+  // 固定支出 / 预算的引用：**跨所有账本**查（分类是全局的，引用不是）
+  const accounts = await accountRepo.listAll()
+  // 兜底带上 DEFAULT：正常情况一定有默认账本，但万一account 表空/种子失败，
+  // 也不能因此「查不到引用」就把保护整个跳过 —— 那等于静默放开删除。
+  const ids = accounts.length ? accounts.map(function (a) { return a.id }) : [DEFAULT_ACCOUNT_ID]
+  const fixedAll = []
+  const budgetAll = []
+  for (const accId of ids) {
+    const fs = await fixedRepo.list(accId)
+    const bs = await budgetRepo.listByAccount(accId)
+    for (const f of fs) fixedAll.push(f)
+    for (const b of bs) budgetAll.push(b)
+  }
+  const refs = countRefs(fixedAll, budgetAll, cat.id)
+  if (refs.fixed > 0) {
+    throw new Error('有 ' + refs.fixed + ' 笔固定支出在用这个分类，先改掉它们再删')
+  }
+  if (refs.budget > 0) {
+    throw new Error('这个分类还设着预算，先取消预算再删')
+  }
 
   await categoryRepo.remove(cat.id)
   // 删掉后把同组的 sort 重排连续，避免留下空洞

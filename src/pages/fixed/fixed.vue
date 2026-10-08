@@ -147,10 +147,14 @@ const catMap = computed(function () {
 })
 function catName(id) {
   const c = catMap.value.get(id)
-  return c ? c.name : '其他'
+  // ⚠️ 真的有叫「其他」的分类（services/category.js 的种子里有），所以拿不到分类时
+  // **不能**兜底成「其他」——那会把「分类被删了」和「用户选了其他」混成一回事，
+  // 用户根本看不出自己这份固定支出已经挂空。老数据里可能已有这种悬挂引用，
+  // 如实说明比假装正常更可取。
+  return c ? c.name : '分类已删除'
 }
 function catOf(id) {
-  return catMap.value.get(id) || { id: id, name: '其他', icon: '📦', type: 'expense' }
+  return catMap.value.get(id) || { id: id, name: '分类已删除', icon: '📦', type: 'expense' }
 }
 
 function onDayChange(e) {
