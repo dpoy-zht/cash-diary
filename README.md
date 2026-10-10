@@ -1,4 +1,4 @@
-# 奶蛙记账 · naiwa-ledger
+# 奶蛙记账 · cash-diary
 
 > 一只黄色小胖龙，盯着你花钱。
 
@@ -27,7 +27,7 @@
 
 ## 📥 下载安装（不想碰代码的走这边）
 
-前往 [**Releases 页面**](https://github.com/dpoy-zht/naiwa-ledger/releases/latest) 下载最新版安装包：
+前往 [**Releases 页面**](https://github.com/dpoy-zht/cash-diary/releases/latest) 下载最新版安装包：
 
 1. 下载 Assets 里的 `nailong-ledger-vX.X.X.apk`（仅支持 **Android**，iOS 用户此路不通）
 2. 手机上直接安装；首次需允许「安装未知来源应用」
@@ -61,8 +61,8 @@
 
 ```bash
 # 1. 拉代码
-git clone https://github.com/dpoy-zht/naiwa-ledger.git
-cd naiwa-ledger
+git clone https://github.com/dpoy-zht/cash-diary.git
+cd cash-diary
 
 # 2. 装依赖（Node 18+；仓库内 .npmrc 已指向 npmmirror 镜像，装不动再研究）
 npm install
