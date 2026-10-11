@@ -211,6 +211,10 @@ export function buildMonthlyReport(input) {
   /* ---- 分类 TOP N（与统计页共用 expenseByCategory，口径必然一致） ---- */
   const totalExpense = sum.expenseCents
   const byId = new Map(cats.map(function (c) { return [c.id, c] }))
+  /** 上月按分类分桶：给 TOP5 每项配一个分类级环比（复用 monthOverMonth，口径与总环比一致） */
+  const prevByCat = new Map(
+    expenseByCategory(prevRows, cats).map(function (r) { return [r.category_id, r.cents] })
+  )
   const topCategories = expenseByCategory(rows, cats)
     .slice(0, TOP_N)
     .map(function (r, i) {
@@ -222,7 +226,9 @@ export function buildMonthlyReport(input) {
         icon: cat.icon || 'more',
         color: r.color,
         cents: r.cents,
-        pct: totalExpense ? r.cents / totalExpense : 0
+        pct: totalExpense ? r.cents / totalExpense : 0,
+        /** 分类级环比。上月该类为 0 时 pct=null（方向仍是 up），页面据此显示「新增」而不是假百分比 */
+        mom: monthOverMonth(r.cents, prevByCat.get(r.category_id) || 0)
       }
     })
 

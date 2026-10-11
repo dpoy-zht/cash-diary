@@ -63,7 +63,10 @@
           <cat-icon :category="c" :size="32" />
           <view class="rank-main">
             <view class="rank-line">
-              <text class="rank-name">{{ c.name }}</text>
+              <view class="rank-l">
+                <text class="rank-name">{{ c.name }}</text>
+                <text v-if="showCatMom" class="rank-mom" :class="c.mom.dir">{{ catMomText(c.mom) }}</text>
+              </view>
               <text class="rank-amt">¥{{ fmt(c.cents) }}<text class="rank-pct">{{ Math.round(c.pct * 100) }}%</text></text>
             </view>
             <view class="bar"><view class="bar-i" :style="{ width: Math.round(c.pct * 100) + '%', background: c.color }" /></view>
@@ -218,6 +221,20 @@ function fmt(cents) {
 function balanceText(cents) {
   const v = Number(cents) || 0
   return (v < 0 ? '-¥' : '¥') + inlineAmount(Math.abs(v))
+}
+
+/** 上月整月没有支出时 TOP5 不显示环比小标 —— 头图已经说明「上月还没有支出」，
+    再给每一行盖一个「新增」是噪音；整个小标列共用这一个开关 */
+const showCatMom = computed(function () {
+  return report.value ? report.value.mom.expense.prevCents > 0 : false
+})
+/** 分类环比小标文案：↑38% / ↓9% / 持平 / 新增。
+    pct 为 null（上月该类没花过）时方向仍是 up，但百分比是假的（除零），
+    如实说「新增」；百分比格式与头部总环比一致（一位小数可省则省） */
+function catMomText(m) {
+  if (m.dir === 'flat') return '持平'
+  if (m.pct === null) return '新增'
+  return (m.dir === 'up' ? '↑' : '↓') + Math.abs(m.pct) + '%'
 }
 /** 环比文案：算不出涨幅（上月为 0）时说人话，不显示 NaN% */
 function momText(m, what) {
@@ -497,6 +514,27 @@ onShow(function () {
   font-size: 13px;
   font-weight: 600;
   color: var(--cd-ink);
+}
+/* 名字 + 环比小标打包在左侧，金额仍靠 space-between 顶到右边（标签行没有小标，不受影响） */
+.rank-l {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.rank-mom {
+  flex: none;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cd-ink-2);
+  white-space: nowrap;
+}
+/* 支出涨了是坏事（红）、降了是好事（绿）—— 与头部总环比 (.mom.up/.down) 同语义 */
+.rank-mom.up {
+  color: var(--cd-danger-ink);
+}
+.rank-mom.down {
+  color: var(--cd-income);
 }
 .rank-amt {
   font-size: 13px;

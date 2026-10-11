@@ -384,3 +384,102 @@ describe('T5.1 —— 按标签汇总（tagBreakdown）', () => {
     expect(bare.tagTop.list).toEqual([])
   })
 })
+
+/**
+ * 分类级环比（批次 A，2026-10-11）。
+ *
+ * 口径：topCategories 每项带 mom，与总环比共用 monthOverMonth ——
+ * 上月该类为 0 时 pct=null（页面显示「新增」，不给假百分比）；
+ * 上月整月无支出时页面用 mom.expense.prevCents 判断整列隐藏。
+ */
+describe('buildMonthlyReport —— 分类级环比 topCategories[].mom', () => {
+  /** 九月：早餐 36 元、午餐 12 元；八月：早餐 30 元、午餐 24 元、打车 100 元 */
+  const SEP = [
+    tx({ id: 11, category_id: 1, amount_cents: 3600, occurred_at: at(2026, 9, 3, 8) }),
+    tx({ id: 12, category_id: 2, amount_cents: 1200, occurred_at: at(2026, 9, 4, 12) })
+  ]
+  const AUG = [
+    tx({ id: 21, category_id: 1, amount_cents: 3000, occurred_at: at(2026, 8, 3, 8) }),
+    tx({ id: 22, category_id: 2, amount_cents: 2400, occurred_at: at(2026, 8, 4, 12) }),
+    tx({ id: 23, category_id: 3, amount_cents: 10000, occurred_at: at(2026, 8, 5, 9) })
+  ]
+
+  function build(patch) {
+    return buildMonthlyReport(
+      Object.assign(
+        { ym: '2026-09', records: SEP, prevRecords: AUG, categories: CATS, totalBudgetCents: 0 },
+        patch
+      )
+    )
+  }
+  function momOf(r, id) {
+    const c = r.topCategories.find(function (x) { return x.category_id === id })
+    return c ? c.mom : null
+  }
+
+  it('涨：早餐 36 > 30 → dir up、pct 20、prevCents 带上月值', () => {
+    const m = momOf(build(), 1)
+    expect(m.dir).toBe('up')
+    expect(m.pct).toBe(20)
+    expect(m.curCents).toBe(3600)
+    expect(m.prevCents).toBe(3000)
+  })
+
+  it('降：午餐 12 < 24 → dir down、pct -50', () => {
+    const m = momOf(build(), 2)
+    expect(m.dir).toBe('down')
+    expect(m.pct).toBe(-50)
+  })
+
+  it('上月该分类为 0 → pct null、dir up（页面据此显示「新增」而不是假百分比）', () => {
+    // 购物（id 4）八月没出现过；打车（id 3）八月有 100 元、本月 80 元，环比是真的 down
+    const r = build({
+      records: SEP.concat([
+        tx({ id: 13, category_id: 4, amount_cents: 500, occurred_at: at(2026, 9, 6, 9) }),
+        tx({ id: 14, category_id: 3, amount_cents: 8000, occurred_at: at(2026, 9, 7, 9) })
+      ])
+    })
+    const m = momOf(r, 4)
+    expect(m.pct).toBeNull()
+    expect(m.dir).toBe('up')
+    expect(m.curCents).toBe(500)
+    // 同一份报告里，上月有记录的分类仍然算得出真实环比
+    expect(momOf(r, 3).pct).toBe(-20)
+  })
+
+  it('持平：本月与上月相等 → dir flat、pct 0', () => {
+    const r = build({
+      records: [tx({ id: 14, category_id: 1, amount_cents: 3000, occurred_at: at(2026, 9, 7, 8) })]
+    })
+    const m = momOf(r, 1)
+    expect(m.dir).toBe('flat')
+    expect(m.pct).toBe(0)
+  })
+
+  it('上月软删除的流水不参与环比（与所有报告口径一致：只看活记录）', () => {
+    const r = build({
+      prevRecords: [tx({ id: 24, category_id: 1, amount_cents: 3000, occurred_at: at(2026, 8, 3, 8), deleted_at: 999 })]
+    })
+    const m = momOf(r, 1)
+    expect(m.prevCents).toBe(0)
+    expect(m.pct).toBeNull()
+    expect(m.dir).toBe('up')
+  })
+
+  it('没传上月流水 → 每项 prevCents 都是 0，不炸（新用户第一个月）', () => {
+    const r = build({ prevRecords: undefined })
+    expect(r.topCategories.length).toBeGreaterThan(0)
+    r.topCategories.forEach(function (c) {
+      expect(c.mom.prevCents).toBe(0)
+      expect(c.mom.pct).toBeNull()
+    })
+  })
+
+  it('追加 mom 不影响 TOP5 现有字段（rank / cents / pct 原样）', () => {
+    const r = build()
+    const first = r.topCategories[0]
+    expect(first.rank).toBe(1)
+    expect(first.cents).toBe(3600)
+    expect(first.pct).toBeCloseTo(3600 / 4800)
+  })
+})
