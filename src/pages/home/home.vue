@@ -159,7 +159,7 @@ import * as fixedService from '../../services/fixed.js'
 import { buildEditInput } from '../../services/tx.js'
 import { groupByDay, dayLabel, ymOf, homeDateLabel, dayStart } from '../../utils/date.js'
 import { expenseSumOfDay } from '../../utils/stats.js'
-import { formatCents, compactYuan, amountSizeClass, COMPACT_FROM_LEN } from '../../utils/money.js'
+import { formatCents, bigAmount } from '../../utils/money.js'
 import { budgetStatus as budgetStatusOf, overAlertKey } from '../../utils/budget.js'
 import { requestNotifyPermission, notifyLocal, REMIND_PREF_KEY, normalizeRemindEnabled } from '../../utils/notify.js'
 import { countFilters, filterSummary } from '../../utils/search.js'
@@ -286,22 +286,14 @@ function maybeAlertOver() {
 }
 
 /**
- * 余额卡两个金额的统一算法（纯函数在 utils/money.js，可单测）。
- *
- * 为什么要压长度：余额卡是 28px 大数字，而每列在窄屏（360dp）加系统大字体下
- * 只有一百多 px 可用 —— vivo/OriginOS 的「系统字体大小」会把 WebView 文本整体
- * 放大，`¥12,345.67` 这种 10 字符必被 CSS 截成 `¥12,345…`（用户真机截图实测）。
- * **改字号挡不住字体缩放，只能压字符数** → 超过 9 位改用 compactYuan（¥1.2万）。
+ * 余额卡两个金额的统一算法 —— 已升级为全站共享的 utils/money.js: bigAmount，
+ * 预算卡/账本卡/报告头图/我的页小卡都用同一套「≥9 字符压紧凑 + 字号分档」。
+ * 压长度的原因不变：余额卡是 28px 大数字，360dp 窄屏 + 系统大字体下
+ * 每列只有一百多 px，`¥12,345.67` 必被截成 `¥12,345…`（用户真机截图实测）。
+ * **改字号挡不住字体缩放，只能压字符数。**
  */
 function balanceAmount(cents) {
-  const full = formatCents(cents)
-  if (full.length >= COMPACT_FROM_LEN) {
-    // compactYuan 自带 ¥（stats 页的圆心/柱标直接用它，那里没模板前缀），
-    // 这里模板已经写死了「¥{{ }}」，所以要把它那个 ¥ 剥掉，否则渲染成「¥¥1.2万」
-    const bare = String(compactYuan(cents)).replace(/^¥/, '')
-    return { text: bare, size: amountSizeClass(bare) }
-  }
-  return { text: full, size: amountSizeClass(full) }
+  return bigAmount(cents)
 }
 
 const incomeAmount = computed(function () {

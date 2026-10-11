@@ -16,7 +16,7 @@
       <mascot-deco class="caishen" slot-id="ledger.current" />
       <text class="lc-label">当前账本</text>
       <text class="lc-name">{{ currentName }}</text>
-      <text class="lc-num">¥{{ balanceText }}</text>
+      <text class="lc-num" :class="balanceSizeClass">¥{{ balanceText }}</text>
       <view class="lc-row">
         <text class="inc">已存 ¥{{ incomeText }}</text>
         <text class="exp">已花 ¥{{ expenseText }}</text>
@@ -47,7 +47,7 @@
           <text class="list-name">{{ l.name }}</text>
           <text class="list-sub">{{ subOf(l) }}</text>
         </view>
-        <text class="list-amt" :class="{ inc: l.balanceCents > 0 }">¥{{ formatCents(Math.abs(l.balanceCents)) }}</text>
+        <text class="list-amt" :class="{ inc: l.balanceCents > 0 }">¥{{ amtOf(l) }}</text>
       </view>
     </view>
 
@@ -71,7 +71,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useAccountStore } from '../../stores/account.js'
 import { useMetaStore } from '../../stores/meta.js'
-import { formatCents } from '../../utils/money.js'
+import { bigAmount, inlineAmount } from '../../utils/money.js'
 import { balanceCents } from '../../utils/stats.js'
 import { UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
@@ -95,14 +95,22 @@ const currentName = computed(function () {
   return c ? c.name : '日常账本'
 })
 
+/** 余额大数字：≥9 字符压紧凑 + 字号分档（同首页余额卡，见 utils/money.js: bigAmount）。
+    30px 大字在系统字体缩放下会被卡片右侧的奶蛙装饰挡住，文本和字号档都要管。 */
+const balanceAmount = computed(function () {
+  return bigAmount(balanceCents(txStore.overview))
+})
 const balanceText = computed(function () {
-  return formatCents(balanceCents(txStore.overview))
+  return balanceAmount.value.text
+})
+const balanceSizeClass = computed(function () {
+  return balanceAmount.value.size
 })
 const incomeText = computed(function () {
-  return formatCents(txStore.overview.incomeCents)
+  return inlineAmount(txStore.overview.incomeCents)
 })
 const expenseText = computed(function () {
-  return formatCents(txStore.overview.expenseCents)
+  return inlineAmount(txStore.overview.expenseCents)
 })
 
 /** 列表行图标底色：轮流用参考包里的几个色，保证同名账本也不会撞色 */
@@ -110,6 +118,11 @@ const ROW_COLORS = ['#ff8a65', '#81c784', '#f48fb1', 'var(--cd-primary-deep)', '
 function colorOfIndex(id) {
   const n = Number(id) || 1
   return ROW_COLORS[(n - 1) % ROW_COLORS.length]
+}
+
+/** 列表行金额：≥1 万压紧凑（utils/money.js: inlineAmount），系统大字体下不挤账本名 */
+function amtOf(l) {
+  return inlineAmount(Math.abs(l.balanceCents))
 }
 
 function shortDate(ts) {
@@ -339,6 +352,13 @@ onShow(function () {
   color: var(--cd-ink);
   letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
+}
+/* 字号分档：字符越多字越小（amountSizeClass 决定挂哪个 class），同首页余额卡 */
+.lc-num.md {
+  font-size: 25px;
+}
+.lc-num.sm {
+  font-size: 21px;
 }
 .lc-row {
   display: flex;

@@ -14,7 +14,7 @@
       <view class="hero">
         <mascot-deco class="hero-milo" :mood="heroMood" slot-id="deco.report.hero" />
         <text class="hero-label">{{ report.label }} · 一共花了</text>
-        <text class="hero-num">¥{{ fmt(report.expenseCents) }}</text>
+        <text class="hero-num" :class="heroSizeClass">¥{{ heroText }}</text>
         <view class="mom" :class="report.mom.expense.dir">
           <text class="mom-txt">{{ momText(report.mom.expense, '支出') }}</text>
         </view>
@@ -130,7 +130,7 @@ import { useMetaStore } from '../../stores/meta.js'
 import { useTagStore } from '../../stores/tag.js'
 import * as tagService from '../../services/tag.js'
 import { buildMonthlyReport } from '../../utils/report.js'
-import { formatCents } from '../../utils/money.js'
+import { bigAmount, inlineAmount } from '../../utils/money.js'
 import { tagColorOf } from '../../utils/palette.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
@@ -158,6 +158,14 @@ const ym = computed(function () {
 const chipText = computed(function () {
   const parts = String(ym.value).split('-')
   return parts[0] + '/' + Number(parts[1])
+})
+
+/** 头图大数字：34px 全站最大，≥9 字符压紧凑 + 字号分档（同首页余额卡，见 utils/money.js: bigAmount） */
+const heroText = computed(function () {
+  return report.value ? bigAmount(report.value.expenseCents).text : '0.00'
+})
+const heroSizeClass = computed(function () {
+  return report.value ? bigAmount(report.value.expenseCents).size : ''
 })
 
 function load() {
@@ -201,14 +209,15 @@ function goBack() {
   uni.reLaunch({ url: '/pages/stats/stats' })
 }
 
-/** 金额（不带符号，永远正数展示） */
+/** 金额（不带符号，永远正数展示）；≥1 万压紧凑（utils/money.js: inlineAmount），
+    系统大字体下不撑破排名行/格子这些窄位 */
 function fmt(cents) {
-  return formatCents(Math.abs(Number(cents) || 0))
+  return inlineAmount(Math.abs(Number(cents) || 0))
 }
-/** 结余：负数写成 -¥12.34，而不是 ¥-12.34 */
+/** 结余：负数写成 -¥12.34，而不是 ¥-12.34；大额压紧凑且负号保留 */
 function balanceText(cents) {
   const v = Number(cents) || 0
-  return (v < 0 ? '-¥' : '¥') + formatCents(Math.abs(v))
+  return (v < 0 ? '-¥' : '¥') + inlineAmount(Math.abs(v))
 }
 /** 环比文案：算不出涨幅（上月为 0）时说人话，不显示 NaN% */
 function momText(m, what) {
@@ -315,6 +324,13 @@ onShow(function () {
   color: var(--cd-ink);
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
+}
+/* 字号分档：字符越多字越小（amountSizeClass 决定挂哪个 class），同首页余额卡 */
+.hero-num.md {
+  font-size: 28px;
+}
+.hero-num.sm {
+  font-size: 24px;
 }
 .mom {
   display: inline-flex;

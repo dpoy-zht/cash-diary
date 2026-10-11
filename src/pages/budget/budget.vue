@@ -12,12 +12,10 @@
       <text class="tc-label">本月总预算</text>
       <text v-if="!budgetStore.hasTotal" class="tc-empty">还没设预算，点一下设置</text>
       <block v-else>
-        <text class="tc-num">¥{{ totalText }}</text>
+        <text class="tc-num" :class="totalSizeClass">¥{{ totalText }}</text>
         <view class="tc-row">
           <text class="tc-spent">已花 ¥{{ spentText }}</text>
-          <text class="tc-remain" :class="{ over: totalStatus.level === 'over' }">
-            {{ totalStatus.remainCents >= 0 ? '还能花 ¥' + formatCents(totalStatus.remainCents) : '已超 ¥' + formatCents(-totalStatus.remainCents) }}
-          </text>
+          <text class="tc-remain" :class="{ over: totalStatus.level === 'over' }">{{ remainText }}</text>
         </view>
         <view class="bar"><view class="bar-i" :class="totalStatus.level" :style="{ width: totalPercent + '%' }" /></view>
         <text class="tc-tip">{{ totalTip }}</text>
@@ -63,7 +61,7 @@ import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
 import { useBudgetStore } from '../../stores/budget.js'
-import { formatCents } from '../../utils/money.js'
+import { bigAmount, inlineAmount } from '../../utils/money.js'
 import { budgetStatus, progressPercent, spentBySubtree } from '../../utils/budget.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
@@ -102,11 +100,24 @@ function spentOf(id) {
   return spentByCat.value.get(Number(id)) || 0
 }
 
+/** 总预算大数字：≥9 字符压紧凑 + 字号分档（同首页余额卡，见 utils/money.js: bigAmount）。
+    30px 大字在系统字体缩放下会撞上右上角的奶蛙装饰，所以文本和字号档都要管。 */
+const totalAmount = computed(function () {
+  return bigAmount(budgetStore.totalCents)
+})
 const totalText = computed(function () {
-  return formatCents(budgetStore.totalCents)
+  return totalAmount.value.text
+})
+const totalSizeClass = computed(function () {
+  return totalAmount.value.size
 })
 const spentText = computed(function () {
-  return formatCents(txStore.summary.expenseCents)
+  return inlineAmount(txStore.summary.expenseCents)
+})
+const remainText = computed(function () {
+  return totalStatus.value.remainCents >= 0
+    ? '还能花 ¥' + inlineAmount(totalStatus.value.remainCents)
+    : '已超 ¥' + inlineAmount(-totalStatus.value.remainCents)
 })
 const totalStatus = computed(function () {
   return budgetStatus(budgetStore.totalCents, txStore.summary.expenseCents)
@@ -149,7 +160,8 @@ function percentOf(c) {
 function rowText(c) {
   const limit = budgetStore.limitOf(c.id)
   if (!limit) return '未设'
-  return '¥' + formatCents(spentOf(c.id)) + ' / ¥' + formatCents(limit)
+  // 两个金额并排占一行，一侧变长会把左侧分类名挤没 —— ≥1 万压紧凑
+  return '¥' + inlineAmount(spentOf(c.id)) + ' / ¥' + inlineAmount(limit)
 }
 function rowClass(c) {
   const lv = statusOf(c).level
@@ -273,6 +285,13 @@ onShow(function () {
   letter-spacing: -0.5px;
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
+}
+/* 字号分档：字符越多字越小（amountSizeClass 决定挂哪个 class），同首页余额卡 */
+.tc-num.md {
+  font-size: 24px;
+}
+.tc-num.sm {
+  font-size: 20px;
 }
 .tc-row {
   display: flex;

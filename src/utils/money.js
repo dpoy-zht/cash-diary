@@ -104,3 +104,61 @@ export function amountSizeClass(text) {
   if (n <= 8) return 'md'
   return 'sm'
 }
+
+/**
+ * 带符号的紧凑写法：-1234567 → '-¥1.2万'。
+ *
+ * 为什么不直接用 compactYuan：它内部 Math.max(0, …) 会把负数钳成 ¥0，
+ * 结余/剩余这类可能为负的金额必须走这里，否则超支的账本会显示成 ¥0。
+ */
+export function compactYuanSigned(cents) {
+  const v = Number(cents) || 0
+  return (v < 0 ? '-' : '') + compactYuan(Math.abs(v))
+}
+
+/**
+ * 大号金额展示的统一算法（v2.3.19 首页余额卡的算法升级为全站共享）。
+ * 返回 { text, size }；**text 不含 ¥** —— 页面模板已经写死了「¥{{ }}」前缀，
+ * 这里再带一个会渲染成「¥¥1.2万」。
+ *
+ * 用在哪些地方：预算卡、账本卡、报告头图、我的页小卡 —— 凡是"一格就一个
+ * 大数字"的地方都按这套走：位数少给完整格式，≥9 字符压紧凑 + 字号分档。
+ */
+export function bigAmount(cents) {
+  const full = formatCents(cents)
+  if (full.length >= COMPACT_FROM_LEN) {
+    // 负数的 ¥ 跟在 - 号后面（'-¥1.2万'），所以剥 ¥ 要连符号一起匹配，
+    // 只剥行首会把负数渲染成「¥¥-1.2万」
+    const bare = compactYuanSigned(cents).replace(/^(-?)¥/, '$1')
+    return { text: bare, size: amountSizeClass(bare) }
+  }
+  return { text: full, size: amountSizeClass(full) }
+}
+
+/**
+ * 行内小字金额：句子或「¥X / ¥Y」配对里的金额（预算卡"已花/还能花"、
+ * 我的页攒钱目标这类）。只返回裸文本，¥ 由模板或拼接方自己写。
+ *
+ * 阈值与 bigAmount 相同（≥9 字符压紧凑）：这些位置字号小但同伴多，
+ * 一侧变长会把同行的分类名/标签挤没，见 rowAmount 的对比。
+ */
+export function inlineAmount(cents) {
+  return bigAmount(cents).text
+}
+
+/** 超过这个字符数（不含符号与 ¥），流水行金额才换紧凑写法 */
+export const ROW_COMPACT_FROM_LEN = 13
+
+/**
+ * 流水行金额：'-¥19.90' / '+¥19.90' / '¥19.90'（type 传 'expense'/'income'/其他）。
+ *
+ * 和 bigAmount 阈值不同的原因：流水行有整行宽度（约 340px），15px 字号下
+ * 12 字符（¥999,999.99 以内）在系统最大字体缩放里也放得下，日常金额
+ * 保留两位小数完整精度；≥¥1000 万才压紧凑，防止把同行的分类名挤没。
+ */
+export function rowAmount(cents, type) {
+  const sign = type === 'expense' ? '-' : type === 'income' ? '+' : ''
+  const full = formatCents(cents)
+  if (full.length < ROW_COMPACT_FROM_LEN) return sign + '¥' + full
+  return sign + compactYuan(cents)
+}

@@ -19,7 +19,7 @@
         <view class="row-main" @click="openEdit(f)">
           <view class="row-line">
             <text class="row-name">{{ catName(f.category_id) }}<text v-if="f.note" class="row-note"> · {{ f.note }}</text></text>
-            <text class="row-amt">-¥{{ formatCents(f.amount_cents) }}</text>
+            <text class="row-amt">{{ rowAmt(f) }}</text>
           </view>
           <view class="row-line2">
             <text class="row-sub" :class="{ off: !f.enabled }">每月 {{ f.day_of_month }} 号 · {{ f.enabled ? '自动记账中' : '已停用' }}</text>
@@ -116,7 +116,7 @@ import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useFixedStore } from '../../stores/fixed.js'
 import { useCategoryStore } from '../../stores/category.js'
-import { formatCents } from '../../utils/money.js'
+import { rowAmount } from '../../utils/money.js'
 import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 import { selectionOf, nextOnPickTop } from '../../utils/category-ui.js'
@@ -155,6 +155,11 @@ function catName(id) {
 }
 function catOf(id) {
   return catMap.value.get(id) || { id: id, name: '分类已删除', icon: '📦', type: 'expense' }
+}
+/** 行内金额：日常保留两位小数，≥¥1000 万压紧凑（utils/money.js: rowAmount），
+    系统大字体下不把分类名/备注挤没 */
+function rowAmt(f) {
+  return rowAmount(f.amount_cents, 'expense')
 }
 
 function onDayChange(e) {

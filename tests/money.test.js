@@ -6,8 +6,13 @@ import {
   groupThousands,
   displayAmount,
   compactYuan,
+  compactYuanSigned,
   amountSizeClass,
-  COMPACT_FROM_LEN
+  bigAmount,
+  inlineAmount,
+  rowAmount,
+  COMPACT_FROM_LEN,
+  ROW_COMPACT_FROM_LEN
 } from '../src/utils/money.js'
 
 describe('parseAmountToCents —— 金额一律整数分，禁止浮点存储', () => {
@@ -174,5 +179,82 @@ describe('amountSizeClass —— 大数字字号档位', () => {
     const compact = compactYuan(123456789).replace(/^¥/, '')
     expect(compact.length).toBeLessThan(COMPACT_FROM_LEN)
     expect(amountSizeClass(compact)).not.toBe('sm')
+  })
+})
+
+/**
+ * 全站字号/截断保护（2026-10-11）。
+ *
+ * 起因：v2.3.19 只给首页余额卡加了「压紧凑 + 字号分档」，其余 10 个页面
+ * 的金额仍是裸 formatCents —— 交接文档核实确认这些页面在系统字体最大档下
+ * 都没有保护。本轮把首页算法升级成共享纯函数推广到全站，这里锁死行为。
+ */
+describe('compactYuanSigned —— 结余可为负，compactYuan 会把负数钳成 ¥0', () => {
+  it('负数带 - 号且按绝对值压缩', () => {
+    expect(compactYuanSigned(-1234567)).toBe('-¥1.2万')
+    expect(compactYuanSigned(-1800000)).toBe('-¥1.8万')
+  })
+
+  it('不到 1 万的负数只补千分位，不凑「万」', () => {
+    expect(compactYuanSigned(-180000)).toBe('-¥1,800')
+  })
+
+  it('正数与 compactYuan 完全一致，0 仍是 ¥0', () => {
+    expect(compactYuanSigned(1990)).toBe(compactYuan(1990))
+    expect(compactYuanSigned(12345678)).toBe(compactYuan(12345678))
+    expect(compactYuanSigned(0)).toBe('¥0')
+  })
+})
+
+describe('bigAmount —— 大号金额统一算法（首页余额卡同款，推广到预算/账本/报告/我的）', () => {
+  it('位数少：完整格式 + 默认字号', () => {
+    expect(bigAmount(1990)).toEqual({ text: '19.90', size: '' })
+    expect(bigAmount(0)).toEqual({ text: '0.00', size: '' })
+  })
+
+  it('7~8 字符：完整格式 + 降一档', () => {
+    expect(bigAmount(180000)).toEqual({ text: '1,800.00', size: 'md' })
+  })
+
+  it('≥9 字符：压成紧凑写法（¥ 前缀由页面模板自己写，这里不带）', () => {
+    expect(bigAmount(1234567)).toEqual({ text: '1.2万', size: '' })
+  })
+
+  it('负数大额：负号保留在文本里，不会丢成 ¥0', () => {
+    expect(bigAmount(-1234567890)).toEqual({ text: '-1234.6万', size: 'md' })
+  })
+})
+
+describe('inlineAmount —— 行内小字金额（已花/还能花、¥X / ¥Y 这类配对位）', () => {
+  it('日常金额保持完整精度', () => {
+    expect(inlineAmount(999999)).toBe('9,999.99')
+  })
+
+  it('≥1 万压紧凑，防止挤爆同行的分类名', () => {
+    expect(inlineAmount(1234567)).toBe('1.2万')
+  })
+
+  it('与 bigAmount 的文本一致（同一套算法的两种取用方式）', () => {
+    expect(inlineAmount(-180000)).toBe(bigAmount(-180000).text)
+    expect(inlineAmount(850000)).toBe(bigAmount(850000).text)
+  })
+})
+
+describe('rowAmount —— 流水行金额（整行宽度，≥¥1000 万才压紧凑）', () => {
+  it('支出带 -，收入带 +，无类型只带 ¥', () => {
+    expect(rowAmount(1990, 'expense')).toBe('-¥19.90')
+    expect(rowAmount(1990, 'income')).toBe('+¥19.90')
+    expect(rowAmount(1990, '')).toBe('¥19.90')
+  })
+
+  it('百万级仍保留两位小数完整精度（对账要紧）', () => {
+    expect(rowAmount(99999999, 'expense')).toBe('-¥999,999.99')
+    expect(rowAmount(123456789, '')).toBe('¥1,234,567.89')
+  })
+
+  it('≥13 字符（≥¥1000 万）压紧凑，系统大字体下不挤没分类名', () => {
+    expect(ROW_COMPACT_FROM_LEN).toBe(13)
+    expect(rowAmount(1234567899, 'expense')).toBe('-¥1234.6万')
+    expect(rowAmount(1234567899, 'income')).toBe('+¥1234.6万')
   })
 })

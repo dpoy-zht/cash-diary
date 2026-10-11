@@ -23,7 +23,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { formatCents } from '../../utils/money.js'
+import { rowAmount } from '../../utils/money.js'
 import { tagColorOf } from '../../utils/palette.js'
 
 /**
@@ -70,9 +70,11 @@ const label = computed(function () {
   const note = (props.record.note || '').trim()
   return note ? props.category.name + ' · ' + note : props.category.name
 })
+/** 行内金额：日常保留两位小数完整精度，≥¥1000 万才压紧凑
+    （utils/money.js: rowAmount）—— 流水行有整行宽度，系统大字体下
+    太长的金额会把左侧分类名挤没 */
 const formatted = computed(function () {
-  const sign = props.record.type === 'expense' ? '-' : '+'
-  return sign + '¥' + formatCents(props.record.amount_cents)
+  return rowAmount(props.record.amount_cents, props.record.type)
 })
 const showTags = computed(function () {
   return props.tags.slice(0, MAX_TAG_CHIPS)

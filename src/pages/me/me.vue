@@ -15,11 +15,11 @@
     <view class="stat-row">
       <view class="stat-cell">
         <text class="sc-label">本月已花</text>
-        <text class="sc-value">¥{{ monthExpenseText }}</text>
+        <text class="sc-value" :class="expenseSizeClass">¥{{ monthExpenseText }}</text>
       </view>
       <view class="stat-cell">
         <text class="sc-label">累计已存</text>
-        <text class="sc-value sc-inc">¥{{ totalIncomeText }}</text>
+        <text class="sc-value sc-inc" :class="incomeSizeClass">¥{{ totalIncomeText }}</text>
       </view>
       <view class="stat-cell">
         <text class="sc-label">连续记账</text>
@@ -138,7 +138,7 @@ import { resetAll } from '../../services/maintenance.js'
 import * as backupService from '../../services/backup.js'
 import { backupFileName, validateBackup } from '../../utils/backup.js'
 import { saveTextFile, pickBackupText, exportDocFileToUser, exportResultMessage } from '../../utils/backup-file.js'
-import { formatCents, parseAmountToCents } from '../../utils/money.js'
+import { parseAmountToCents, bigAmount, inlineAmount } from '../../utils/money.js'
 import { dateTimeLabel } from '../../utils/date.js'
 import { streakDays, levelOf } from '../../utils/stats.js'
 import {
@@ -180,11 +180,25 @@ const isDev = import.meta.env.DEV
 const GOAL_KEY = 'cashDiary.goalCents'
 const goalCents = ref(0)
 
+/** 三张小卡并排，每格只有九十多 px：≥9 字符压紧凑 + 字号分档
+    （同首页余额卡，见 utils/money.js: bigAmount），系统大字体下不撑破格子 */
+const monthExpense = computed(function () {
+  return bigAmount(txStore.summary.expenseCents)
+})
 const monthExpenseText = computed(function () {
-  return formatCents(txStore.summary.expenseCents)
+  return monthExpense.value.text
+})
+const expenseSizeClass = computed(function () {
+  return monthExpense.value.size
+})
+const totalIncome = computed(function () {
+  return bigAmount(txStore.overview.incomeCents)
 })
 const totalIncomeText = computed(function () {
-  return formatCents(txStore.overview.incomeCents)
+  return totalIncome.value.text
+})
+const incomeSizeClass = computed(function () {
+  return totalIncome.value.size
 })
 const streak = computed(function () {
   return streakDays(txStore.recentTs, Date.now())
@@ -199,7 +213,8 @@ const savedCents = computed(function () {
 })
 const goalText = computed(function () {
   if (!goalCents.value) return '点一下设置攒钱目标'
-  return '已存 ¥' + formatCents(savedCents.value) + ' / 目标 ¥' + formatCents(goalCents.value)
+  // 两个金额嵌在一句里，≥1 万压紧凑，免得系统大字体下折成三行
+  return '已存 ¥' + inlineAmount(savedCents.value) + ' / 目标 ¥' + inlineAmount(goalCents.value)
 })
 const goalPct = computed(function () {
   if (!goalCents.value) return 0
@@ -209,7 +224,7 @@ const goalTip = computed(function () {
   if (!goalCents.value) return '设定目标后开始攒钱进度'
   const rest = goalCents.value - savedCents.value
   if (rest <= 0) return '目标达成！暴富奶蛙皮肤已解锁'
-  return '再攒 ¥' + formatCents(rest) + ' 就能解锁暴富奶蛙皮肤'
+  return '再攒 ¥' + inlineAmount(rest) + ' 就能解锁暴富奶蛙皮肤'
 })
 
 function editGoal() {
@@ -954,6 +969,13 @@ onShow(function () {
   color: var(--cd-ink);
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
+}
+/* 字号分档：字符越多字越小（amountSizeClass 决定挂哪个 class），同首页余额卡 */
+.sc-value.md {
+  font-size: 14px;
+}
+.sc-value.sm {
+  font-size: 13px;
 }
 .sc-inc {
   color: var(--cd-income);

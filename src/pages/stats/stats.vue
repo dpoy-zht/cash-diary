@@ -217,7 +217,7 @@ import {
   periodNameOf,
   shortDateTime
 } from '../../utils/date.js'
-import { formatCents, compactYuan } from '../../utils/money.js'
+import { formatCents, compactYuan, inlineAmount } from '../../utils/money.js'
 import { readableInk } from '../../utils/palette.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 
@@ -262,11 +262,13 @@ const rows = computed(function () {
 const periodName = computed(function () {
   return periodNameOf(period.value)
 })
+/** 顶部合计条里支出/收入两个数并排：≥1 万压紧凑（utils/money.js: inlineAmount），
+    系统大字体下两个金额加间隔词不会撑出屏幕 */
 const periodExpenseText = computed(function () {
-  return '¥' + formatCents(txStore.periodSummary.expenseCents)
+  return '¥' + inlineAmount(txStore.periodSummary.expenseCents)
 })
 const periodIncomeText = computed(function () {
-  return '¥' + formatCents(txStore.periodSummary.incomeCents)
+  return '¥' + inlineAmount(txStore.periodSummary.incomeCents)
 })
 
 /* ---- 顶部选择器（胶囊 + picker，fields 随期间变化） ---- */
