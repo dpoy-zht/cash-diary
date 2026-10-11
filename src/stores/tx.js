@@ -7,6 +7,7 @@ import { useMetaStore } from './meta.js'
 import { lastNMonths, monthRange, toDateStr, prevYmOf } from '../utils/date.js'
 import { emptyFilters, normalizeFilters, hasAnyFilter } from '../utils/search.js'
 import { monthlySummaries, periodRange, trendSpecFor, sumByType, bucketSummaries, prevPeriodRange } from '../utils/stats.js'
+import { recentCombos, recentNotes, QUICK_WINDOW_DAYS } from '../utils/quick.js'
 
 /** 趋势图统计的月份数 */
 export const TREND_MONTHS = 6
@@ -31,6 +32,23 @@ export const useTxStore = defineStore('tx', function () {
   /** 月度报告（T4.4）：当月流水 + 上月流水（环比用）。总预算由页面从 budget store 取 */
   const reportRecords = ref([])
   const reportPrevRecords = ref([])
+
+  /**
+   * 记一笔页的「常用」候选（批次 B）：近 60 天流水一次区间查询，
+   * 归并与排序全在 utils/quick.js 纯函数里（可单测）。
+   * 单独一个加载器而不并进 refresh()：只有记账页需要，别的页不必付这次查询；
+   * 失败时两个 ref 保持空数组，页面据此整行隐藏。
+   */
+  const quickCombos = ref([])
+  const quickNotes = ref([])
+
+  async function loadQuick() {
+    const end = Date.now()
+    const start = end - QUICK_WINDOW_DAYS * 86400000
+    const rows = await txService.listByRange(start, end, currentAccount())
+    quickCombos.value = recentCombos(rows, { now: end })
+    quickNotes.value = recentNotes(rows, { now: end })
+  }
 
   /**
    * 首页搜索：跨月流水（备注/分类名命中）+ 组合筛选（T4.3）。
@@ -262,6 +280,9 @@ export const useTxStore = defineStore('tx', function () {
     periodPrevSummary,
     reportRecords,
     reportPrevRecords,
+    quickCombos,
+    quickNotes,
+    loadQuick,
     searchKeyword,
     searchFilters,
     searchResults,

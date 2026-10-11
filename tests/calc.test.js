@@ -13,6 +13,7 @@ import {
   evalExpression,
   centsToDisplay
 } from '../src/utils/calc.js'
+import { formatCents, parseAmountToCents } from '../src/utils/money.js'
 
 /** 模拟一串按键，返回最终状态（测试里不想每次都解包 state） */
 function press(keys, from) {
@@ -345,5 +346,41 @@ describe('算式未写完时的显示（回归：不要回退成 0.00）', () =>
 
   it('空输入仍是 0.00', () => {
     expect(calcDisplay(initialCalcState())).toBe('0.00')
+  })
+})
+
+describe('一键再记 —— 金额经 calcKey 逐键重建（批次 B）', () => {
+  /**
+   * add 页的常用组合 chip 把 formatCents 的产物剥掉千分位逗号后逐键喂给
+   * calcKey（见 pages/add/add.vue: applyCombo）。这里锁死回路：喂进去的
+   * 金额与 calcAmountText 产出的可保存文本必须还原成同一个金额，否则会
+   * 出现「chip 写 ¥7.00、存进去是别的数」的脱节。
+   */
+  function feedAmount(amountCents) {
+    const digits = formatCents(amountCents).replace(/,/g, '')
+    let st = initialCalcState()
+    for (let i = 0; i < digits.length; i += 1) {
+      const r = calcKey(st, digits.charAt(i))
+      expect(r.error).toBeUndefined()
+      st = r.state
+    }
+    return { text: calcAmountText(st), state: st }
+  }
+
+  it('日常金额回路：¥7.00 / ¥19.90 / ¥0.50（前导零）', () => {
+    expect(feedAmount(700).text).toBe('7.00')
+    expect(feedAmount(1990).text).toBe('19.90')
+    expect(feedAmount(50).text).toBe('0.50')
+  })
+
+  it('大额（千分位剥逗号）与 9 位整数上限回路，金额分毫不差', () => {
+    expect(parseAmountToCents(feedAmount(1850000).text)).toBe(1850000)
+    expect(parseAmountToCents(feedAmount(99999999999).text)).toBe(99999999999)
+  })
+
+  it('回路产物能直接走保存链：不可再求值（canEvaluate 假）、可清空', () => {
+    const r = feedAmount(700)
+    expect(canEvaluate(r.state)).toBe(false)
+    expect(canClear(r.state)).toBe(true)
   })
 })

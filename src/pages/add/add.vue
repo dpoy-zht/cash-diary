@@ -31,10 +31,51 @@
         class="note-input"
         placeholder="加点备注…"
         placeholder-class="ph"
+        @focus="onNoteFocus"
+        @blur="onNoteBlur"
       />
       <picker mode="date" :value="dateStr" :start="minDateStr" :end="todayStr" @change="onDateChange">
         <view class="date-btn">{{ dateStr.slice(5) }}</view>
       </picker>
+    </view>
+
+    <!-- 常用组合：近 60 天重复记过的「分类+备注+金额」，点一下全填好。
+         白底 chip 与黄底的分类 chip 区分：这里是"一键填单"，不是"选择分类" -->
+    <view v-if="quickCombos.length" class="quick-row">
+      <text class="quick-label">常用</text>
+      <scroll-view scroll-x class="quick-scroll">
+        <view class="quick-chips">
+          <view
+            v-for="(c, i) in quickCombos"
+            :key="i"
+            class="quick-chip pressable"
+            hover-class="pressable-hover"
+            hover-stay-time="80"
+            @click="applyCombo(c)"
+          >
+            <text class="quick-chip-t">{{ comboLabel(c) }}</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 常用备注：点进备注框才出现（blur 延迟收起，给 chip 的 click 留时间窗） -->
+    <view v-if="noteFocused && quickNotes.length" class="quick-row">
+      <text class="quick-label">备注</text>
+      <scroll-view scroll-x class="quick-scroll">
+        <view class="quick-chips">
+          <view
+            v-for="(n, i) in quickNotes"
+            :key="i"
+            class="quick-chip pressable"
+            hover-class="pressable-hover"
+            hover-stay-time="80"
+            @click="applyNote(n)"
+          >
+            <text class="quick-chip-t">{{ n.note }}</text>
+          </view>
+        </view>
+      </scroll-view>
     </view>
 
     <!-- 分类选择：一级宫格 + 二级横条（两级结构见 utils/category-ui.js） -->
@@ -131,6 +172,33 @@ const successShow = ref(false)
 const lastSaved = ref(null)
 const saving = ref(false)
 
+/** 备注框是否聚焦（常用备注行据此显隐）。blur 延迟收起：点击 chip 时 blur 先于
+    click 到达，立刻收起会让 click 落在已移除的节点上 —— 给 250ms 时间窗 */
+const noteFocused = ref(false)
+let noteBlurTimer = null
+
+function onNoteFocus() {
+  if (noteBlurTimer) { clearTimeout(noteBlurTimer); noteBlurTimer = null }
+  noteFocused.value = true
+}
+function onNoteBlur() {
+  if (noteBlurTimer) clearTimeout(noteBlurTimer)
+  noteBlurTimer = setTimeout(function () { noteFocused.value = false }, 250)
+}
+
+/**
+ * 常用组合：分类已被删掉的不能上 —— 填进去等于记一条新的「分类悬空」流水，
+ * 正是数据体检要清理的东西。分类表异步加载，用 computed 让它跟着补齐。
+ */
+const quickCombos = computed(function () {
+  return txStore.quickCombos.filter(function (c) {
+    return !!categoryStore.byId(c.categoryId)
+  })
+})
+const quickNotes = computed(function () {
+  return txStore.quickNotes
+})
+
 /** 一级分类列表：默认选中第一项 / 切换收支时兜底用 */
 const cats = computed(function () {
   return type.value === 'expense' ? categoryStore.expenseTops : categoryStore.incomeTops
@@ -165,6 +233,42 @@ function switchType(t) {
   if (!list.some(function (c) { return c.id === categoryId.value })) {
     categoryId.value = list.length ? list[0].id : null
   }
+}
+
+/** chip 文案：'早餐·豆浆油条 ¥7.00' / '早餐 ¥7.00'，收入带 + 号（与流水列表同语义） */
+function comboLabel(c) {
+  const cat = categoryStore.byId(c.categoryId)
+  const name = cat ? cat.name : ''
+  const sign = c.type === 'income' ? '+' : ''
+  return (c.note ? name + '·' + c.note : name) + ' ' + sign + '¥' + formatCents(c.amountCents)
+}
+
+/**
+ * 点常用组合：类型/分类/备注/金额一次填好。金额必须走 calcKey 逐键重建 ——
+ * 大数字展示（amountText）与保存值（current）都出自 calc 状态，直接改 current
+ * 会出现「显示 0.00 却存进 7 元」的脱节。
+ */
+function applyCombo(c) {
+  haptic(10)
+  if (type.value !== c.type) switchType(c.type)
+  categoryId.value = c.categoryId
+  note.value = c.note
+  // formatCents 带千分位逗号，逗号不是合法键，剥掉再逐键喂给状态机
+  const digits = String(formatCents(c.amountCents)).replace(/,/g, '')
+  let st = initialCalcState()
+  for (let i = 0; i < digits.length; i += 1) {
+    const r = calcKey(st, digits.charAt(i))
+    if (r.error) break
+    st = r.state
+  }
+  calc.value = st
+  current.value = calcAmountText(st)
+}
+
+/** 点常用备注：只填备注，分类与金额不动 —— 同一句备注常配不同金额 */
+function applyNote(n) {
+  haptic(10)
+  note.value = n.note
 }
 /**
  * 键盘按键。运算规则全在 utils/calc.js（纯函数），页面只存状态、
@@ -229,6 +333,8 @@ onShow(function () {
   armOnFirstInteraction()
   // 标签列表可能被「标签管理」页改过（改名/删除），每次进页面重取一次
   tagStore.load().catch(function () { /* 取不到不阻塞记账 */ })
+  // 常用组合/备注：近 60 天一次区间查询；取不到就不显示常用行，不阻塞记账
+  txStore.loadQuick().catch(function () { /* 常用行是增强，失败保持隐藏 */ })
   const t = toDateStr(Date.now())
   if (t === todayStr.value) return
   if (dateStr.value === todayStr.value) dateStr.value = t
@@ -297,6 +403,8 @@ async function save() {
     successShow.value = true
     haptic(30) // 保存成功长振一下，跟按键的轻振区分开
     playSfx('success') // 记账成功「叮」：与长振同时，构成"记上了"的确认感
+    // 刚记的这笔马上参与常用度统计（连记三天奶茶，第四天它就该出现在「常用」里）
+    txStore.loadQuick().catch(function () { /* 常用行是增强，失败保持现状 */ })
   } catch (err) {
     // 关键：异常一定要变成用户看得见的提示，否则表现就是"点了没反应"
     uni.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
@@ -470,6 +578,49 @@ watch(
   font-weight: 600;
   color: var(--cd-ink);
   box-shadow: var(--cd-sh-card);
+  white-space: nowrap;
+}
+
+/* ---- 常用组合 / 常用备注（批次 B）----
+   白底 chip：与黄底的分类 chip 区分 —— 这里是"一键填单"，不是"选择分类"。
+   scroll-x 模式与 fixed.vue 的 cat-scroll 相同（white-space:nowrap + flex 容器
+   + flex:none chip），那是真机验证过的写法，别自创。 */
+.quick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 16px 0;
+}
+.quick-label {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cd-ink-2);
+}
+.quick-scroll {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.quick-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px;
+}
+.quick-chip {
+  flex: none;
+  background: var(--cd-surface);
+  border-radius: var(--cd-r-pill);
+  padding: 8px 14px;
+  box-shadow: var(--cd-sh-card);
+}
+/* 横向 flex 里的 <text> 要显式块级 + nowrap，否则「早餐」被压成两行（全站约定） */
+.quick-chip-t {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cd-ink);
   white-space: nowrap;
 }
 
