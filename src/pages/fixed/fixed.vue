@@ -77,11 +77,20 @@
           </view>
         </scroll-view>
 
-        <!-- 金额 -->
+        <!-- 金额：type="text" + inputmode="decimal"，别改回 type="digit"（原因同编辑弹层，
+             uni-app 会把 digit 渲染成 number，浏览器那套有效性拦截会让小数点输不进去） -->
         <text class="f-label">每月金额</text>
         <view class="amt-box">
           <text class="amt-y">¥</text>
-          <input v-model="form.amountStr" class="amt-input" type="digit" placeholder="0.00" placeholder-class="amt-ph" />
+          <input
+            v-model="form.amountStr"
+            class="amt-input"
+            type="text"
+            inputmode="decimal"
+            placeholder="0.00"
+            placeholder-class="amt-ph"
+            @input="onAmountInput"
+          />
         </view>
 
         <!-- 日期 -->
@@ -120,6 +129,8 @@ import { rowAmount } from '../../utils/money.js'
 import { UI_PRIMARY, UI_DANGER } from '../../utils/constant.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 import { selectionOf, nextOnPickTop } from '../../utils/category-ui.js'
+import { sanitizeAmountInput, normalizeAmountForSave } from '../../utils/entry.js'
+import { parseAmountToCents } from '../../utils/money.js'
 
 const store = useFixedStore()
 const categoryStore = useCategoryStore()
@@ -169,6 +180,19 @@ function onEnabledChange(e) {
   form.enabled = !!e.detail.value
 }
 
+/**
+ * 金额输入约束（纯函数在 utils/entry.js）：只放行数字与一个小数点。
+ * 与编辑弹层同一个坑、同一个解法 —— 别把 type 改回 digit。
+ */
+function onAmountInput(e) {
+  let raw = e && e.detail && typeof e.detail.value === 'string' ? e.detail.value : null
+  if (raw === null && e && e.target && typeof e.target.value === 'string') raw = e.target.value
+  if (raw === null) return
+  const clean = sanitizeAmountInput(raw)
+  // v-model 已把原值写进 form.amountStr，只有被约束改写时才回写
+  if (clean !== raw) form.amountStr = clean
+}
+
 /** 新增：清空表单。分类预选到**第一个一级**（不是二级）——
    既让用户一眼看到两级选择条，又不会没注意就存到「早餐」那种二级名下 */
 function openCreate() {
@@ -193,8 +217,15 @@ function openEdit(f) {
 }
 
 async function onSave() {
+  // '75.' → '75'：parseAmountToCents 不认尾巴上的点
+  const amount = normalizeAmountForSave(form.amountStr)
+  // 就地拦掉空金额/0 金额：交给 service 会抛「金额无效」，用户看到的是保存失败而不是"还没填"
+  if (!parseAmountToCents(amount)) {
+    uni.showToast({ title: '先输个金额嘛~', icon: 'none' })
+    return
+  }
   const input = {
-    amountStr: form.amountStr,
+    amountStr: amount,
     categoryId: form.categoryId,
     dayOfMonth: form.dayOfMonth,
     note: form.note,

@@ -89,7 +89,7 @@ import { ref, computed, watch } from 'vue'
 import { colorOf } from '../../utils/palette.js'
 import { selectionOf, nextOnPickTop } from '../../utils/category-ui.js'
 import { toDateStr } from '../../utils/date.js'
-import { clampFutureDate, minSelectableDate, sanitizeAmountInput } from '../../utils/entry.js'
+import { clampFutureDate, minSelectableDate, sanitizeAmountInput, normalizeAmountForSave } from '../../utils/entry.js'
 import { parseAmountToCents } from '../../utils/money.js'
 import TagChips from '../tag-chips/tag-chips.vue'
 
@@ -162,7 +162,7 @@ watch(
 
 function onSave() {
   // '75.' → '75'：parseAmountToCents 不认尾巴上的点，不规范化的话保存直接报「金额无效」
-  const amount = String(amountStr.value || '').replace(/\.$/, '')
+  const amount = normalizeAmountForSave(amountStr.value)
   // 在这里就拦掉空金额/0 金额：交给父级会抛「金额无效」，用户看到的是保存失败而不是"还没填"
   if (!parseAmountToCents(amount)) {
     uni.showToast({ title: '先输个金额嘛~', icon: 'none' })

@@ -62,6 +62,20 @@ export function minSelectableDate(today, years) {
 }
 
 /**
+ * 保存前规范化：削掉尾巴上的小数点（'75.' → '75'）。
+ *
+ * `sanitizeAmountInput` 刻意**保留**尾点（用户正在打小数，屏幕上要看得见），
+ * 但 `parseAmountToCents` / `parseAmountBound` 的正则不认 '75.' —— 直接拿过去会
+ * 返回 null，表现是「金额无效」或（筛选场景）条件被静默丢掉。所以存之前必须过这一刀。
+ *
+ * @param {*} raw 输入框现值
+ * @returns {string} 不含尾点的金额字符串
+ */
+export function normalizeAmountForSave(raw) {
+  return String(raw == null ? '' : raw).replace(/\.$/, '')
+}
+
+/**
  * 金额输入框的约束（纯函数，可单测）：只放行数字与一个小数点，
  * 整数 ≤9 位、小数 ≤2 位 —— 与 utils/money.js 的 parseAmountToCents 完全同口径，
  * 目的是不让「输入框里打得出来、一保存就报金额无效」这种事发生。
@@ -75,7 +89,7 @@ export function minSelectableDate(today, years) {
  * 数字键盘，但不再有浏览器那套不可预期的有效性拦截，约束由这个函数把守。
  *
  * @param {*} raw 输入框现值
- * @returns {string} 净化后的金额字符串（可能含尾巴上的点，如 '7.'）
+ * @returns {string} 净化后的金额字符串（可能含尾巴上的点，如 '7.'，保存前再走 normalizeAmountForSave）
  */
 export function sanitizeAmountInput(raw) {
   let s = String(raw == null ? '' : raw).replace(/[^\d.]/g, '')

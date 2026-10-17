@@ -53,12 +53,14 @@
         </scroll-view>
       </template>
 
-      <!-- 金额区间（元） -->
+      <!-- 金额区间（元）。type="text" + inputmode="decimal"：uni-app 会把 type="digit"
+           渲染成 <input type="number">，浏览器对中间态（如 '12.'）判无效并清空，
+           用户根本打不出小数金额；这里走文本通道，约束由 onAmountInput 把守 -->
       <text class="f-label">金额区间（元）</text>
       <view class="amount-row">
-        <input v-model="minStr" class="a-input" type="digit" placeholder="最低" />
+        <input v-model="minStr" class="a-input" type="text" inputmode="decimal" placeholder="最低" @input="onMinInput" />
         <text class="a-tilde">~</text>
-        <input v-model="maxStr" class="a-input" type="digit" placeholder="最高" />
+        <input v-model="maxStr" class="a-input" type="text" inputmode="decimal" placeholder="最高" @input="onMaxInput" />
       </view>
 
       <!-- 日期区间（含首尾两天） -->
@@ -92,7 +94,7 @@ import { computed, ref, watch } from 'vue'
 import { colorOf, tagColorOf } from '../../utils/palette.js'
 import { parseAmountBound } from '../../utils/money.js'
 import { dateStrStart, dateStrEndExclusive, toDateStr } from '../../utils/date.js'
-import { minSelectableDate } from '../../utils/entry.js'
+import { minSelectableDate, sanitizeAmountInput, normalizeAmountForSave } from '../../utils/entry.js'
 
 /**
  * 账单筛选面板（T4.3）：类型 / 分类多选 / 金额区间 / 日期区间。
@@ -178,13 +180,29 @@ function onEnd(e) {
   endStr.value = e.detail.value || ''
 }
 
+/**
+ * 金额区间输入约束（纯函数在 utils/entry.js，与编辑弹层/固定支出同一套）。
+ * 只放行数字与一个小数点、整数≤9位、小数≤2位 —— 与 parseAmountBound 同口径。
+ */
+function onAmountInput(e, target) {
+  let raw = e && e.detail && typeof e.detail.value === 'string' ? e.detail.value : null
+  if (raw === null && e && e.target && typeof e.target.value === 'string') raw = e.target.value
+  if (raw === null) return
+  const clean = sanitizeAmountInput(raw)
+  if (clean !== raw) target.value = clean
+}
+
+function onMinInput(e) { onAmountInput(e, minStr) }
+function onMaxInput(e) { onAmountInput(e, maxStr) }
+
 function onApply() {
   emit('apply', {
     type: type.value,
     categoryIds: catIds.value.slice(),
     tagIds: tagIds.value.slice(),
-    minCents: parseAmountBound(minStr.value),
-    maxCents: parseAmountBound(maxStr.value),
+    // '12.' → '12'：parseAmountBound 不认尾点，不规范化会把条件静默丢掉
+    minCents: parseAmountBound(normalizeAmountForSave(minStr.value)),
+    maxCents: parseAmountBound(normalizeAmountForSave(maxStr.value)),
     startTs: dateStrStart(startStr.value),
     endTs: dateStrEndExclusive(endStr.value)
   })

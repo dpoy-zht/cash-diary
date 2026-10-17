@@ -3,9 +3,10 @@ import {
   formAfterSaved,
   clampFutureDate,
   minSelectableDate,
-  sanitizeAmountInput
+  sanitizeAmountInput,
+  normalizeAmountForSave
 } from '../src/utils/entry.js'
-import { parseAmountToCents } from '../src/utils/money.js'
+import { parseAmountToCents, parseAmountBound } from '../src/utils/money.js'
 
 describe('entry / 连续记账的表单收敛（T3.1）', () => {
   it('清空金额与备注，保留类型/分类/日期', function () {
@@ -133,5 +134,57 @@ describe('entry / 金额输入约束（编辑弹层，回归：type=digit 改不
   it('null / undefined 不抛异常', () => {
     expect(sanitizeAmountInput(null)).toBe('')
     expect(sanitizeAmountInput(undefined)).toBe('')
+  })
+})
+
+describe('entry / 保存前规范化 normalizeAmountForSave', () => {
+  /**
+   * sanitizeAmountInput 刻意保留尾巴上的点（用户正在打小数，屏幕上要看得见），
+   * 但 parseAmountToCents / parseAmountBound 的正则不认 '75.' ——
+   * 不过这一刀就会「金额无效」，或在筛选场景把条件静默丢掉。
+   */
+  it('削掉尾巴上的小数点', () => {
+    expect(normalizeAmountForSave('75.')).toBe('75')
+    expect(normalizeAmountForSave('0.')).toBe('0')
+    expect(normalizeAmountForSave('.')).toBe('')
+  })
+
+  it('不带尾点的值原样返回（幂等）', () => {
+    expect(normalizeAmountForSave('75')).toBe('75')
+    expect(normalizeAmountForSave('7.5')).toBe('7.5')
+    expect(normalizeAmountForSave('')).toBe('')
+    expect(normalizeAmountForSave('0.05')).toBe('0.05')
+  })
+
+  it('只削一个尾点，不动中间的点', () => {
+    expect(normalizeAmountForSave('7.5.')).toBe('7.5')
+  })
+
+  it('净化 + 规范化：非零金额一定能过 parseAmountToCents', () => {
+    const ok = ['7', '7.', '7.5', '0.05', '75.00', '123456789', '123456789.99']
+    ok.forEach(function (s) {
+      const out = normalizeAmountForSave(sanitizeAmountInput(s))
+      expect(parseAmountToCents(out)).not.toBe(null)
+    })
+  })
+
+  it('空 / 纯点 / 0 金额过不了 parseAmountToCents（既有契约：交易不能记 0 元）', () => {
+    const bad = ['', '.', '0', '0.', '0.0', '0.00']
+    bad.forEach(function (s) {
+      const out = normalizeAmountForSave(sanitizeAmountInput(s))
+      expect(parseAmountToCents(out)).toBe(null)
+    })
+  })
+
+  it('筛选场景：尾点规范化后条件不再被静默丢掉', () => {
+    // 不过这一刀时 parseAmountBound('12.') → null（正则不匹配）→ 上限被当成"不限"
+    expect(parseAmountBound('12.')).toBe(null)
+    expect(parseAmountBound(normalizeAmountForSave('12.'))).toBe(1200)
+    expect(parseAmountBound(normalizeAmountForSave(''))).toBe(null)
+  })
+
+  it('null / undefined 不抛异常', () => {
+    expect(normalizeAmountForSave(null)).toBe('')
+    expect(normalizeAmountForSave(undefined)).toBe('')
   })
 })
