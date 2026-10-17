@@ -375,6 +375,10 @@ function group(intStr) {
  * - 算式中 → 表达式原样（用户要看得见自己按了什么）
  * - 已算出结果 → 金额（千分位 + 两位小数）
  * - 纯数字输入中 → 千分位整数 + 已输入的小数（不补小数位：输入 '19.9' 就显示 '19.9'，与原行为一致）
+ *
+ * ⚠️ **小数点必须原样显示**：这里曾经走 `normalizeOperand`，而它会把尾巴上的点削掉
+ * （'7.' → '7'），于是用户按了 `.` 屏幕毫无反应 —— 看不到自己按上没有，也不敢接着按数字。
+ * 那是真实反馈过的 bug。现在只补前导零（'.5' → '0.5'），尾巴上的点一个字不动。
  */
 export function calcDisplay(state) {
   const st = state || initialCalcState()
@@ -386,8 +390,9 @@ export function calcDisplay(state) {
   if (containsOperator(expr)) return expr
   const cur = currentOperand(expr)
   if (!cur) return '0.00'
-  const s = normalizeOperand(cur)
-  if (s === null) return '0.00'
+  // 只补前导零，不削尾点：normalizeOperand 是给"求值/保存"用的（那边 '7.' 该等于 7），
+  // 展示要用户看到的原样。两条路刻意分开，别合回去。
+  const s = cur.charAt(0) === '.' ? '0' + cur : cur
   const parts = s.split('.')
   return group(parts[0]) + (parts.length === 2 ? '.' + parts[1] : '')
 }

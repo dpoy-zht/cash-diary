@@ -238,6 +238,25 @@ describe('页面展示与可提交金额', () => {
     expect(calcDisplay(initialCalcState())).toBe('0.00')
   })
 
+  it('小数点必须实时显示（ Regression：按了 . 屏幕没反应）', () => {
+    // 曾经这里走 normalizeOperand，它会把尾巴上的点削掉：'7.' → '7'，
+    // 于是用户按了小数点，顶部金额一动不动，既没法确认按上没有，也不敢接着按数字。
+    expect(calcDisplay(press(['7', '.']))).toBe('7.')
+    expect(calcDisplay(press(['7', '.', '5']))).toBe('7.5')
+    // 首位小数点：自动补 0，点也要在
+    expect(calcDisplay(press(['.']))).toBe('0.')
+    expect(calcDisplay(press(['.', '5']))).toBe('0.5')
+    // 算式中按小数点同样要可见
+    expect(calcDisplay(press(['3', '+', '5', '.']))).toBe('3+5.')
+  })
+
+  it('小数点显示不影响保存值（尾巴上的点由 calcAmountText 削）', () => {
+    // 展示保留 '7.'，但保存必须拿到 '7' —— 两条路刻意分开，别为了显示把求值也改了
+    expect(calcAmountText(press(['7', '.']))).toBe('7')
+    expect(parseAmountToCents(calcAmountText(press(['7', '.'])))).toBe(700)
+    expect(calcAmountText(press(['7', '.', '5']))).toBe('7.5')
+  })
+
   it('算式中展示表达式本身（让用户看见自己按了什么）', () => {
     expect(calcDisplay(press(['3', '+', '5', '×', '2']))).toBe('3+5×2')
   })

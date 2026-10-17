@@ -60,3 +60,30 @@ export function minSelectableDate(today, years) {
   base.setFullYear(base.getFullYear() - n)
   return toDateStr(base.getTime())
 }
+
+/**
+ * 金额输入框的约束（纯函数，可单测）：只放行数字与一个小数点，
+ * 整数 ≤9 位、小数 ≤2 位 —— 与 utils/money.js 的 parseAmountToCents 完全同口径，
+ * 目的是不让「输入框里打得出来、一保存就报金额无效」这种事发生。
+ *
+ * ⚠️ **为什么约束要自己写，而不是靠 `<input type="digit">`**：
+ * uni-app 会把 `digit` 渲染成 `<input type="number">`，而浏览器对 number 输入框的
+ * 「输入中间态」（比如正在打 `7.`）会判无效并清空，uni-app 内部那套
+ * `resolveDigitDecimalPoint` 补丁还会在 blur 时把小数点削掉。实际表现就是
+ * 「编辑记录时金额改不动、小数点输不进去」—— 真机反馈过的 bug。
+ * 改用 `type="text" + inputmode="decimal"` 走文本通道后，手机端仍是带小数点的
+ * 数字键盘，但不再有浏览器那套不可预期的有效性拦截，约束由这个函数把守。
+ *
+ * @param {*} raw 输入框现值
+ * @returns {string} 净化后的金额字符串（可能含尾巴上的点，如 '7.'）
+ */
+export function sanitizeAmountInput(raw) {
+  let s = String(raw == null ? '' : raw).replace(/[^\d.]/g, '')
+  const dot = s.indexOf('.')
+  // 只保留第一个小数点，其余直接去掉（'7.5.5' → '7.55'）
+  if (dot !== -1) s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '')
+  const parts = s.split('.')
+  if (parts[0].length > 9) parts[0] = parts[0].slice(0, 9)
+  if (parts.length === 2 && parts[1].length > 2) parts[1] = parts[1].slice(0, 2)
+  return parts.join('.')
+}

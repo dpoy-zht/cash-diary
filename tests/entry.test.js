@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { formAfterSaved, clampFutureDate, minSelectableDate } from '../src/utils/entry.js'
+import {
+  formAfterSaved,
+  clampFutureDate,
+  minSelectableDate,
+  sanitizeAmountInput
+} from '../src/utils/entry.js'
+import { parseAmountToCents } from '../src/utils/money.js'
 
 describe('entry / 连续记账的表单收敛（T3.1）', () => {
   it('清空金额与备注，保留类型/分类/日期', function () {
@@ -72,5 +78,60 @@ describe('entry / 未来日期拦截（T3.3）', () => {
     expect(minSelectableDate('2026-09-29')).toBe('2021-09-29')
     expect(minSelectableDate('2026-09-29', 1)).toBe('2025-09-29')
     expect(/^\d{4}-\d{2}-\d{2}$/.test(minSelectableDate('2026-01-01'))).toBe(true)
+  })
+})
+
+describe('entry / 金额输入约束（编辑弹层，回归：type=digit 改不动金额）', () => {
+  /**
+   * 背景：编辑弹层的金额框原来写 `type="digit"`，uni-app 会把它渲染成
+   * `<input type="number">`。浏览器对 number 输入框的「输入中间态」（如 '7.'）
+   * 判无效并清空，uni-app 内部的 resolveDigitDecimalPoint 补丁还会在 blur 时
+   * 把小数点削掉 —— 真机上表现为「编辑记录时金额改不动、小数点输不进去」。
+   * 现在改成 type="text" + inputmode="decimal"，约束由 sanitizeAmountInput 把守。
+   */
+  it('数字与小数点原样通过（含正在输入的尾巴上的点）', () => {
+    expect(sanitizeAmountInput('7')).toBe('7')
+    expect(sanitizeAmountInput('7.')).toBe('7.')
+    expect(sanitizeAmountInput('7.5')).toBe('7.5')
+    expect(sanitizeAmountInput('0.05')).toBe('0.05')
+    expect(sanitizeAmountInput('')).toBe('')
+  })
+
+  it('非数字字符一律剥掉（粘贴、手滑、桌面端全键盘都能打进来）', () => {
+    expect(sanitizeAmountInput('7a5')).toBe('75')
+    expect(sanitizeAmountInput('¥75.00')).toBe('75.00')
+    expect(sanitizeAmountInput('-75')).toBe('75')
+    expect(sanitizeAmountInput(' 7 5 ')).toBe('75')
+    expect(sanitizeAmountInput('abc')).toBe('')
+  })
+
+  it('只保留第一个小数点', () => {
+    expect(sanitizeAmountInput('7.5.5')).toBe('7.55')
+    expect(sanitizeAmountInput('..')).toBe('.')
+    expect(sanitizeAmountInput('7..5')).toBe('7.5')
+  })
+
+  it('整数最多 9 位、小数最多 2 位（与 parseAmountToCents 同口径）', () => {
+    expect(sanitizeAmountInput('1234567890')).toBe('123456789')
+    expect(sanitizeAmountInput('7.555')).toBe('7.55')
+    expect(sanitizeAmountInput('1234567890.99')).toBe('123456789.99')
+  })
+
+  it('净化结果必须都能被 parseAmountToCents 接受（除了空与纯点）', () => {
+    const samples = ['7', '7.', '7.5', '0.05', '75.00', '123456789', '123456789.99', '']
+    samples.forEach(function (s) {
+      const clean = sanitizeAmountInput(s)
+      if (clean === '' || clean === '.') {
+        expect(parseAmountToCents(clean)).toBe(null)
+      } else {
+        // '7.' 这类尾巴带点的由页面保存前再削一次，这里先确认剥掉点后一定能解析
+        expect(parseAmountToCents(clean.replace(/\.$/, ''))).not.toBe(null)
+      }
+    })
+  })
+
+  it('null / undefined 不抛异常', () => {
+    expect(sanitizeAmountInput(null)).toBe('')
+    expect(sanitizeAmountInput(undefined)).toBe('')
   })
 })
