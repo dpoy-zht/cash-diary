@@ -1,5 +1,7 @@
 <template>
-  <view v-if="record" class="sheet-wrap">
+  <!-- 不要在这里加 v-if="record"：挂载由父级（home.vue 的 v-if="editing"）控制，
+     与 filter-sheet 保持一致 —— 整件创建/销毁，editing 为 null 时组件直接卸载。 -->
+  <view class="sheet-wrap">
     <view class="mask" @click="$emit('close')"></view>
     <view class="sheet">
       <view class="sheet-grip"></view>
@@ -8,21 +10,23 @@
         <text class="stype">{{ record.type === 'expense' ? '支出' : '收入' }}</text>
       </view>
 
-      <!-- 金额：type="text" + inputmode="decimal"，别改回 type="digit"。
-           uni-app 会把 digit 渲染成 <input type="number">，而浏览器对 number 输入框的
-           "输入中间态"（比如正在打 '7.'）会判无效并清空，uni-app 内部那套
-           resolveDigitDecimalPoint 补丁还会在 blur 时把小数点削掉 —— 表现为
-           「编辑时金额改不动 / 小数点输不进去」。改文本通道后手机端仍是带小数点的
-           数字键盘（inputmode 负责），但不再有浏览器那套不可预期的有效性拦截，
-           输入约束由下面的 onAmountInput 自己把守。 -->
-      <input
-        v-model="amountStr"
-        class="sheet-input"
-        type="text"
-        inputmode="decimal"
-        placeholder="金额"
-        @input="onAmountInput"
-      />
+      <!-- 金额：完全照抄 fixed.vue 里「已验证可输入」的那套结构（amt-box 包一层 +
+           ¥ 前缀 + 输入框只写 flex:1，**不写 width / padding / border**）。
+           App 端 <input> 会被包一层 uni-input，width:100% 会把内层原生 input 挤成零尺寸，
+           表现为「有边框有底色但字不显示、也点不动」。 -->
+      <text class="sheet-label">金额（元）</text>
+      <view class="amt-box">
+        <text class="amt-y">¥</text>
+        <input
+          v-model="amountStr"
+          class="amt-input"
+          type="text"
+          inputmode="decimal"
+          placeholder="0.00"
+          placeholder-class="amt-ph"
+          @input="onAmountInput"
+        />
+      </view>
 
       <!-- 一级 chip 条 -->
       <scroll-view scroll-x class="sheet-cats" :show-scrollbar="false">
@@ -61,7 +65,19 @@
       </scroll-view>
 
       <view class="sheet-meta">
-        <input v-model="note" class="sheet-input sheet-note" type="text" placeholder="备注（可选）" maxlength="30" />
+        <!-- 备注框与上面的金额框同款处理：border / padding / 背景全交给外层 .note-box，
+             输入框本身只留 flex + 字体。App 端 <input> 外层的 uni-input 会照常画出边框底色，
+             但 border/padding 写在输入框自己身上时，内层原生 input 会被压成零尺寸
+             （文字不显示、也收不到点击）。真机验证：金额框这么改之后立刻可输入。 -->
+        <view class="note-box">
+          <input
+            v-model="note"
+            class="note-input"
+            placeholder="备注（可选）"
+            placeholder-class="sheet-ph"
+            maxlength="30"
+          />
+        </view>
         <picker mode="date" :value="dateStr" :start="minDateStr" :end="todayStr" @change="onDateChange">
           <view class="sheet-date">{{ dateStr.slice(5) }}</view>
         </picker>
@@ -135,8 +151,11 @@ function onDateChange(e) {
  * 整数 ≤9 位、小数 ≤2 位 —— 与 utils/money.js 的 parseAmountToCents 同口径，
  * 避免「输入框里能打出来、一保存就报金额无效」。
  *
- * 为什么不靠 input 的 type 把守：见模板注释，type="digit" 在 uni-app 里会变成
- * number，浏览器那套有效性拦截不可预期（还会在 blur 时削掉小数点）。
+ * 为什么不靠 input 的 type 把守：type="digit" 在 uni-app 里会被渲染成
+ * <input type="number">，浏览器对"输入中间态"（如正在打 '7.'）判无效并清空，
+ * uni-app 内部的 resolveDigitDecimalPoint 补丁还会在 blur 时把小数点削掉 ——
+ * 这就是最早「编辑时金额改不动 / 小数点输不进去」的根因。走文本通道后手机端
+ * 仍是带小数点的数字键盘（inputmode 负责），约束由本函数自己把守。
  */
 function onAmountInput(e) {
   // uni-app 的 input 事件值在 e.detail.value；个别端点为空时退回读 DOM，别直接把字段清空
@@ -231,19 +250,38 @@ function onSave() {
   padding: 3px 10px;
   border-radius: var(--cd-r-pill);
 }
-.sheet-input {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid var(--cd-line);
-  border-radius: var(--cd-r-sm);
-  background: var(--cd-bg);
-  padding: 12px 14px;
-  font-family: var(--cd-font);
-  font-size: 16px;
+/* 金额框：结构与 fixed.vue 的 amt-box / amt-input 保持一致（那边真机验证过可输入）。
+   关键：.amt-input **不写 width / padding / border / box-sizing**，
+   边框与内边距交给外层 .amt-box。 */
+.sheet-label {
+  display: block;
+  font-size: 12px;
   font-weight: 700;
+  color: var(--cd-ink-2);
+  margin: 2px 0 8px;
+}
+.amt-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--cd-primary-lt);
+  border-radius: var(--cd-r-pill);
+  padding: 10px 16px;
+  margin-bottom: 8px;
+}
+.amt-y {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--cd-icon);
+}
+.amt-input {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 800;
   color: var(--cd-ink);
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 10px;
+}
+.amt-ph {
+  color: var(--cd-ink-2);
 }
 .sheet-cats {
   white-space: nowrap;
@@ -260,23 +298,36 @@ function onSave() {
   gap: 8px;
 }
 /* 备注 + 日期同一行：备注自适应宽度，日期按钮不换行 */
-.sheet-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--cd-ink-2);
-  margin: 2px 0 8px;
-}
 .sheet-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
 }
-.sheet-note {
+/* 备注框：与金额框同款 —— 外层 .note-box 承担 border/padding/背景，
+   输入框本身只留 flex + 字体。border/padding 直接写在 <input> 上时，
+   App 端内层原生 input 会被压成零尺寸（字不显示、点不动），真机已确认。 */
+.note-box {
   flex: 1;
   min-width: 0;
-  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  border: 1px solid var(--cd-line);
+  border-radius: var(--cd-r-sm);
+  background: var(--cd-bg);
+  padding: 12px 14px;
+}
+.note-input {
+  flex: 1;
+  font-family: var(--cd-font);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cd-ink);
+}
+/* 占位符配色：与 fixed.vue 的 amt-ph 同口径，正文 --cd-ink-2 */
+.sheet-ph {
+  color: var(--cd-ink-2);
 }
 .sheet-date {
   border: 1px solid var(--cd-line);
@@ -324,7 +375,10 @@ function onSave() {
   gap: 10px;
   margin-top: 6px;
 }
-.sheet-actions button {
+/* 用类选择器而不是 `button` 标签：uni-app 把 <button> 渲染成 <uni-button>，
+   标签选择器匹配不到（filter-sheet 里同一个坑，这里一并修掉）。 */
+.sheet-actions .btn-del,
+.sheet-actions .btn-save {
   flex: 1;
   height: 50px;
   line-height: 50px;
@@ -333,7 +387,8 @@ function onSave() {
   font-size: 16px;
   font-weight: 800;
 }
-.sheet-actions button::after {
+.sheet-actions .btn-del::after,
+.sheet-actions .btn-save::after {
   border: none;
 }
 .btn-del {

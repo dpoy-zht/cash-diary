@@ -126,7 +126,12 @@
       @close="filterShow = false"
       @apply="onApplyFilter"
     />
+    <!-- v-if 挂在这里（而不是组件内部 v-if="record"），与 filter-sheet 保持一致：
+         整件创建/销毁，editing 为 null 时组件直接卸载。
+         openEdit/onSave/onRemove/closeEdit 都会置空 editing，行为与原内部 v-if 等价。
+         （真正的金额框故障在 edit-sheet 的输入框 CSS 上，与这里无关，见该组件注释。） -->
     <edit-sheet
+      v-if="editing"
       :record="editing"
       :tree="editingTree"
       :tags="tagStore.list"
