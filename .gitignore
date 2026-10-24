@@ -100,3 +100,7 @@ demo/assets/nailong/*.webp
 demo/assets/nailong/_raw/
 # 奶龙记账 v2.0 基准原型用的 milo 表情包（用户提供，仅个人自用，不随仓库分发）
 demo/assets/milo/*.png
+
+# ===== 发布标记 / 本地记忆（不该进仓库）=====
+.wbapp_*.genie
+.workbuddy/

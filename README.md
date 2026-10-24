@@ -71,7 +71,7 @@ npm install
 # 3. 跑测试（先看奶蛙的脸色）
 npm test
 
-# 4. 浏览器里跑起来（内存存储，自带空白数据）
+# 4. 浏览器里跑起来（数据存在 localStorage，刷新/关页面都不丢）
 npm run dev:h5
 ```
 
@@ -79,12 +79,34 @@ npm run dev:h5
 
 | 命令 | 作用 |
 |---|---|
-| `npm run dev:h5` | H5 开发服务器（内存存储） |
+| `npm run dev:h5` | H5 开发服务器（localStorage 持久化） |
 | `npm run dev:app` | App 端开发构建 |
-| `npm run build:h5` | H5 生产构建 |
+| `npm run build:h5` | H5 生产构建（产物 `dist/build/h5`，可直接静态托管） |
 | `npm run build:app` | App 生产构建（产物 `dist/build/app`，云打包的输入） |
-| `npm test` | 跑全部单元测试（717 条） |
+| `npm test` | 跑全部单元测试（962 条） |
 | `npm run lint` | ESLint 检查 |
+
+### 🌐 网页版
+
+同一套代码既能打包成 Android App，也能直接跑在浏览器里：
+
+```bash
+npm run build:h5                 # 产出 dist/build/h5（纯静态，1MB 出头）
+python -m http.server 8080 --directory dist/build/h5
+# 打开 http://localhost:8080
+```
+
+- **数据持久化**：网页版走 `src/db/memory.js`，直接读写 `localStorage`
+  （key `cashDiary.memory.v1`），带 200ms 防抖合并写和配额超限提示。
+  刷新、关标签页、重开浏览器，账目都在。
+- **桌面 / 移动自适应**：`src/styles/h5-shell.css` 里用 `@media (min-width: 560px)`
+  分界——窄屏保持全屏移动布局，宽屏收成居中的应用画布（520px，圆角+阴影+暖色氛围底）。
+  这个文件由 `main.js` 用 `// #ifdef H5` 条件编译引入，**App 构建完全不含它**。
+- **桌面交互**：补了鼠标手型、hover 反馈、输入框焦点环、可选中文字。
+- **示例数据**：首次打开是空库，空状态里有一个「载入示例账目」按钮
+  （H5 专属），一键灌入 9 笔模拟账目，方便立刻看到列表分组和统计圆环的效果。
+
+在线体验：https://naiwa-ledger.app.workbuddy.host/?sharecode=HKSDNKLVIM
 
 想在手机上跑 / 打出 APK：
 

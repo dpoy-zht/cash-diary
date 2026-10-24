@@ -1,0 +1,233 @@
+/**
+ * 网页版（H5）专属样式 —— **仅在 H5 构建中引入**（见 main.js 的 #ifdef H5）。
+ *
+ * 为什么单独一个文件、而不是写进 App.vue 的 <style>：
+ * 1. App 端绝不能受网页版改造影响。条件编译引入能保证 `uni build -p app`
+ *    根本不会把这份 CSS 打进产物，比在 App.vue 里用 /* #ifdef H5 *\/ 好审计。
+ * 2. 网页版的桌面画布、鼠标反馈、焦点环是一整套东西，集中在一处便于改。
+ *
+ * 设计取舍（重要）：
+ * 全站 0 处 rpx、1183 处 px，是典型的移动优先设计，没有任何 max-width 容器。
+ * 直接搬上桌面会把余额卡、分段控件、空状态卡片全部横向拉满 1440px，
+ * 视觉层级彻底塌掉（改造前实测截图确认过）。
+ *
+ * 这里选择「居中的应用画布」而不是「重排成两栏」：
+ * - 记账 App 的信息密度是围绕单列手机屏设计的，硬拆两栏要重写 11 个页面，
+ *   风险远大于收益；
+ * - 画布方案让移动端与桌面端共用同一套布局，只在外层加容器的感觉，
+ *   移动端（< 560px）一行都不受影响。
+ */
+
+/* ---------------- 桌面画布 ---------------- */
+
+html,
+body {
+  background: #efe2c6;
+}
+
+@media (min-width: 560px) {
+  /* 画布自己滚动，窗口不滚 —— 否则外层会多出一条滚动条 */
+  body {
+    overflow: hidden;
+  }
+
+  /* 暖色氛围底色，让画布两侧不是一块死白 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at 10% 12%, rgba(255, 217, 61, 0.62), transparent 40%),
+      radial-gradient(circle at 88% 86%, rgba(255, 176, 74, 0.5), transparent 44%),
+      linear-gradient(160deg, #fff8e4 0%, #eeddb8 100%);
+    z-index: 0;
+  }
+
+  /**
+   * ⚠️ 关键一行：transform: translateZ(0)。
+   *
+   * 页面里共有 10 处 position: fixed（底部 tab 栏、编辑/筛选/标签/WebDAV 弹层、
+   * 各页 FAB）。fixed 元素默认相对**视口**定位，只给 uni-app 加 max-width
+   * 是关不住它们的 —— 底部栏和弹层会横跨整个浏览器窗口。
+   *
+   * CSS 规范：带 transform 的祖先会成为 fixed 后代的**包含块**。
+   * 加这一个属性，10 处 fixed 元素全部自动收进画布，不用改任何组件代码
+   * （也就不会碰到 App 端）。
+   * 实测：tab 栏 bottom 精确落在画布 bottom（872），滚动画布时纹丝不动。
+   */
+  uni-app {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 520px;
+    height: calc(100vh - 56px);
+    margin: 28px auto;
+    overflow: hidden;
+    border-radius: 26px;
+    background: #fff8e7;
+    box-shadow:
+      0 28px 72px rgba(93, 78, 55, 0.22),
+      0 2px 0 rgba(255, 255, 255, 0.6) inset;
+    transform: translateZ(0);
+  }
+
+  /**
+   * 画布内的滚动容器。
+   *
+   * uni-app H5 默认由窗口承担滚动；画布固定高度 + overflow: hidden 之后，
+   * 页面内容（实测 pageBody 990px > 画布 844px）会被直接裁掉而不是滚动。
+   * 把滚动交给 uni-page-wrapper，底部 tab 栏因为上面那个 transform
+   * 仍然固定在画布底部，不会跟着内容滚走。
+   */
+  uni-page-wrapper {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  /* 桌面滚动条：细一点、和奶油色主题协调，别用系统默认的粗灰条 */
+  uni-page-wrapper::-webkit-scrollbar {
+    width: 10px;
+  }
+  uni-page-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(93, 78, 55, 0.18);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  uni-page-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(93, 78, 55, 0.32);
+    background-clip: content-box;
+  }
+  uni-page-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ---------------- 桌面鼠标 / 键盘反馈 ----------------
+ * 只在"有精确指针"的设备上启用（(hover: hover) and (pointer: fine)），
+ * 触屏手机不会命中，避免粘住 hover 态。
+ *
+ * 选择器来自脚本解析：把 src 下所有带 @click / @tap / hover-class 的元素
+ * 的 class 提取出来，排除遮罩类（mask / tc-mask）—— 那些不该显示手型。
+ */
+
+@media (hover: hover) and (pointer: fine) {
+  uni-button,
+  .add-row,
+  .arr,
+  .btn-apply,
+  .btn-clear,
+  .btn-del,
+  .btn-ghost,
+  .btn-save,
+  .btn-y,
+  .cat,
+  .cat-chip,
+  .chip,
+  .color-cell,
+  .create-btn,
+  .d-clear,
+  .detail-chip,
+  .dev-row,
+  .dl-row,
+  .dot-btn,
+  .filter-btn,
+  .fix-btn,
+  .fn-right,
+  .fn-row,
+  .fn-switch,
+  .goal-card,
+  .icon-btn,
+  .icon-cell,
+  .key,
+  .list-row,
+  .pchip,
+  .plus,
+  .quick-chip,
+  .report-entry,
+  .row-del,
+  .row-main,
+  .s-clear,
+  .seg-item,
+  .sheet-btn,
+  .sheet-close,
+  .sm-clear,
+  .sub-chip,
+  .tab,
+  .tag-chip,
+  .tag-new,
+  .tc-btn,
+  .tc-cancel,
+  .tc-edit,
+  .tc-ok,
+  .tc-sheet,
+  .ts-item,
+  .tx-item,
+  .type-item {
+    cursor: pointer;
+  }
+
+  /* 悬停时轻微提亮 + 抬起，给"可点"一个视觉确认；不用 transform，
+     避免和组件自己的过渡动画（如 chip 的 scale）打架 */
+  uni-button:hover,
+  .btn-apply:hover,
+  .btn-clear:hover,
+  .btn-del:hover,
+  .btn-ghost:hover,
+  .btn-save:hover,
+  .btn-y:hover,
+  .chip:hover,
+  .cat-chip:hover,
+  .detail-chip:hover,
+  .icon-btn:hover,
+  .plus:hover,
+  .quick-chip:hover,
+  .seg-item:hover,
+  .sheet-btn:hover,
+  .sub-chip:hover,
+  .tab:hover,
+  .tag-chip:hover,
+  .tag-new:hover,
+  .tc-btn:hover,
+  .tx-item:hover {
+    filter: brightness(0.96);
+  }
+
+  /* 输入类：手型改成文本插入符 */
+  uni-input,
+  uni-textarea,
+  .a-input,
+  .amt-input,
+  .note-input,
+  input,
+  textarea {
+    cursor: text;
+  }
+
+  /* 桌面端允许选中文字（App 端全局禁选是移动端习惯，网页里反而不方便复制金额/备注） */
+  .tx-item,
+  .dl-row,
+  .list-row,
+  .detail-chip {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* ---------------- 输入框焦点可见 ----------------
+ * 键盘 Tab 走查时得看得见落点。用黄色的外发光，和主题一致，
+ * 不用浏览器默认的蓝色描边。
+ */
+@media (hover: hover) and (pointer: fine) {
+  uni-input:focus-within,
+  .a-input:focus-within,
+  .amt-box:focus-within,
+  .note-box:focus-within {
+    outline: none;
+  }
+  .amt-box:focus-within,
+  .note-box:focus-within,
+  .a-input:focus-within {
+    box-shadow: 0 0 0 3px rgba(255, 217, 61, 0.55);
+  }
+}

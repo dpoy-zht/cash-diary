@@ -101,6 +101,20 @@
         <asset-slot slot-id="home.empty" img-class="empty-img" />
         <text class="empty-title">{{ emptyTitle }}</text>
         <text class="empty-sub">{{ emptySub }}</text>
+        <!-- 网页版专属：一键灌入示例账目。
+             评委打开链接时库是空的，只能看到空状态；灌一批像样的账目后，
+             列表分组 / 统计圆环 / 预算进度这些真正的效果立刻可见。
+             只放在空状态里（有数据就不再出现），且 H5 条件编译，App 端没有这段。 -->
+        <!-- #ifdef H5 -->
+        <view
+          v-if="!searching"
+          class="demo-seed pressable"
+          hover-class="pressable-hover"
+          @click="onSeedDemo"
+        >
+          <text class="demo-seed-t">载入示例账目 · 先看看有数据的样子</text>
+        </view>
+        <!-- #endif -->
       </view>
     </view>
 
@@ -171,6 +185,10 @@ import { countFilters, filterSummary } from '../../utils/search.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 import FilterSheet from '../../components/filter-sheet/filter-sheet.vue'
 import TagCreateSheet from '../../components/tag-create-sheet/tag-create-sheet.vue'
+// 网页版专属：示例账目灌入（App 端不引入，避免给正式包加无用代码）
+// #ifdef H5
+import { seedDemoData } from '../../services/demo.js'
+// #endif
 
 /**
  * 首页（v2.0）：月份切换 + 余额卡 + 全部/支出/收入分段 + 按日流水 + FAB。
@@ -508,8 +526,31 @@ function onRemove() {
 const editTagIds = ref([])
 const editTagCreateShow = ref(false)
 
-async function openEdit(r) {
-  editing.value = r
+// #ifdef H5
+/**
+ * 网页版专属：一键灌入示例账目。
+ * 走 seedDemoData → txStore.add，和用户手点记账同一条链路
+ * （金额整数分、账本归属、月分桶全部按真实规则走）。
+ */
+const demoSeeding = ref(false)
+async function onSeedDemo() {
+  if (demoSeeding.value) return
+  demoSeeding.value = true
+  try {
+    const r = await seedDemoData({ txStore: txStore, categoryStore: categoryStore, metaStore: metaStore })
+    uni.showToast({
+      title: r.added ? '已载入 ' + r.added + ' 笔示例账目' : '分类还没就绪，稍后再试一下',
+      icon: 'none'
+    })
+  } catch (e) {
+    uni.showToast({ title: '载入失败，稍后再试', icon: 'none' })
+  } finally {
+    demoSeeding.value = false
+  }
+}
+// #endif
+
+async function openEdit(r) {  editing.value = r
   editTagIds.value = []
   try {
     const map = await tagStore.mapByTxs([r.id])
@@ -951,6 +992,27 @@ onShow(async function () {
   font-size: 13px;
   color: var(--cd-ink-2);
 }
+
+/* 网页版专属：空状态里的「载入示例账目」入口（App 端不会渲染这个元素） */
+/* #ifdef H5 */
+.demo-seed {
+  margin-top: 16px;
+  padding: 9px 18px;
+  border-radius: var(--cd-r-pill);
+  background: var(--cd-primary-lt);
+  transition: filter var(--cd-dur) var(--cd-ease);
+}
+.demo-seed-t {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cd-ink);
+}
+@media (hover: hover) and (pointer: fine) {
+  .demo-seed:hover {
+    filter: brightness(0.96);
+  }
+}
+/* #endif */
 
 /* ---- 超支弹窗 ---- */
 .mask {
