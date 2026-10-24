@@ -1,0 +1,104 @@
+/**
+ * 深色令牌层 —— 桌面两栏布局专用（H5-only，由 main.js 条件编译引入）。
+ *
+ * 设计原则（重要）：
+ * 1. **只覆盖令牌，不覆盖组件**。全站色值都走 `var(--cd-*)`，
+ *    所以在祖先上加 `.cd-dark` 一处，卡片、列表、弹层、底部栏会自动整体翻转。
+ *    绝不在各组件里写深色特例 —— 否则以后加一个深色页面就要再来一遍。
+ * 2. **对比度先算再选，不靠肉眼**。深色底会把中灰读成"还行"，
+ *    实测常常只有 2.x:1。所有取值由 `src/utils/contrast.js` 计算，
+ *    并由 `tests/theme-dark.test.js` 断言，改色改坏了测试会红。
+ * 3. **层次靠三件事叠加，不只靠底色差**：
+ *    bg（页面）→ surface（卡片）→ surface-2（抬升：表头/行 hover），
+ *    再加可见边线 `--cd-line`（对 surface ≥3:1，满足 WCAG 1.4.11 非文本对比度）
+ *    与柔和分隔线 `--cd-line-soft`（密集列表用，避免整屏都是硬线）。
+ *
+ * 达标基线（实测值见测试）：
+ *   正文 `--cd-ink` / `--cd-surface`        ≈ 14.6:1
+ *   次文字 `--cd-ink-2` / `--cd-surface`    ≈ 8.6:1
+ *   边线 `--cd-line` / `--cd-surface`       ≈ 3.6:1
+ *   按钮字 `--cd-btn-ink` / `--cd-primary`  ≈ 12.2:1
+ *
+ * ⚠️ 不要在 .vue 文件里写死这里出现的色值 —— `tests/tokens.test.js` 会拦。
+ */
+
+/* ⚠️ 选择器必须**同时覆盖 App.vue 的三个令牌落点**：
+ *     App.vue 写的是 `:root, page, uni-page-body { --cd-*: ... }`。
+ *     CSS 变量按最近的祖先取值，而 `uni-page-body` 是一个真实元素 ——
+ *     只在 html 上覆盖的话，页面内所有元素仍然继承 `uni-page-body` 那份浅色值，
+ *     于是会出现"面板还是白的、但只在深色文件里定义的新令牌却生效了"的半翻转状态
+ *     （这个坑第一次实现时实测踩到了）。
+ *     所以下面三行缺一不可。
+ *
+ * 特异性用 `html.cd-dark ...`（0,1,1）压过 App.vue 的 `uni-page-body`（0,0,1）
+ * 与 `:root`（0,1,0），不依赖样式表的加载顺序。
+ *
+ * 类由 home.vue 在进入宽屏两栏模式时加到 documentElement（见 applyDeskClasses）。 */
+html.cd-dark,
+html.cd-dark page,
+html.cd-dark uni-page-body {
+  /* ---- 层次底色：页面 → 卡片 → 抬升 ---- */
+  --cd-bg: #0e0b08; /* 页面底（最沉） */
+  --cd-surface: #1c1710; /* 卡片/面板 */
+  --cd-surface-2: #262017; /* 抬升一档：表头、行悬停、输入框底 */
+
+  /* ---- 边线：两档 ----
+     --cd-line        结构边线 / 输入框 / 面板轮廓（≥3:1，满足 1.4.11）
+     --cd-line-soft   卡片内密集分隔线（≥1.5:1，可见但不喧宾夺主） */
+  --cd-line: #7d6e58;
+  --cd-line-soft: #4d4236;
+
+  /* ---- 文字（暖白系，保品牌调性，不用纯白 #fff 以免刺眼）---- */
+  --cd-ink: #f6f0e6; /* 主文字 ≈14.6:1 */
+  --cd-ink-2: #cdbfa6; /* 次文字 / 占位 ≈8.6:1 */
+  --cd-ink-3: #7d6f5b; /* 弱化：仅装饰，不承载正文 */
+
+  /* ---- 品牌蛋黄：深底上反而更跳，保持原色 ---- */
+  --cd-primary: #ffd93d;
+  --cd-primary-deep: #ffc93c;
+  --cd-primary-lt: #3b3320; /* "浅黄底"在深色下变成深黄调面板 */
+  --cd-primary-mid: #4a3f22;
+  /* 蛋黄按钮上的字：深色模式必须用深字（白字在黄上只有 1.3:1） */
+  --cd-btn-ink: #241c0c;
+
+  /* ---- 语义色：深底上提高明度 ---- */
+  --cd-income: #6ee7a8;
+  --cd-income-lt: #2b4a38;
+  --cd-danger-ink: #ff9a94;
+
+  /* ---- 图标与次级棕 ---- */
+  --cd-icon: #dccfb7;
+  --cd-icon-2: #ab9c82;
+  --cd-icon-3: #7d6f5b;
+  --cd-gold-ink: #ffd54a;
+
+  /* ---- 点缀 ---- */
+  --cd-blush: #5a3538;
+  --cd-heart: #ff8fa3;
+
+  /* ---- 渐变：余额卡从"大黄块"改为深调面板 + 蛋黄描边，
+         否则整块高亮在深色页面上会晃眼 ---- */
+  --cd-grad-brand: linear-gradient(135deg, #322a1b 0%, #241e15 100%);
+  --cd-grad-head: linear-gradient(180deg, #241e15 0%, #1c1710 100%);
+
+  /* ---- 阴影：深色下靠黑影做抬升，暖黄发光几乎不可见 ---- */
+  --cd-sh-card: 0 2px 14px rgba(0, 0, 0, 0.45);
+  --cd-sh-btn: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- 画布外的氛围底色 ----
+ * h5-shell.css 铺的是浅色暖调渐变；深色模式下要换成同一色系的暗版，
+ * 否则深色画布会浮在一块亮黄底上。
+ * 这几个字面色值不进令牌体系：它们只属于"氛围背景"这一处，
+ * 且是渐变（令牌层只收纯色），放这里比硬塞一个语义错误的令牌更清楚。
+ */
+html.cd-dark body {
+  background: var(--cd-bg);
+}
+
+html.cd-dark body::before {
+  background:
+    radial-gradient(circle at 10% 12%, rgba(255, 217, 61, 0.1), transparent 42%),
+    radial-gradient(circle at 88% 86%, rgba(255, 176, 74, 0.07), transparent 46%),
+    linear-gradient(160deg, #17120c 0%, #090705 100%);
+}

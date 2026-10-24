@@ -9,6 +9,43 @@
       </view>
     </view>
 
+    <!-- 网页版宽屏：两栏布局（左列表 / 右统计）。
+         状态仍全部由本页持有，desk-view 只做展示与事件派发 —— 这样分组/查表/汇总
+         只有一份实现，缩窄窗口退回单列时月份与搜索词也不会丢。见该组件注释。 -->
+    <!-- #ifdef H5 -->
+    <desk-view
+      v-if="deskMode"
+      :month-label="ymText"
+      :records="filtered"
+      :groups="groups"
+      :categories="categoryStore.list"
+      :summary="txStore.summary"
+      :budget-line="budgetLine"
+      :budget-over="budgetLineOver"
+      :seg="seg"
+      :segs="segs"
+      :kw="kw"
+      :searching="searching"
+      :filter-count="filterCount"
+      :cat-of="catOf"
+      :tags-of="tagsOf"
+      :index-of="indexOf"
+      :day-label="dayLabel"
+      :day-expense="dayExpenseCents"
+      @shift-month="shiftMonth"
+      @seg="seg = $event"
+      @kw-change="onDeskKw"
+      @clear-search="onClearKw"
+      @filter="filterShow = true"
+      @add="goAdd"
+      @edit="openEdit"
+      @seed="onSeedDemo"
+    />
+    <!-- #endif -->
+
+    <!-- 移动端单列内容（窄屏浏览器，或 App 端 —— deskMode 在非 H5 恒为 false） -->
+    <template v-if="!deskMode">
+
     <!-- 月份切换 -->
     <view class="month-switch">
       <view class="arr" @click="shiftMonth(-1)">‹</view>
@@ -117,6 +154,8 @@
         <!-- #endif -->
       </view>
     </view>
+    </template>
+    <!-- /移动端单列内容 -->
 
     <!-- 超支弹窗（真实预算判断触发，见 maybeAlertOver） -->
     <view v-if="overShow" class="mask" @click="overShow = false">
@@ -165,8 +204,8 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { onShow, onHide } from '@dcloudio/uni-app'
 import { useTxStore } from '../../stores/tx.js'
 import { useCategoryStore } from '../../stores/category.js'
 import { useMetaStore } from '../../stores/meta.js'
@@ -185,9 +224,10 @@ import { countFilters, filterSummary } from '../../utils/search.js'
 import { svgMaskStyle } from '../../utils/svg-icon.js'
 import FilterSheet from '../../components/filter-sheet/filter-sheet.vue'
 import TagCreateSheet from '../../components/tag-create-sheet/tag-create-sheet.vue'
-// 网页版专属：示例账目灌入（App 端不引入，避免给正式包加无用代码）
+// 网页版专属：示例账目灌入 + 宽屏两栏布局（App 端不引入，避免给正式包加无用代码）
 // #ifdef H5
 import { seedDemoData } from '../../services/demo.js'
+import DeskView from '../../components/desk-view/desk-view.vue'
 // #endif
 
 /**
@@ -369,6 +409,72 @@ const emptySub = computed(function () {
 
 /* ---- 组合筛选（T4.3）：入口角标 + 条件摘要 + 应用 ---- */
 const filterShow = ref(false)
+
+/**
+ * 网页版宽屏两栏模式。
+ *
+ * 非 H5 恒为 false —— 模板里的 `v-if="!deskMode"` 于是永远走移动端分支，
+ * App 端行为与改造前完全一致（只多一次恒真判断，不渲染额外节点）。
+ *
+ * 门槛 1024 必须与 `desk-layout.css` 里的 `@media (min-width: 1024px)` 对齐：
+ * 两边对不上会出现「JS 认为该走两栏、CSS 却没放宽画布」的错位。
+ */
+const deskMode = ref(false)
+
+// #ifdef H5
+const DESK_MIN_WIDTH = 1024
+function syncDeskMode() {
+  deskMode.value = typeof window !== 'undefined' && window.innerWidth >= DESK_MIN_WIDTH
+}
+
+/**
+ * 主题/画布的开关类挂在 `documentElement` 上。
+ *
+ * 为什么不用组件内的 scoped 类：底部 tab 栏、编辑/筛选弹层都不在 desk-view 内部，
+ * 只把类加在自己的根上，它们会留在浅色主题里，跟深色两栏拼在一起很难看。
+ *
+ * 代价是这两个类会影响**所有**页面（它们挂在 html 上），所以必须跟着本页的
+ * 可见性开关 —— 见下面 onShow / onHide 的处理。否则跳到统计页会变成
+ * "1240px 宽的深色单列"，比原来更糟。
+ */
+function applyDeskClasses(on) {
+  if (typeof document === 'undefined' || !document.documentElement) return
+  const el = document.documentElement
+  if (on) {
+    el.classList.add('cd-dark', 'cd-desk')
+  } else {
+    el.classList.remove('cd-dark', 'cd-desk')
+  }
+}
+
+/** 两栏模式下打开记一笔（与底部 tab 栏的加号走同一条路径） */
+function goAdd() {
+  uni.navigateTo({ url: '/pages/add/add' })
+}
+
+/** 两栏模式的搜索框：先同步 v-model，再走首页原有的防抖搜索 */
+function onDeskKw(v) {
+  kw.value = v
+  onKwInput()
+}
+
+// 宽度变化时切换模式，并同步主题类
+watch(deskMode, function (on) {
+  applyDeskClasses(on)
+})
+
+onMounted(function () {
+  syncDeskMode()
+  applyDeskClasses(deskMode.value)
+  window.addEventListener('resize', syncDeskMode)
+})
+
+onUnmounted(function () {
+  window.removeEventListener('resize', syncDeskMode)
+  applyDeskClasses(false)
+})
+// #endif
+
 const filterCount = computed(function () {
   return countFilters(txStore.searchFilters)
 })
@@ -585,6 +691,13 @@ const iconBell = svgMaskStyle('M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6v-5c0-3.07-
 const iconHeart = svgMaskStyle('M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z')
 
 onShow(async function () {
+  // #ifdef H5
+  // 两栏模式的深色/宽画布类挂在 html 上，会波及所有页面 ——
+  // 回到本页时重新确认宽度并挂上（离开时由 onHide 摘掉）
+  syncDeskMode()
+  applyDeskClasses(deskMode.value)
+  // #endif
+
   // 让顶部日期跟着现实走（跨零点/跨天回来都要是新的）
   nowTs.value = Date.now()
 
@@ -609,6 +722,17 @@ onShow(async function () {
   // 自动备份：每 24h 静默写一份到应用私有目录（仅 App 端，失败不打扰）
   backupService.autoBackupIfNeeded().catch(function () { /* 静默 */ })
 })
+
+// #ifdef H5
+/**
+ * 离开本页时摘掉深色/宽画布类。
+ * 这两个类挂在 html 上，留着会影响后续打开的页面（如统计页会变成
+ * 1240px 宽的深色单列 —— 比不改还糟）。onShow 里再挂回来。
+ */
+onHide(function () {
+  applyDeskClasses(false)
+})
+// #endif
 </script>
 
 <style scoped>
